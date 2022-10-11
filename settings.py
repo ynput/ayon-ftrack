@@ -37,6 +37,12 @@ class FtrackNextTaskUpdate(BaseSettingsModel):
         title="Ignored statuses", default_factory=list)
     name_sorting: bool = True
 
+    @validator("mapping")
+    def ensure_unique_names(cls, value):
+        """Ensure name fields within the lists have unique names."""
+        ensure_unique_names(value)
+        return value
+
 
 class FtrackServiceHandlers(BaseSettingsModel):
     status_update: FtrackUserStatusUpdate = Field(title="Update status on task action")
