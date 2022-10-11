@@ -45,36 +45,11 @@ class FtrackNextTaskUpdate(BaseSettingsModel):
 
 
 class FtrackServiceHandlers(BaseSettingsModel):
-    status_update: FtrackUserStatusUpdate = Field(title="Update status on task action")
-    next_task_update: FtrackNextTaskUpdate = Field(title="Update status on next task")
+    """Settings for event handlers running in ftrack service."""
+
+    status_update: FtrackUserStatusUpdate = Field(
+        title="Update status on task action")
+    next_task_update: FtrackNextTaskUpdate = Field(
+        title="Update status on next task")
 
 
-class FtrackServiceSettings(BaseSettingsModel):
-
-    username: str = Field(
-        "",
-        title="Ftrack user name",
-    )
-
-    api_key: str = Field(
-        "",
-        title="Ftrack API key",
-    )
-
-
-class FtrackSettings(BaseSettingsModel):
-    """Test addon settings."""
-
-    ftrack_server: str = Field(
-        "https://ftrackapp.com",
-        title="Ftrack server url",
-    )
-
-    events: FtrackServiceHandlers = Field(
-        title="Server service",
-    )
-
-    service_settings: FtrackServiceSettings = Field(
-        default_factory=FtrackServiceSettings,
-        title="Service settings",
-    )
