@@ -42,6 +42,19 @@ class FtrackAddon(BaseServerAddon):
                             ]
                         }
                     ]
+                },
+                "next_task_update": {
+                    "enabled": True,
+                    "mapping": [
+                        {
+                            "name": "Not Ready",
+                            "value": "Ready"
+                        }
+                    ],
+                    "ignored_statuses": [
+                        "Omitted"
+                    ],
+                    "name_sorting": False
                 }
             }
         })

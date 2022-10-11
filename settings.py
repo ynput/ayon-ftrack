@@ -3,16 +3,16 @@ from pydantic import Field, validator
 from openpype.settings import BaseSettingsModel, ensure_unique_names
 
 
-class StatusMapping(BaseSettingsModel):
+class UserTaskStatusMapping(BaseSettingsModel):
     _layout = "expanded"
     name: str
     value: list[str] = Field(default_factory=list)
 
 
-class FtrackStatusUpdate(BaseSettingsModel):
+class FtrackUserStatusUpdate(BaseSettingsModel):
     _isGroup = True
     enabled: bool = True
-    mapping: list[StatusMapping] = Field(
+    mapping: list[UserTaskStatusMapping] = Field(
         default_factory=list, title="Status mapping")
 
     @validator("mapping")
@@ -22,8 +22,25 @@ class FtrackStatusUpdate(BaseSettingsModel):
         return value
 
 
+class NextTaskStatusMapping(BaseSettingsModel):
+    _layout = "expanded"
+    name: str
+    value: str
+
+
+class FtrackNextTaskUpdate(BaseSettingsModel):
+    _isGroup = True
+    enabled: bool = True
+    mapping: list[NextTaskStatusMapping] = Field(
+        title="Status Mappings", default_factory=list)
+    ignored_statuses: list[str] = Field(
+        title="Ignored statuses", default_factory=list)
+    name_sorting: bool = True
+
+
 class FtrackServiceHandlers(BaseSettingsModel):
-    status_update: FtrackStatusUpdate = Field(title="Update status on task action")
+    status_update: FtrackUserStatusUpdate = Field(title="Update status on task action")
+    next_task_update: FtrackNextTaskUpdate = Field(title="Update status on next task")
 
 
 class FtrackServiceSettings(BaseSettingsModel):
