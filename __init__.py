@@ -17,3 +17,30 @@ class FtrackAddon(BaseServerAddon):
 
     def setup(self):
         pass
+
+    async def get_default_settings(self):
+        settings_model_cls = self.get_settings_model()
+        return settings_model_cls(**{
+            "ftrack_server": "",
+            "events": {
+                "status_update": {
+                    "enabled": True,
+                    "mapping": [
+                        {
+                            "name": "In Progress",
+                            "value": ["__any__"]
+                        }, {
+                            "name": "Ready",
+                            "value": ["Not Ready"]
+                        }, {
+                            "name": "__ignore__",
+                            "value": [
+                                "in progress",
+                                "omitted",
+                                "on hold"
+                            ]
+                        }
+                    ]
+                }
+            }
+        })
