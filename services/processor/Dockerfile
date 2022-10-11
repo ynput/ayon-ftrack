@@ -13,4 +13,4 @@ WORKDIR /service
 RUN poetry config virtualenvs.create false \
  && poetry install --no-interaction --no-ansi
 
-CMD ["python", "-m", "leecher"]
+CMD ["python", "-m", "processor"]

@@ -7,11 +7,12 @@ from .listener import listen
 
 IGNORE_TOPICS = {}
 
+
 def create_description(payload: dict[str, Any]):
-    uname = payload.get("source", {}).get("user", {}).get("username") or "somebody"
+    uname = payload.get("source", {}).get("user", {}).get("username")
     if not uname:
-        return "Somewhat happended"
-    return f"{uname} did something"
+        return f"Leeched {payload['topic']}"
+    return f"Leeched {payload['topic']} by {uname}"
 
 
 def callback(event):
