@@ -43,12 +43,12 @@ class ProcessEventHub(ftrack_api.event.hub.EventHub):
             "sequential": True,
         }
         response = ayclient.api.post("enroll", json=payload)
-        if not response:
-            if response.status_code == 404:
-                logging.info("Nothing to do")
-            else:
-                logging.error("Something's wrong")
+        if response.status_code == 204:
             return None
+        elif response.status_code >= 400:
+            logging.error(response)
+            return None
+
         return response.json()
 
     def finish_job(self, job):
