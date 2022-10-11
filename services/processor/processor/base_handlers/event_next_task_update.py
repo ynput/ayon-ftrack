@@ -114,6 +114,11 @@ class NextTaskUpdate(BaseEvent):
             ))
             return
 
+        mod_mapping = {}
+        for item in event_settings["mapping"]:
+            mod_mapping[item["name"]] = item["value"]
+        event_settings["mapping"] = mod_mapping
+
         statuses = session.query("Status").all()
 
         entities_info = self.filter_by_status_state(_entities_info, statuses)
