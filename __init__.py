@@ -12,7 +12,8 @@ class FtrackAddon(BaseServerAddon):
     settings_model: Type[FtrackSettings] = FtrackSettings
     frontend_scopes: dict[str, Any] = {"project": {"sidebar": "hierarchy"}}
     services = {
-        "leecher": {"image": "openpype/ay-ftrack-leecher:1.0.0"}
+        "leecher": {"image": "openpype/ay-ftrack-leecher:1.0.0"},
+        "processor": {"image": "openpype/ay-ftrack-processor:1.0.0"}
     }
 
     def setup(self):

@@ -12,12 +12,23 @@ class StatusMapping(BaseSettingsModel):
 class FtrackStatusUpdate(BaseSettingsModel):
     _isGroup = True
     enabled: bool = True
-    mapping: list[StatusMapping] = Field(default_factory=list)
+    mapping: list[StatusMapping] = Field(default_factory=list, title="Status mapping")
 
 
 class FtrackServiceHandlers(BaseSettingsModel):
-    status_update: FtrackStatusUpdate = Field(
-        title="Update status on task action"
+    status_update: FtrackStatusUpdate = Field(title="Update status on task action")
+
+
+class FtrackServiceSettings(BaseSettingsModel):
+
+    username: str = Field(
+        "",
+        title="Ftrack user name",
+    )
+
+    api_key: str = Field(
+        "",
+        title="Ftrack API key",
     )
 
 
@@ -30,14 +41,10 @@ class FtrackSettings(BaseSettingsModel):
     )
 
     events: FtrackServiceHandlers = Field(
-        title="Server service"
-    )
-    user: str = Field(
-        "",
-        title="Ftrack user name",
+        title="Server service",
     )
 
-    key: str = Field(
-        "",
-        title="Ftrack API key",
+    service_settings: FtrackServiceSettings = Field(
+        default_factory=FtrackServiceSettings,
+        title="Service settings",
     )
