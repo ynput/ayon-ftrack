@@ -1,6 +1,6 @@
-from pydantic import Field
+from pydantic import Field, validator
 
-from openpype.settings import BaseSettingsModel
+from openpype.settings import BaseSettingsModel, ensure_unique_names
 
 
 class StatusMapping(BaseSettingsModel):
@@ -12,7 +12,14 @@ class StatusMapping(BaseSettingsModel):
 class FtrackStatusUpdate(BaseSettingsModel):
     _isGroup = True
     enabled: bool = True
-    mapping: list[StatusMapping] = Field(default_factory=list, title="Status mapping")
+    mapping: list[StatusMapping] = Field(
+        default_factory=list, title="Status mapping")
+
+    @validator("mapping")
+    def ensure_unique_names(cls, value):
+        """Ensure name fields within the lists have unique names."""
+        ensure_unique_names(value)
+        return value
 
 
 class FtrackServiceHandlers(BaseSettingsModel):
