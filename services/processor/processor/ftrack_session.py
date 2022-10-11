@@ -29,12 +29,9 @@ class ProcessEventHub(ftrack_api.event.hub.EventHub):
 
     def prepare_server_connection(self):
         try:
-            assert ayclient.get("users/me")
-
+            assert ayclient.api.get("users/me")
         except Exception:
-            self.log.error(
-                "Server \"{}\" is not responding, exiting."
-            )
+            logging.error('Server "{}" is not responding, exiting.')
             sys.exit(0)
 
     def get_next_ftrack_event(self):
@@ -58,14 +55,13 @@ class ProcessEventHub(ftrack_api.event.hub.EventHub):
         event_id = job["id"]
         source_id = job["dependsOn"]
         source_event = ayclient.api.get(f"events/{source_id}").json()
-        print("Source event:", source_event)
+        print(f"Processing event... {source_id}")
 
         description = f"Processed {source_event['description']}"
 
         req_data = {
             "sender": ayclient.config.service_name,
             "description": description,
-            "payload": {"value": "whatevr"},
             "status": "finished",
         }
 
@@ -86,13 +82,13 @@ class ProcessEventHub(ftrack_api.event.hub.EventHub):
                 continue
 
             src_job = ayclient.api.get(f"events/{job['dependsOn']}").json()
-            ftrack_event = src_job["payload"]
+            ftrack_event = ftrack_api.event.base.Event(**src_job["payload"])
             self._handle(ftrack_event)
 
             self.finish_job(job)
 
             # Additional special processing of events.
-            if ftrack_event['topic'] == 'ftrack.meta.disconnected':
+            if ftrack_event["topic"] == "ftrack.meta.disconnected":
                 break
 
             if duration is not None:
@@ -109,49 +105,57 @@ class ProcessEventHub(ftrack_api.event.hub.EventHub):
 
 
 class CustomEventHubSession(ftrack_api.session.Session):
-    '''An isolated session for interaction with an ftrack server.'''
+    """An isolated session for interaction with an ftrack server."""
+
     def __init__(
-        self, server_url=None, api_key=None, api_user=None, auto_populate=True,
-        plugin_paths=None, cache=None, cache_key_maker=None,
-        auto_connect_event_hub=False, schema_cache_path=None,
-        plugin_arguments=None, timeout=60, **kwargs
+        self,
+        server_url=None,
+        api_key=None,
+        api_user=None,
+        auto_populate=True,
+        plugin_paths=None,
+        cache=None,
+        cache_key_maker=None,
+        auto_connect_event_hub=False,
+        schema_cache_path=None,
+        plugin_arguments=None,
+        timeout=60,
+        **kwargs,
     ):
         self.kwargs = kwargs
 
         super(ftrack_api.session.Session, self).__init__()
-        self.logger = logging.getLogger(
-            __name__ + '.' + self.__class__.__name__
-        )
+        self.logger = logging.getLogger(__name__ + "." + self.__class__.__name__)
         self._closed = False
 
         if server_url is None:
-            server_url = os.environ.get('FTRACK_SERVER')
+            server_url = os.environ.get("FTRACK_SERVER")
 
         if not server_url:
             raise TypeError(
                 'Required "server_url" not specified. Pass as argument or set '
-                'in environment variable FTRACK_SERVER.'
+                "in environment variable FTRACK_SERVER."
             )
 
         self._server_url = server_url
 
         if api_key is None:
             api_key = os.environ.get(
-                'FTRACK_API_KEY',
+                "FTRACK_API_KEY",
                 # Backwards compatibility
-                os.environ.get('FTRACK_APIKEY')
+                os.environ.get("FTRACK_APIKEY"),
             )
 
         if not api_key:
             raise TypeError(
                 'Required "api_key" not specified. Pass as argument or set in '
-                'environment variable FTRACK_API_KEY.'
+                "environment variable FTRACK_API_KEY."
             )
 
         self._api_key = api_key
 
         if api_user is None:
-            api_user = os.environ.get('FTRACK_API_USER')
+            api_user = os.environ.get("FTRACK_API_USER")
             if not api_user:
                 try:
                     api_user = getpass.getuser()
@@ -161,8 +165,8 @@ class CustomEventHubSession(ftrack_api.session.Session):
         if not api_user:
             raise TypeError(
                 'Required "api_user" not specified. Pass as argument, set in '
-                'environment variable FTRACK_API_USER or one of the standard '
-                'environment variables used by Python\'s getpass module.'
+                "environment variable FTRACK_API_USER or one of the standard "
+                "environment variables used by Python's getpass module."
             )
 
         self._api_user = api_user
@@ -174,12 +178,8 @@ class CustomEventHubSession(ftrack_api.session.Session):
         new_api = hasattr(self.__class__, "record_operations")
 
         if new_api:
-            self._record_operations = collections.defaultdict(
-                lambda: True
-            )
-            self._auto_populate = collections.defaultdict(
-                lambda: auto_populate
-            )
+            self._record_operations = collections.defaultdict(lambda: True)
+            self._auto_populate = collections.defaultdict(lambda: auto_populate)
         else:
             self.record_operations = True
             self.auto_populate = auto_populate
@@ -190,9 +190,7 @@ class CustomEventHubSession(ftrack_api.session.Session):
 
         # Enforce always having a memory cache at top level so that the same
         # in-memory instance is returned from session.
-        self.cache = ftrack_api.cache.LayeredCache([
-            ftrack_api.cache.MemoryCache()
-        ])
+        self.cache = ftrack_api.cache.LayeredCache([ftrack_api.cache.MemoryCache()])
 
         if cache is not None:
             if callable(cache):
@@ -235,9 +233,9 @@ class CustomEventHubSession(ftrack_api.session.Session):
 
         self._plugin_paths = plugin_paths
         if self._plugin_paths is None:
-            self._plugin_paths = os.environ.get(
-                'FTRACK_EVENT_PLUGIN_PATH', ''
-            ).split(os.pathsep)
+            self._plugin_paths = os.environ.get("FTRACK_EVENT_PLUGIN_PATH", "").split(
+                os.pathsep
+            )
 
         self._discover_plugins(plugin_arguments=plugin_arguments)
 
@@ -247,11 +245,11 @@ class CustomEventHubSession(ftrack_api.session.Session):
             if schema_cache_path is None:
                 schema_cache_path = appdirs.user_cache_dir()
                 schema_cache_path = os.environ.get(
-                    'FTRACK_API_SCHEMA_CACHE_PATH', schema_cache_path
+                    "FTRACK_API_SCHEMA_CACHE_PATH", schema_cache_path
                 )
 
             schema_cache_path = os.path.join(
-                schema_cache_path, 'ftrack_api_schema_cache.json'
+                schema_cache_path, "ftrack_api_schema_cache.json"
             )
 
         self.schemas = self._load_schemas(schema_cache_path)
@@ -262,26 +260,17 @@ class CustomEventHubSession(ftrack_api.session.Session):
         self._configure_locations()
         self.event_hub.publish(
             ftrack_api.event.base.Event(
-                topic='ftrack.api.session.ready',
-                data=dict(
-                    session=self
-                )
+                topic="ftrack.api.session.ready", data=dict(session=self)
             ),
-            synchronous=True
+            synchronous=True,
         )
 
     def _create_event_hub(self):
         return ftrack_api.event.hub.EventHub(
-            self._server_url,
-            self._api_user,
-            self._api_key
+            self._server_url, self._api_user, self._api_key
         )
 
 
 class OPServerSession(CustomEventHubSession):
     def _create_event_hub(self):
-        return ProcessEventHub(
-            self._server_url,
-            self._api_user,
-            self._api_key
-        )
+        return ProcessEventHub(self._server_url, self._api_user, self._api_key)

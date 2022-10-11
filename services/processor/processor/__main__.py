@@ -18,7 +18,7 @@ def main():
     settings = addon_settings()
     service_settings = settings["service_settings"]
     session = OPServerSession(
-        settings["ftrack_url"],
+        settings["ftrack_server"],
         service_settings["api_key"],
         service_settings["username"]
     )
