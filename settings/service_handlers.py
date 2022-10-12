@@ -78,6 +78,13 @@ class SyncStatusTaskToParentMapping(BaseSettingsModel):
         default_factory=list,
     )
 
+    @validator("task_statuses")
+    def ensure_unique_names(cls, value):
+        """Ensure name fields within the lists have unique names."""
+
+        ensure_unique_names(value)
+        return value
+
 
 class SyncStatusTaskToParent(BaseSettingsModel):
     _isGroup = True
@@ -108,6 +115,13 @@ class SyncStatusTaskToVersion(BaseSettingsModel):
         default_factory=list,
     )
 
+    @validator("mapping")
+    def ensure_unique_names(cls, value):
+        """Ensure name fields within the lists have unique names."""
+
+        ensure_unique_names(value)
+        return value
+
 
 class SyncStatusVersionToTask(BaseSettingsModel):
     _isGroup = True
@@ -120,6 +134,13 @@ class SyncStatusVersionToTask(BaseSettingsModel):
         title="Skip on Asset types (short)",
         default_factory=list,
     )
+
+    @validator("mapping")
+    def ensure_unique_names(cls, value):
+        """Ensure name fields within the lists have unique names."""
+
+        ensure_unique_names(value)
+        return value
 
 
 class NextTaskStatusMapping(BaseSettingsModel):
@@ -186,35 +207,46 @@ class FtrackServiceHandlers(BaseSettingsModel):
 
     prepare_project: PrepareProjectAction = Field(
         title="Prepare Project",
+        default_factory=PrepareProjectAction,
     )
     sync_hier_entity_attributes: SyncHierarchicalAttributes = Field(
         title="Sync Hierarchical and Entity Attributes",
+        default_factory=SyncHierarchicalAttributes,
     )
     clone_review_session: CloneReviewAction = Field(
         title="Clone Review Session",
+        default_factory=CloneReviewAction,
     )
     thumbnail_updates: ThumbnailHierarchyUpdates = Field(
         title="Update Hierarchy thumbnails",
+        default_factory=ThumbnailHierarchyUpdates,
     )
     # This should not be here!
     status_update: UserStatusUpdate = Field(
         title="Update status on task action",
+        default_factory=UserStatusUpdate,
     )
     status_task_to_parent: SyncStatusTaskToParent = Field(
         title="Sync status from Task to Parent",
+        default_factory=SyncStatusTaskToParent,
     )
     status_task_to_version: SyncStatusTaskToVersion = Field(
         title="Sync status from Task to Version",
+        default_factory=SyncStatusTaskToVersion,
     )
     status_version_to_task: SyncStatusVersionToTask = Field(
         title="Sync status from Version to Task",
+        default_factory=SyncStatusVersionToTask,
     )
     next_task_update: NextTaskUpdate = Field(
         title="Update status on next task",
+        default_factory=NextTaskUpdate,
     )
     transfer_values_of_hierarchical_attributes: TransferHierNonHierAttrsAction = Field(
         title="Action to transfer hierarchical attribute values",
+        default_factory=TransferHierNonHierAttrsAction,
     )
     create_daily_review_session: CreateDailyReviewSession = Field(
         title="Create daily review session",
+        default_factory=CreateDailyReviewSession,
     )
