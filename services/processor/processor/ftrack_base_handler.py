@@ -8,7 +8,7 @@ import traceback
 import time
 import logging
 
-from ay_client import get_addon_settings
+from ayclient import addon_settings
 
 import ftrack_api
 
@@ -605,7 +605,7 @@ class BaseHandler(object):
 
         project_settings = project_settings_by_id.get(project_name)
         if not project_settings:
-            project_settings = {"ftrack": get_addon_settings()}
+            project_settings = {"ftrack": addon_settings()}
             event["data"]["project_settings"][project_name] = project_settings
         return project_settings
 

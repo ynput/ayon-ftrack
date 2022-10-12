@@ -34,8 +34,8 @@ def callback(event):
 if __name__ == "__main__":
     settings = ayclient.addon_settings()
     listen(
-        url=settings["server"],
-        api_key=settings["key"],
-        username=settings["user"],
+        url=settings["ftrack_server"],
+        api_key=settings["service_settings"]["api_key"],
+        username=settings["service_settings"]["username"],
         callback=callback,
     )
