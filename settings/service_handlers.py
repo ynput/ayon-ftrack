@@ -53,23 +53,6 @@ class ThumbnailHierarchyUpdates(BaseSettingsModel):
     levels: int = Field(title="Levels", ge=0)
 
 
-class UserStatusUpdate(BaseSettingsModel):
-    # TODO move out of here - artist machine logic
-    _isGroup = True
-    enabled: bool = True
-    mapping: list[DictWithStrList] = Field(
-        title="Status mapping",
-        default_factory=list,
-    )
-
-    @validator("mapping")
-    def ensure_unique_names(cls, value):
-        """Ensure name fields within the lists have unique names."""
-
-        ensure_unique_names(value)
-        return value
-
-
 class SyncStatusTaskToParentMapping(BaseSettingsModel):
     _isGroup = True
     new_status: str = Field(title="New parent status")
@@ -220,11 +203,6 @@ class FtrackServiceHandlers(BaseSettingsModel):
     thumbnail_updates: ThumbnailHierarchyUpdates = Field(
         title="Update Hierarchy thumbnails",
         default_factory=ThumbnailHierarchyUpdates,
-    )
-    # This should not be here!
-    status_update: UserStatusUpdate = Field(
-        title="Update status on task action",
-        default_factory=UserStatusUpdate,
     )
     status_task_to_parent: SyncStatusTaskToParent = Field(
         title="Sync status from Task to Parent",
