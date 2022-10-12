@@ -106,7 +106,10 @@ class NextTaskUpdate(BaseEvent):
 
         # Load status mapping from presets
         event_settings = (
-            project_settings["ftrack"]["events"][self.settings_key]
+            project_settings
+            ["ftrack"]
+            ["service_event_handlers"]
+            [self.settings_key]
         )
         if not event_settings["enabled"]:
             self.log.debug("Project \"{}\" has disabled {}.".format(

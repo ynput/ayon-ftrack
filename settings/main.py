@@ -31,7 +31,7 @@ class FtrackSettings(BaseSettingsModel):
         title="Ftrack server url",
     )
 
-    events: FtrackServiceHandlers = Field(
+    service_event_handlers: FtrackServiceHandlers = Field(
         title="Server Actions/Events",
     )
 
