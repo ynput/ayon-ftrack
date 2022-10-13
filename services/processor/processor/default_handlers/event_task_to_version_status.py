@@ -110,6 +110,10 @@ class TaskToVersionStatus(BaseEventHandler):
         event_settings = (
             project_settings["ftrack"]["events"][self.settings_key]
         )
+        mod_mapping = {}
+        for item in event_settings["mapping"]:
+            mod_mapping[item["name"]] = item["value"]
+        event_settings["mapping"] = mod_mapping
         _status_mapping = event_settings["mapping"]
         if not event_settings["enabled"]:
             self.log.debug("Project \"{}\" has disabled {}.".format(

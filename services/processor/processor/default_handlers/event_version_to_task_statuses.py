@@ -66,6 +66,11 @@ class VersionToTaskStatus(BaseEventHandler):
             ))
             return
 
+        mod_mapping = {}
+        for item in event_settings["mapping"]:
+            mod_mapping[item["name"]] = item["value"]
+        event_settings["mapping"] = mod_mapping
+
         _status_mapping = event_settings["mapping"] or {}
         status_mapping = {
             key.lower(): value
