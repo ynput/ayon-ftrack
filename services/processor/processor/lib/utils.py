@@ -7,8 +7,8 @@ def get_addon_resource_url(*args):
     parts = [
         server_url,
         "addons",
-        ayclient.addon_name,
-        ayclient.addon_version,
+        ayclient.config.addon_name,
+        ayclient.config.addon_version,
         "public"
     ]
     parts.extend(args)
