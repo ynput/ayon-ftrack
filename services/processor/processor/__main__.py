@@ -20,7 +20,8 @@ def main():
     session = OPServerSession(
         settings["ftrack_server"],
         service_settings["api_key"],
-        service_settings["username"]
+        service_settings["username"],
+        auto_connect_event_hub=True
     )
     server = FtrackServer(handler_paths)
     server.run_server(session)
