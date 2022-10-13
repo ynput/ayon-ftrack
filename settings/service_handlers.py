@@ -2,18 +2,8 @@ from pydantic import Field, validator
 
 from openpype.settings import BaseSettingsModel, ensure_unique_names
 
-ROLES_TITLE = "Roles for action"
 
-
-class DictWithStrList(BaseSettingsModel):
-    """Common model for Dictionary like object with list of strings as value.
-
-    This model requires 'ensure_unique_names' validation.
-    """
-
-    _layout = "expanded"
-    name: str = Field("")
-    value: list[str] = Field(default_factory=list)
+from .common import DictWithStrList, ROLES_TITLE
 
 
 class PrepareProjectAction(BaseSettingsModel):
