@@ -30,7 +30,7 @@ class ThumbnailEvents(BaseEventHandler):
         event_settings = (
             project_settings
             ["ftrack"]
-            ["events"]
+            ["service_event_handlers"]
             [self.settings_key]
         )
         if not event_settings["enabled"]:

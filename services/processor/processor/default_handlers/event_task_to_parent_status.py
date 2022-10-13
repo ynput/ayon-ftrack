@@ -299,7 +299,10 @@ class TaskStatusToParent(BaseEventHandler):
 
     def prepare_settings(self, project_settings, project_name):
         event_settings = (
-            project_settings["ftrack"]["events"][self.settings_key]
+            project_settings
+            ["ftrack"]
+            ["service_event_handlers"]
+            [self.settings_key]
         )
 
         if not event_settings["enabled"]:

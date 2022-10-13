@@ -108,7 +108,10 @@ class TaskToVersionStatus(BaseEventHandler):
         )
 
         event_settings = (
-            project_settings["ftrack"]["events"][self.settings_key]
+            project_settings
+            ["ftrack"]
+            ["service_event_handlers"]
+            [self.settings_key]
         )
         mod_mapping = {}
         for item in event_settings["mapping"]:

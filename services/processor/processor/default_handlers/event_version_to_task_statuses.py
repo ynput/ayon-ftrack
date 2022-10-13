@@ -57,7 +57,10 @@ class VersionToTaskStatus(BaseEventHandler):
 
         # Load status mapping from presets
         event_settings = (
-            project_settings["ftrack"]["events"]["status_version_to_task"]
+            project_settings
+            ["ftrack"]
+            ["service_event_handlers"]
+            ["status_version_to_task"]
         )
         # Skip if event is not enabled or status mapping is not set
         if not event_settings["enabled"]:

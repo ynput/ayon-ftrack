@@ -94,7 +94,7 @@ class PushFrameValuesToTaskEvent(BaseEventHandler):
         event_settings = (
             project_settings
             ["ftrack"]
-            ["events"]
+            ["service_event_handlers"]
             ["sync_hier_entity_attributes"]
         )
         # Skip if event is not enabled
