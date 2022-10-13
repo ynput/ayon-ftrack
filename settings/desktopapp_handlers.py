@@ -35,3 +35,8 @@ class FtrackDesktopAppHandlers(BaseSettingsModel):
         title="Application - Status change on launch",
         default_factory=ApplicationLaunchStatuses,
     )
+
+
+DEFAULT_DESKTOP_HANDLERS_SETTINGS = {
+    "application_launch_statuses": {},
+}

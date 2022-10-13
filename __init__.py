@@ -2,7 +2,7 @@ from typing import Any, Type
 
 from openpype.addons import BaseServerAddon
 
-from .settings import FtrackSettings
+from .settings import FtrackSettings, DEFAULT_VALUES
 
 
 class FtrackAddon(BaseServerAddon):
@@ -21,40 +21,4 @@ class FtrackAddon(BaseServerAddon):
 
     async def get_default_settings(self):
         settings_model_cls = self.get_settings_model()
-        return settings_model_cls(**{
-            "ftrack_server": "",
-            "events": {
-                "status_update": {
-                    "enabled": True,
-                    "mapping": [
-                        {
-                            "name": "In Progress",
-                            "value": ["__any__"]
-                        }, {
-                            "name": "Ready",
-                            "value": ["Not Ready"]
-                        }, {
-                            "name": "__ignore__",
-                            "value": [
-                                "in progress",
-                                "omitted",
-                                "on hold"
-                            ]
-                        }
-                    ]
-                },
-                "next_task_update": {
-                    "enabled": True,
-                    "mapping": [
-                        {
-                            "name": "Not Ready",
-                            "value": "Ready"
-                        }
-                    ],
-                    "ignored_statuses": [
-                        "Omitted"
-                    ],
-                    "name_sorting": False
-                }
-            }
-        })
+        return settings_model_cls(**DEFAULT_VALUES)

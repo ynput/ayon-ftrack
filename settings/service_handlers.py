@@ -221,3 +221,29 @@ class FtrackServiceHandlers(BaseSettingsModel):
         title="Create daily review session",
         default_factory=CreateDailyReviewSession,
     )
+
+
+DEFAULT_SERVICE_HANDLERS_SETTINGS = {
+    "prepare_project": {},
+    "sync_hier_entity_attributes": {},
+    "clone_review_session": {},
+    "thumbnail_updates": {},
+    "status_task_to_parent": {},
+    "status_task_to_version": {},
+    "status_version_to_task": {},
+    "next_task_update": {
+        "enabled": True,
+        "mapping": [
+            {
+                "name": "Not Ready",
+                "value": "Ready"
+            }
+        ],
+        "ignored_statuses": [
+            "Omitted"
+        ],
+        "name_sorting": False
+    },
+    "transfer_values_of_hierarchical_attributes": {},
+    "create_daily_review_session": {},
+}

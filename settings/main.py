@@ -2,8 +2,15 @@ from pydantic import Field
 
 from openpype.settings import BaseSettingsModel
 
-from .service_handlers import FtrackServiceHandlers
-from .desktopapp_handlers import FtrackDesktopAppHandlers
+from .service_handlers import (
+    FtrackServiceHandlers,
+    DEFAULT_SERVICE_HANDLERS_SETTINGS,
+)
+
+from .desktopapp_handlers import (
+    FtrackDesktopAppHandlers,
+    DEFAULT_DESKTOP_HANDLERS_SETTINGS,
+)
 
 
 class FtrackServiceSettings(BaseSettingsModel):
@@ -46,3 +53,14 @@ class FtrackSettings(BaseSettingsModel):
         default_factory=FtrackDesktopAppHandlers,
         title="User Actions/Events",
     )
+
+
+DEFAULT_VALUES = {
+    "ftrack_server": "",
+    "service_event_handlers": DEFAULT_SERVICE_HANDLERS_SETTINGS,
+    "service_settings": {
+        "username": "",
+        "api_key": ""
+    },
+    "user_handlers": DEFAULT_DESKTOP_HANDLERS_SETTINGS,
+}
