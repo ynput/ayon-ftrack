@@ -44,19 +44,11 @@ class ThumbnailHierarchyUpdates(BaseSettingsModel):
 
 
 class SyncStatusTaskToParentMapping(BaseSettingsModel):
-    _isGroup = True
     new_status: str = Field(title="New parent status")
-    task_statuses: list[DictWithStrList] = Field(
+    task_statuses: list[str] = Field(
         title="Task status",
         default_factory=list,
     )
-
-    @validator("task_statuses")
-    def ensure_unique_names(cls, value):
-        """Ensure name fields within the lists have unique names."""
-
-        ensure_unique_names(value)
-        return value
 
 
 class SyncStatusTaskToParent(BaseSettingsModel):
