@@ -5,6 +5,7 @@ import getpass
 import atexit
 import threading
 import time
+import queue
 import collections
 import appdirs
 
@@ -68,6 +69,16 @@ class ProcessEventHub(ftrack_api.event.hub.EventHub):
         res = ayclient.api.patch(f"events/{event_id}", json=req_data)
         assert res
 
+    def load_event_from_jobs(self):
+        job = self.get_next_ftrack_event()
+        if not job:
+            return False
+
+        src_job = ayclient.api.get(f"events/{job['dependsOn']}").json()
+        ftrack_event = ftrack_api.event.base.Event(**src_job["payload"])
+        self._event_queue.put((ftrack_event, job))
+        return True
+
     def wait(self, duration=None):
         """Overridden wait
         Event are loaded from Mongo DB when queue is empty. Handled event is
@@ -76,19 +87,26 @@ class ProcessEventHub(ftrack_api.event.hub.EventHub):
         started = time.time()
         self.prepare_server_connection()
         while True:
-            job = self.get_next_ftrack_event()
-            if not job:
-                time.sleep(0.1)
+            job = None
+            try:
+                item = self._event_queue.get(timeout=0.1)
+                if isinstance(item, tuple):
+                    event, job = item
+                else:
+                    event = item
+
+            except queue.Empty:
+                if not self.load_event_from_jobs():
+                    time.sleep(0.1)
                 continue
 
-            src_job = ayclient.api.get(f"events/{job['dependsOn']}").json()
-            ftrack_event = ftrack_api.event.base.Event(**src_job["payload"])
-            self._handle(ftrack_event)
+            self._handle(event)
 
-            self.finish_job(job)
+            if job is not None:
+                self.finish_job(job)
 
             # Additional special processing of events.
-            if ftrack_event["topic"] == "ftrack.meta.disconnected":
+            if event["topic"] == "ftrack.meta.disconnected":
                 break
 
             if duration is not None:

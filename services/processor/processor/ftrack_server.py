@@ -152,8 +152,6 @@ class FtrackServer:
             self.log.info(len(msg) * "*")
             self.log.info(msg)
 
-        print(self.handler_paths)
-
         # keep event_hub on session running
         self.session.event_hub.wait()
         self.is_running = False
