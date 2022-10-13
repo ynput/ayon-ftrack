@@ -1,5 +1,5 @@
 from .constants import (
-    CUST_ATTR_GROUP,
+    CUST_ATTR_GROUPS,
     CUST_ATTR_ID_KEY,
     CUST_ATTR_AUTO_SYNC,
 )
@@ -18,7 +18,7 @@ from .ftrack_action_handler import LocalAction, ServerAction
 
 
 __all__ = (
-    "CUST_ATTR_GROUP",
+    "CUST_ATTR_GROUPS",
     "CUST_ATTR_ID_KEY",
     "CUST_ATTR_AUTO_SYNC",
 
