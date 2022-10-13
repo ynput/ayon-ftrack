@@ -322,6 +322,10 @@ class TaskStatusToParent(BaseEventHandler):
         _all_match = (
             event_settings["parent_status_match_all_task_statuses"]
         )
+        _mod_all_match = {}
+        for item in _all_match:
+            _mod_all_match[item["name"]] = item["value"]
+        _all_match = _mod_all_match
         _single_match = (
             event_settings["parent_status_by_task_status"]
         )
