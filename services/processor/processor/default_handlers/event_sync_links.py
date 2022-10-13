@@ -3,11 +3,8 @@ from bson.objectid import ObjectId
 
 from openpype.pipeline import AvalonMongoDB
 
-from processor.lib import BaseEventHandler
-from openpype_modules.ftrack.lib import (
-    CUST_ATTR_ID_KEY,
-    query_custom_attributes,
-)
+from processor.lib import BaseEventHandler, query_custom_attributes
+from openpype_modules.ftrack.lib import CUST_ATTR_ID_KEY
 
 
 class SyncLinksToAvalon(BaseEventHandler):

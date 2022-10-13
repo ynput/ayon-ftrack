@@ -4,8 +4,7 @@ import collections
 
 import ftrack_api
 
-from processor.lib import ServerAction
-from openpype_modules.ftrack.lib.avalon_sync import create_chunks
+from processor.lib import ServerAction, create_chunks
 
 
 class TransferHierarchicalValues(ServerAction):

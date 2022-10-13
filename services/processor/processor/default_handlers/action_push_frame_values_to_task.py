@@ -3,8 +3,7 @@ import json
 import collections
 import ftrack_api
 
-from processor.lib import ServerAction
-from openpype_modules.ftrack.lib import query_custom_attributes
+from processor.lib import ServerAction, query_custom_attributes
 
 
 class PushHierValuesToNonHier(ServerAction):

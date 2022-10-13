@@ -4,8 +4,7 @@ import copy
 
 import ftrack_api
 
-from processor.lib import BaseEventHandler
-from openpype_modules.ftrack.lib import query_custom_attributes
+from processor.lib import BaseEventHandler, query_custom_attributes
 
 
 class PushFrameValuesToTaskEvent(BaseEventHandler):

@@ -4,10 +4,9 @@ import copy
 from openpype.client import get_project, create_project
 from openpype.settings import ProjectSettings, SaveWarningExc
 
-from processor.lib import ServerAction
+from processor.lib import ServerAction, CUST_ATTR_AUTO_SYNC
 from openpype_modules.ftrack.lib import (
     get_openpype_attr,
-    CUST_ATTR_AUTO_SYNC
 )
 
 
