@@ -2,10 +2,10 @@ import functools
 from .ftrack_base_handler import BaseHandler
 
 
-class BaseEvent(BaseHandler):
+class BaseEventHandler(BaseHandler):
     '''Custom Event base class
 
-    BaseEvent is based on ftrack.update event
+    BaseEventHandler is based on ftrack.update event
     - get entities from event
 
     If want to use different event base
