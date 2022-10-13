@@ -12,7 +12,7 @@ class DictWithStrList(BaseSettingsModel):
     """
 
     _layout = "expanded"
-    name: str
+    name: str = Field("")
     value: list[str] = Field(default_factory=list)
 
 
@@ -50,7 +50,7 @@ class ThumbnailHierarchyUpdates(BaseSettingsModel):
     """Push thumbnail from version, up through multiple hierarchy levels."""
 
     enabled: bool = True
-    levels: int = Field(title="Levels", ge=0)
+    levels: int = Field(999, title="Levels", ge=0)
 
 
 class SyncStatusTaskToParentMapping(BaseSettingsModel):
@@ -165,9 +165,14 @@ class TransferHierNonHierAttrsAction(BaseSettingsModel):
 class CreateDailyReviewSession(BaseSettingsModel):
     _isGroup = True
     enabled: bool = True
+    review_session_template: str = Field(
+        "",
+        title="ReviewSession name template",
+    )
     cycle_enabled: bool = Field(
         False,
         title="Run automatically every day",
+        section="Automated execution",
     )
     cycle_hour_start: str = Field(
         "00:00:00",
@@ -176,10 +181,8 @@ class CreateDailyReviewSession(BaseSettingsModel):
         widget="time",
         regex="(?:[01]\d|2[0123]):(?:[012345]\d):(?:[012345]\d)",
     )
-    review_session_template: str = Field(
-        title="ReviewSession name template",
-    )
     role_list: list[str] = Field(
+        section="---",
         title=ROLES_TITLE,
         default_factory=list,
     )

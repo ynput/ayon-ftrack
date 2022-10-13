@@ -33,6 +33,7 @@ class FtrackSettings(BaseSettingsModel):
     )
 
     service_event_handlers: FtrackServiceHandlers = Field(
+        default_factory=FtrackServiceHandlers,
         title="Server Actions/Events",
     )
 

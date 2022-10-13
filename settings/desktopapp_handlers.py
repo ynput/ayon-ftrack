@@ -12,18 +12,23 @@ class DictWithStrList(BaseSettingsModel):
     """
 
     _layout = "expanded"
-    name: str
+    name: str = Field("")
     value: list[str] = Field(default_factory=list)
 
 
 class ApplicationLaunchStatuses(BaseSettingsModel):
+    """Application launch statuses
+
+    Change task's status to left side if current task status is in list on right side
+    """
     enabled: bool = True
     ignored_statuses: list[str] = Field(
+        default_factory=list,
         title="Do not change status if current status is",
     )
     status_change: list[DictWithStrList] = Field(
-        title="Change task's status to <b>left side</b> if current task status is in list on <b>right side</b>.",
-        default_factory=DictWithStrList,
+        title="Status change",
+        default_factory=list,
     )
 
     @validator("status_change")
