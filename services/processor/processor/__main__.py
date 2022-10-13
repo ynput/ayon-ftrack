@@ -8,7 +8,7 @@ from .ftrack_server import FtrackServer
 def get_handler_paths() -> list[str]:
     current_dir = os.path.dirname(os.path.abspath(__file__))
     handler_paths = [
-        os.path.join(current_dir, "base_handlers"),
+        os.path.join(current_dir, "default_handlers"),
     ]
     return handler_paths
 
