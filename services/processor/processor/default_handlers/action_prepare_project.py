@@ -4,9 +4,11 @@ import copy
 from openpype.client import get_project, create_project
 from openpype.settings import ProjectSettings, SaveWarningExc
 
-from processor.lib import ServerAction, CUST_ATTR_AUTO_SYNC
-from openpype_modules.ftrack.lib import (
+from processor.lib import (
+    ServerAction,
+    CUST_ATTR_AUTO_SYNC,
     get_openpype_attr,
+    get_icon_url,
 )
 
 
@@ -17,6 +19,7 @@ class PrepareProjectServer(ServerAction):
     label = "OpenPype Admin"
     variant = "- Prepare Project (Server)"
     description = "Set basic attributes on the project"
+    icon = get_icon_url("OpenPypeAdmin.svg")
 
     settings_key = "prepare_project"
 

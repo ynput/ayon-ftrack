@@ -1,3 +1,24 @@
+import ayclient
+
+
+def get_addon_resource_url(*args):
+    # server_url = ayclient.config.server_url
+    server_url = "https://dev.openpype.cloud"
+    parts = [
+        server_url,
+        "addons",
+        ayclient.addon_name,
+        ayclient.addon_version,
+        "public"
+    ]
+    parts.extend(args)
+    return "/".join(parts)
+
+
+def get_icon_url(icon_name):
+    return get_addon_resource_url("icons", icon_name)
+
+
 def create_chunks(iterable, chunk_size=None):
     """Separate iterable into multiple chunks by size.
 
