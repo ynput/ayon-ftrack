@@ -71,7 +71,7 @@ class FtrackServer:
             modules, crashed = modules_from_path(path)
             for filepath, exc_info in crashed:
                 self.log.warning("Filepath load crashed {}.\n{}".format(
-                    filepath, traceback.format_exception(*exc_info)
+                    filepath, "".join(traceback.format_exception(*exc_info))
                 ))
 
             for filepath, module in modules:
