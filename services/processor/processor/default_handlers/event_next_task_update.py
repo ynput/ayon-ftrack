@@ -1,8 +1,8 @@
 import collections
-from processor.ftrack_event_handler import BaseEvent
+from processor.lib import BaseEventHandler
 
 
-class NextTaskUpdate(BaseEvent):
+class NextTaskUpdate(BaseEventHandler):
     """Change status on following Task.
 
     Handler cares about changes of status id on Task entities. When new status
