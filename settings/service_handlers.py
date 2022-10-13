@@ -40,7 +40,7 @@ class ThumbnailHierarchyUpdates(BaseSettingsModel):
     """Push thumbnail from version, up through multiple hierarchy levels."""
 
     enabled: bool = True
-    levels: int = Field(999, title="Levels", ge=0)
+    levels: int = Field(1, title="Levels", ge=0)
 
 
 class SyncStatusTaskToParentMapping(BaseSettingsModel):
@@ -216,13 +216,77 @@ class FtrackServiceHandlers(BaseSettingsModel):
 
 
 DEFAULT_SERVICE_HANDLERS_SETTINGS = {
-    "prepare_project": {},
-    "sync_hier_entity_attributes": {},
-    "clone_review_session": {},
-    "thumbnail_updates": {},
-    "status_task_to_parent": {},
-    "status_task_to_version": {},
-    "status_version_to_task": {},
+    "prepare_project": {
+        "enabled": True,
+        "role_list": [
+            "Administrator",
+            "Project manager"
+        ]
+    },
+    "sync_hier_entity_attributes": {
+        "enabled": True,
+        "interest_entity_types": [
+            "Shot",
+            "Asset Build"
+        ],
+        "interest_attributes": [
+            "frameStart",
+            "frameEnd"
+        ],
+        "action_enabled": True,
+        "role_list": [
+            "Administrator",
+            "Project Manager"
+        ]
+    },
+    "clone_review_session": {
+        "enabled": True,
+        "role_list": [
+            "Administrator",
+            "Project Manager"
+        ]
+    },
+    "thumbnail_updates": {
+        "enabled": True,
+        "levels": 1
+    },
+    "status_task_to_parent": {
+        "enabled": True,
+        "parent_object_types": [
+            "Shot",
+            "Asset Build"
+        ],
+        "parent_status_match_all_task_statuses": [
+            {
+                "name": "Completed",
+                "value": [
+                    "Approved",
+                    "Omitted"
+                ]
+            }
+        ],
+        "parent_status_by_task_status": [
+            {
+                "new_status": "In Progress",
+                "task_statuses": [
+                    "in progress",
+                    "change requested",
+                    "retake",
+                    "pending review"
+                ]
+            }
+        ]
+    },
+    "status_task_to_version": {
+        "enabled": True,
+        "mapping": [],
+        "asset_types_filter": []
+    },
+    "status_version_to_task": {
+        "enabled": True,
+        "mapping": [],
+        "asset_types_to_skip": []
+    },
     "next_task_update": {
         "enabled": True,
         "mapping": [
@@ -236,6 +300,21 @@ DEFAULT_SERVICE_HANDLERS_SETTINGS = {
         ],
         "name_sorting": False
     },
-    "transfer_values_of_hierarchical_attributes": {},
-    "create_daily_review_session": {},
+    "transfer_values_of_hierarchical_attributes": {
+        "enabled": True,
+        "role_list": [
+            "Administrator",
+            "Project manager"
+        ]
+    },
+    "create_daily_review_session": {
+        "enabled": True,
+        "role_list": [
+            "Administrator",
+            "Project Manager"
+        ],
+        "cycle_enabled": False,
+        "cycle_hour_start": "00:00:00",
+        "review_session_template": "{yy}{mm}{dd}"
+    },
 }
