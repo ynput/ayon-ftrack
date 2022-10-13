@@ -128,6 +128,7 @@ class FtrackServer:
         if session._auto_connect_event_hub_thread:
             # Use timeout from session (since ftrack-api 2.1.0)
             timeout = getattr(session, "request_timeout", 60)
+            self.log.info("Waiting for event hub to connect")
             started = time.time()
             while not session.event_hub.connected:
                 if (time.time() - started) > timeout:
@@ -135,6 +136,10 @@ class FtrackServer:
                         "Connection to Ftrack was not created in {} seconds"
                     ).format(timeout))
                 time.sleep(0.1)
+
+        elif not session.event_hub.connected:
+            self.log.info("Connecting event hub")
+            session.event_hub.connect()
 
         self.session = session
         if load_files:

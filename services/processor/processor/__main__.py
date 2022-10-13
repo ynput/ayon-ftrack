@@ -21,7 +21,7 @@ def main():
         settings["ftrack_server"],
         service_settings["api_key"],
         service_settings["username"],
-        auto_connect_event_hub=True
+        auto_connect_event_hub=False
     )
     server = FtrackServer(handler_paths)
     server.run_server(session)
