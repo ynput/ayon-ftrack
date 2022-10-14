@@ -10,14 +10,10 @@ class FtrackAddon(BaseServerAddon):
     title = "ftrack addon"
     version = "1.0.0"
     settings_model: Type[FtrackSettings] = FtrackSettings
-    frontend_scopes: dict[str, Any] = {"project": {"sidebar": "hierarchy"}}
     services = {
         "leecher": {"image": "openpype/ay-ftrack-leecher:1.0.0"},
         "processor": {"image": "openpype/ay-ftrack-processor:1.0.0"}
     }
-
-    def setup(self):
-        pass
 
     async def get_default_settings(self):
         settings_model_cls = self.get_settings_model()
