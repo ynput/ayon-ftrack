@@ -1,6 +1,14 @@
-from pydantic import Field
+import json
+from pydantic import Field, validator
 
 from openpype.settings import BaseSettingsModel
+
+
+def parse_json_string(value):
+    try:
+        return json.dumps(value)
+    except Exception:
+        raise AssertionError("Your value couldn't be parsed as json")
 
 
 class CollectFamilyProfile(BaseSettingsModel):
@@ -44,10 +52,22 @@ class CollectFtrackCustomAttributeDataPlugin(BaseSettingsModel):
 
 class ValidateFtrackAttributesPlugin(BaseSettingsModel):
     enabled: bool = True
-    # TODO this is raw-json
     ftrack_custom_attributes: str = Field(
-        "", title="Custom attributes to validate"
+        "",
+        title="Custom attributes to validate",
+        widget="textarea",
     )
+
+    @validator("ftrack_custom_attributes")
+    def json_parse(cls, value):
+        """Ensure name fields within the lists have unique names."""
+
+        parsed_data = parse_json_string(value)
+        if not isinstance(parsed_data):
+            raise AssertionError(
+                "Parsed value is {} but object is expected".format(
+                    str(type(parsed_data))))
+        return value
 
 
 class IntegrateHierarchyProfile(BaseSettingsModel):
