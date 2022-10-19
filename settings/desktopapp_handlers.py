@@ -2,7 +2,15 @@ from pydantic import Field, validator
 
 from openpype.settings import BaseSettingsModel, ensure_unique_names
 
-from .common import DictWithStrList
+from .common import DictWithStrList, ROLES_TITLE
+
+
+class SimpleAction(BaseSettingsModel):
+    enabled: bool = True
+    role_list: list[str] = Field(
+        title=ROLES_TITLE,
+        default_factory=list,
+    )
 
 
 class ApplicationLaunchStatuses(BaseSettingsModel):
@@ -28,6 +36,37 @@ class ApplicationLaunchStatuses(BaseSettingsModel):
         return value
 
 
+class CreateUpdateCustomAttributesAction(BaseSettingsModel):
+    role_list: list[str] = Field(
+        title=ROLES_TITLE,
+        default_factory=list,
+    )
+
+
+class PrepareProjectAction(SimpleAction):
+    create_project_structure_checked: bool = Field(
+        True,
+        description="Check \"Create project structure\" by default",
+        title="Create project structure",
+    )
+
+
+class FillWorkfileAttr(BaseSettingsModel):
+    enabled: bool = True
+    custom_attribute_key: str = Field(
+        "",
+        title="Custom attribute key",
+        description=(
+            "Custom attribute must be <b>Text</b>"
+            " type added to <b>Task</b> entity type"
+        ),
+    )
+    role_list: list[str] = Field(
+        title=ROLES_TITLE,
+        default_factory=list,
+    )
+
+
 class FtrackDesktopAppHandlers(BaseSettingsModel):
     """Settings for event handlers running in ftrack service."""
 
@@ -35,6 +74,42 @@ class FtrackDesktopAppHandlers(BaseSettingsModel):
         title="Application - Status change on launch",
         default_factory=ApplicationLaunchStatuses,
     )
+    create_update_attributes: CreateUpdateCustomAttributesAction = Field(
+        title="Create/Update Avalon Attributes",
+        default_factory=CreateUpdateCustomAttributesAction,
+    )
+    prepare_project: PrepareProjectAction = Field(
+        title="Prepare Project",
+        default_factory=PrepareProjectAction,
+    )
+    clean_hierarchical_attr: SimpleAction = Field(
+        title="Clean hierarchical custom attributes",
+        default_factory=SimpleAction
+    )
+    delete_asset_subset: SimpleAction = Field(
+        title="Delete Asset/Subsets",
+        default_factory=SimpleAction,
+    )
+    delete_old_versions: SimpleAction = Field(
+        title="Delete old versions",
+        default_factory=SimpleAction,
+    )
+    delivery_action: SimpleAction = Field(
+        title="Delivery action",
+        default_factory=SimpleAction,
+    )
+    job_killer: SimpleAction = Field(
+        title="Job Killer",
+        default_factory=SimpleAction,
+    )
+    fill_workfile_attribute: FillWorkfileAttr = Field(
+        title="Fill workfile Custom attribute",
+        default_factory=FillWorkfileAttr,
+    )
+    # Removed settings
+    # - seed_project
+    # - sync_to_avalon_local
+    # - store_thubmnail_to_avalon
 
 
 DEFAULT_DESKTOP_HANDLERS_SETTINGS = {
