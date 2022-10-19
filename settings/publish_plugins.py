@@ -135,6 +135,7 @@ class IntegrateFtrackInstancePlugin(BaseSettingsModel):
         title="AssetVersion status on publish",
         default_factory=list,
     )
+    # These values did have a different label then value is
     # {"openpype_version": "OpenPype version"},
     # {"frame_start": "Frame start"},
     # {"frame_end": "Frame end"},
