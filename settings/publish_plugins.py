@@ -246,4 +246,275 @@ class FtrackPublishPlugins(BaseSettingsModel):
     )
 
 
-DEFAULT_PUBLISH_SETTINGS = {}
+DEFAULT_PUBLISH_SETTINGS = {
+    "CollectFtrackFamily": {
+        "enabled": True,
+        "profiles": [
+            {
+                "hosts": [
+                    "standalonepublisher"
+                ],
+                "families": [],
+                "task_types": [],
+                "task_names": [],
+                "add_ftrack_family": True,
+                "advanced_filtering": []
+            },
+            {
+                "hosts": [
+                    "standalonepublisher"
+                ],
+                "families": [
+                    "matchmove",
+                    "shot"
+                ],
+                "task_types": [],
+                "task_names": [],
+                "add_ftrack_family": False,
+                "advanced_filtering": []
+            },
+            {
+                "hosts": [
+                    "standalonepublisher"
+                ],
+                "families": [
+                    "plate"
+                ],
+                "task_types": [],
+                "task_names": [],
+                "add_ftrack_family": False,
+                "advanced_filtering": [
+                    {
+                        "families": [
+                            "clip",
+                            "review"
+                        ],
+                        "add_ftrack_family": True
+                    }
+                ]
+            },
+            {
+                "hosts": [
+                    "traypublisher"
+                ],
+                "families": [],
+                "task_types": [],
+                "task_names": [],
+                "add_ftrack_family": True,
+                "advanced_filtering": []
+            },
+            {
+                "hosts": [
+                    "traypublisher"
+                ],
+                "families": [
+                    "matchmove",
+                    "shot"
+                ],
+                "task_types": [],
+                "task_names": [],
+                "add_ftrack_family": False,
+                "advanced_filtering": []
+            },
+            {
+                "hosts": [
+                    "traypublisher"
+                ],
+                "families": [
+                    "plate",
+                    "review",
+                    "audio"
+                ],
+                "task_types": [],
+                "task_names": [],
+                "add_ftrack_family": False,
+                "advanced_filtering": [
+                    {
+                        "families": [
+                            "clip",
+                            "review"
+                        ],
+                        "add_ftrack_family": True
+                    }
+                ]
+            },
+            {
+                "hosts": [
+                    "maya"
+                ],
+                "families": [
+                    "model",
+                    "setdress",
+                    "animation",
+                    "look",
+                    "rig",
+                    "camera"
+                ],
+                "task_types": [],
+                "task_names": [],
+                "add_ftrack_family": True,
+                "advanced_filtering": []
+            },
+            {
+                "hosts": [
+                    "tvpaint"
+                ],
+                "families": [
+                    "renderPass"
+                ],
+                "task_types": [],
+                "task_names": [],
+                "add_ftrack_family": False,
+                "advanced_filtering": []
+            },
+            {
+                "hosts": [
+                    "tvpaint"
+                ],
+                "families": [],
+                "task_types": [],
+                "task_names": [],
+                "add_ftrack_family": True,
+                "advanced_filtering": []
+            },
+            {
+                "hosts": [
+                    "nuke"
+                ],
+                "families": [
+                    "write",
+                    "render",
+                    "prerender"
+                ],
+                "task_types": [],
+                "task_names": [],
+                "add_ftrack_family": False,
+                "advanced_filtering": [
+                    {
+                        "families": [
+                            "review"
+                        ],
+                        "add_ftrack_family": True
+                    }
+                ]
+            },
+            {
+                "hosts": [
+                    "aftereffects"
+                ],
+                "families": [
+                    "render",
+                    "workfile"
+                ],
+                "task_types": [],
+                "task_names": [],
+                "add_ftrack_family": True,
+                "advanced_filtering": []
+            },
+            {
+                "hosts": [
+                    "flame"
+                ],
+                "families": [
+                    "plate",
+                    "take"
+                ],
+                "task_types": [],
+                "task_names": [],
+                "add_ftrack_family": True,
+                "advanced_filtering": []
+            },
+            {
+                "hosts": [
+                    "houdini"
+                ],
+                "families": [
+                    "usd"
+                ],
+                "task_types": [],
+                "task_names": [],
+                "add_ftrack_family": True,
+                "advanced_filtering": []
+            },
+            {
+                "hosts": [
+                    "photoshop"
+                ],
+                "families": [
+                    "review"
+                ],
+                "task_types": [],
+                "task_names": [],
+                "add_ftrack_family": True,
+                "advanced_filtering": []
+            }
+        ]
+    },
+    "CollectFtrackCustomAttributeData": {
+        "enabled": False,
+        "custom_attribute_keys": []
+    },
+    "IntegrateHierarchyToFtrack": {
+        "create_task_status_profiles": []
+    },
+    "IntegrateFtrackNote": {
+        "enabled": True,
+        "note_template": "{intent}: {comment}",
+        "note_labels": []
+    },
+    "IntegrateFtrackDescription": {
+        "enabled": False,
+        "optional": True,
+        "active": True,
+        "description_template": "{comment}"
+    },
+    "ValidateFtrackAttributes": {
+        "enabled": False,
+        "ftrack_custom_attributes": {}
+    },
+    "IntegrateFtrackComponentOverwrite": {
+        "enabled": True
+    },
+    "IntegrateFtrackInstance": {
+        "family_mapping": {
+            "camera": "cam",
+            "look": "look",
+            "mayaAscii": "scene",
+            "model": "geo",
+            "rig": "rig",
+            "setdress": "setdress",
+            "pointcache": "cache",
+            "render": "render",
+            "prerender": "render",
+            "render2d": "render",
+            "nukescript": "comp",
+            "write": "render",
+            "review": "mov",
+            "plate": "img",
+            "audio": "audio",
+            "workfile": "scene",
+            "animation": "cache",
+            "image": "img",
+            "reference": "reference",
+            "ass": "cache",
+            "mayaScene": "scene",
+            "camerarig": "rig",
+            "yeticache": "cache",
+            "yetiRig": "rig",
+            "xgen": "xgen",
+            "rendersetup": "rendersetup",
+            "assembly": "assembly",
+            "layout": "layout",
+            "unrealStaticMesh": "geo",
+            "vrayproxy": "cache",
+            "redshiftproxy": "cache",
+            "usd": "usd"
+        },
+        "keep_first_subset_name_for_review": True,
+        "asset_versions_status_profiles": [],
+        "additional_metadata_keys": []
+    },
+    "IntegrateFtrackFarmStatus": {
+        "farm_status_profiles": []
+    }
+}
