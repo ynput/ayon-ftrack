@@ -35,6 +35,7 @@ class CollectFamilyProfile(BaseSettingsModel):
 
 
 class CollectFtrackFamilyPlugin(BaseSettingsModel):
+    _isGroup = True
     enabled: bool = True
     profiles: list[CollectFamilyProfile] = Field(
         default_factory=list,
@@ -43,6 +44,7 @@ class CollectFtrackFamilyPlugin(BaseSettingsModel):
 
 
 class CollectFtrackCustomAttributeDataPlugin(BaseSettingsModel):
+    _isGroup = True
     enabled: bool = True
     custom_attribute_keys: list[str] = Field(
         title="Custom attribute keys",
@@ -51,6 +53,7 @@ class CollectFtrackCustomAttributeDataPlugin(BaseSettingsModel):
 
 
 class ValidateFtrackAttributesPlugin(BaseSettingsModel):
+    _isGroup = True
     enabled: bool = True
     ftrack_custom_attributes: str = Field(
         "",
@@ -83,12 +86,14 @@ class IntegrateHierarchyProfile(BaseSettingsModel):
 
 
 class IntegrateHierarchyToFtrackPlugin(BaseSettingsModel):
+    _isGroup = True
     create_task_status_profiles: list[IntegrateHierarchyProfile] = Field(
         default_factory=list,
     )
 
 
 class IntegrateFtrackNotePlugin(BaseSettingsModel):
+    _isGroup = True
     enabled: bool = True
     note_template: str = Field(
         "",
@@ -106,6 +111,7 @@ class IntegrateFtrackNotePlugin(BaseSettingsModel):
 
 
 class IntegrateFtrackDescriptionPlugin(BaseSettingsModel):
+    _isGroup = True
     enabled: bool = True
     optional: bool = Field(False, title="Optional")
     active: bool = Field(True, title="Active")
@@ -120,6 +126,7 @@ class IntegrateFtrackDescriptionPlugin(BaseSettingsModel):
 
 
 class IntegrateFtrackComponentOverwritePlugin(BaseSettingsModel):
+    _isGroup = True
     enabled: bool = True
 
 
@@ -143,6 +150,7 @@ class AssetVersionStatusProfile(BaseSettingsModel):
 
 
 class IntegrateFtrackInstancePlugin(BaseSettingsModel):
+    _isGroup = True
     family_mapping: list[str] = Field(
         title="Family Mapping",
         default_factory=list,
@@ -207,6 +215,7 @@ class IntegrateFarmStartusProfile(BaseSettingsModel):
 
 
 class IntegrateFtrackFarmStatusPlugin(BaseSettingsModel):
+    _isGroup = True
     farm_status_profiles: list = Field(
         title="Farm status profiles",
         default_factory=list,
