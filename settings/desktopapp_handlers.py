@@ -113,5 +113,78 @@ class FtrackDesktopAppHandlers(BaseSettingsModel):
 
 
 DEFAULT_DESKTOP_HANDLERS_SETTINGS = {
-    "application_launch_statuses": {},
+    "application_launch_statuses": {
+        "enabled": True,
+        "ignored_statuses": [
+            "In Progress",
+            "Omitted",
+            "On hold",
+            "Approved"
+        ],
+        "status_change": [
+            {
+                "name": "In Progress",
+                "value": []
+            }
+        ]
+    },
+    "create_update_attributes": {
+        "role_list": [
+            "Pypeclub",
+            "Administrator"
+        ]
+    },
+    "prepare_project": {
+        "enabled": True,
+        "role_list": [
+            "Pypeclub",
+            "Administrator",
+            "Project manager"
+        ],
+        "create_project_structure_checked": False
+    },
+    "clean_hierarchical_attr": {
+        "enabled": True,
+        "role_list": [
+            "Pypeclub",
+            "Administrator",
+            "Project manager"
+        ]
+    },
+    "delete_asset_subset": {
+        "enabled": True,
+        "role_list": [
+            "Pypeclub",
+            "Administrator",
+            "Project Manager"
+        ]
+    },
+    "delete_old_versions": {
+        "enabled": True,
+        "role_list": [
+            "Pypeclub",
+            "Project Manager",
+            "Administrator"
+        ]
+    },
+    "delivery_action": {
+        "enabled": True,
+        "role_list": [
+            "Pypeclub",
+            "Project Manager",
+            "Administrator"
+        ]
+    },
+    "job_killer": {
+        "enabled": True,
+        "role_list": [
+            "Pypeclub",
+            "Administrator"
+        ]
+    },
+    "fill_workfile_attribute": {
+        "enabled": False,
+        "custom_attribute_key": "",
+        "role_list": []
+    }
 }
