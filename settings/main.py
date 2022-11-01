@@ -6,10 +6,13 @@ from .service_handlers import (
     FtrackServiceHandlers,
     DEFAULT_SERVICE_HANDLERS_SETTINGS,
 )
-
 from .desktopapp_handlers import (
     FtrackDesktopAppHandlers,
     DEFAULT_DESKTOP_HANDLERS_SETTINGS,
+)
+from .publish_plugins import (
+    FtrackPublishPlugins,
+    DEFAULT_PUBLISH_SETTINGS,
 )
 
 
@@ -53,6 +56,10 @@ class FtrackSettings(BaseSettingsModel):
         default_factory=FtrackDesktopAppHandlers,
         title="User Actions/Events",
     )
+    publish: FtrackPublishPlugins = Field(
+        default_factory=FtrackPublishPlugins,
+        title="Publish plugins"
+    )
 
 
 DEFAULT_VALUES = {
@@ -63,4 +70,5 @@ DEFAULT_VALUES = {
         "api_key": ""
     },
     "user_handlers": DEFAULT_DESKTOP_HANDLERS_SETTINGS,
+    "publish": DEFAULT_PUBLISH_SETTINGS
 }
