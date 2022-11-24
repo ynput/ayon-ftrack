@@ -3,12 +3,13 @@ from typing import Type
 from openpype.addons import BaseServerAddon
 
 from .settings import FtrackSettings, DEFAULT_VALUES
+from .version import __version__
 
 
 class FtrackAddon(BaseServerAddon):
     name = "ftrack"
     title = "ftrack addon"
-    version = "1.0.0"
+    version = __version__
     settings_model: Type[FtrackSettings] = FtrackSettings
     services = {
         "leecher": {"image": "openpype/ay-ftrack-leecher:1.0.0"},
