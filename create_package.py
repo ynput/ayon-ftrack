@@ -87,6 +87,13 @@ def copy_server_content(addon_output_dir, current_dir, log):
         ):
             shutil.copytree(src_path, dst_path)
 
+    # Copy ftrack common
+    ftrack_common = os.path.join(current_dir, "ftrack_common")
+    processor_dir = os.path.join(
+        current_dir, "services", "processor"
+    )
+    shutil.copytree(ftrack_common, processor_dir)
+
 
 def zip_client_side(addon_package_dir, current_dir, zip_file_name, log):
     """Copy and zip `client` content into `addon_package_dir'.
