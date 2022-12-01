@@ -9,8 +9,9 @@ process able to import them.
 
 from .constants import (
     FTRACK_ID_ATTRIB,
-    FTRACK_CUSTOM_ATTRIBUTE_GROUP,
-    FTRACK_ATTR_KEY_SERVER_ID,
+    CUST_ATTR_KEY_SERVER_ID,
+    CUST_ATTR_GROUP,
+    CUST_ATTR_AUTO_SYNC,
 )
 
 from .custom_attributes import (
@@ -27,8 +28,9 @@ from .lib import (
 
 __all__ = (
     "FTRACK_ID_ATTRIB",
-    "FTRACK_CUSTOM_ATTRIBUTE_GROUP",
-    "FTRACK_ATTR_KEY_SERVER_ID",
+    "CUST_ATTR_KEY_SERVER_ID",
+    "CUST_ATTR_GROUP",
+    "CUST_ATTR_AUTO_SYNC",
 
     "get_custom_attr_configs",
     "query_custom_attribute_values",

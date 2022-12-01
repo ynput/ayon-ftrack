@@ -2,7 +2,7 @@ import itertools
 import collections
 
 from .lib import join_filter_values
-from .constants import FTRACK_CUSTOM_ATTRIBUTE_GROUP
+from .constants import CUST_ATTR_GROUP
 
 
 def get_custom_attr_configs(session, query_keys=None, split_hierarchical=True):
@@ -41,7 +41,7 @@ def get_custom_attr_configs(session, query_keys=None, split_hierarchical=True):
         " where group.name in (\"{}\")"
     ).format(
         join_filter_values(query_keys),
-        FTRACK_CUSTOM_ATTRIBUTE_GROUP
+        CUST_ATTR_GROUP
     )
     all_avalon_attr = session.query(cust_attrs_query).all()
     for cust_attr in all_avalon_attr:
