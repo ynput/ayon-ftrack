@@ -26,12 +26,16 @@ import argparse
 import logging
 
 # Files or directories that won't be copied to server part of addon
-IGNORED_FILENAMES = {
+IGNORED_FILENAMES_FOR_SERVER = {
     "package",
     "__pycache__",
     "client",
     "create_package.py",
     "LICENSE",
+    # TODO move content of ftrack sync elsewhere
+    "ftrack_sync",
+    # Is copied to special place
+    "ftrack_common",
 }
 
 # Patterns of directories to be skipped for server part of addon
@@ -66,7 +70,7 @@ def copy_server_content(addon_output_dir, current_dir, log):
     log.info("Copying server content")
 
     for filename in os.listdir(current_dir):
-        if filename in IGNORED_FILENAMES:
+        if filename in IGNORED_FILENAMES_FOR_SERVER:
             continue
 
         src_path = os.path.join(current_dir, filename)
