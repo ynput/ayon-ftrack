@@ -34,8 +34,6 @@ IGNORED_FILENAMES_FOR_SERVER = {
     "LICENSE",
     # TODO move content of ftrack sync elsewhere
     "ftrack_sync",
-    # Is copied to special place
-    "ftrack_common",
 }
 
 # Patterns of directories to be skipped for server part of addon
