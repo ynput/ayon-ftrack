@@ -51,6 +51,38 @@ IGNORE_FILE_PATTERNS = [
 ]
 
 
+def copy_dir(src_dir, dst_dir):
+    """Copy directory to destination directory.
+
+    Ignore if destination already contains directories from source.
+
+    Args:
+        src_dir (str): Directory path that will be copied to destination
+            directory.
+        dst_dir (str): Directory path where source directory content will be
+            copied.
+    """
+
+    version_info = sys.version_info
+    # Use 'dirs_exist_ok=True' which is available since Python 3.8
+    if version_info[0] == 3 and version_info[1] >= 8:
+        shutil.copytree(src_dir, dst_dir, dirs_exist_ok=True)
+        return
+
+    try:
+        os.makedirs(dst_dir)
+    except Exception:
+        pass
+
+    for item in os.listdir(src_dir):
+        src_path = os.path.join(src_dir, item)
+        dst_path = os.path.join(dst_dir, item)
+        if os.path.isdir(src_path):
+            copy_dir(src_path, dst_path)
+        else:
+            shutil.copy2(src_path, dst_path)
+
+
 def _value_match_regexes(value, regexes):
     for regex in regexes:
         if regex.search(value):
@@ -88,11 +120,11 @@ def copy_server_content(addon_output_dir, current_dir, log):
             shutil.copytree(src_path, dst_path)
 
     # Copy ftrack common
-    ftrack_common = os.path.join(current_dir, "ftrack_common")
+    ftrack_common_name = "ftrack_common"
+    ftrack_common_dir = os.path.join(current_dir, ftrack_common_name)
     processor_dir = os.path.join(
-        current_dir, "services", "processor"
-    )
-    shutil.copytree(ftrack_common, processor_dir)
+        addon_output_dir, "services", "processor", ftrack_common_name)
+    copy_dir(ftrack_common_dir, processor_dir)
 
 
 def zip_client_side(addon_package_dir, current_dir, zip_file_name, log):
