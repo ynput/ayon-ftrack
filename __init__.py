@@ -10,7 +10,7 @@ from .version import __version__
 
 class FtrackAddon(BaseServerAddon):
     name = "ftrack"
-    title = "ftrack addon"
+    title = "Ftrack"
     version = __version__
     settings_model: Type[FtrackSettings] = FtrackSettings
     services = {
