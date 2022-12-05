@@ -1,14 +1,10 @@
 import json
 from pydantic import Field, validator
 
-from openpype.settings import BaseSettingsModel
-
-
-def parse_json_string(value):
-    try:
-        return json.dumps(value)
-    except Exception:
-        raise AssertionError("Your value couldn't be parsed as json")
+from openpype.settings import (
+    BaseSettingsModel,
+    ensure_unique_names,
+)
 
 
 class CollectFamilyProfile(BaseSettingsModel):
@@ -43,7 +39,7 @@ class CollectFtrackFamilyPlugin(BaseSettingsModel):
     )
 
 
-class CollectFtrackCustomAttributeDataPlugin(BaseSettingsModel):
+class CollectFtrackCustomAttributeDataModel(BaseSettingsModel):
     _isGroup = True
     enabled: bool = True
     custom_attribute_keys: list[str] = Field(
@@ -52,11 +48,11 @@ class CollectFtrackCustomAttributeDataPlugin(BaseSettingsModel):
     )
 
 
-class ValidateFtrackAttributesPlugin(BaseSettingsModel):
+class ValidateFtrackAttributesModel(BaseSettingsModel):
     _isGroup = True
     enabled: bool = True
     ftrack_custom_attributes: str = Field(
-        "",
+        "{}",
         title="Custom attributes to validate",
         widget="textarea",
     )
@@ -65,8 +61,8 @@ class ValidateFtrackAttributesPlugin(BaseSettingsModel):
     def json_parse(cls, value):
         """Ensure name fields within the lists have unique names."""
 
-        parsed_data = parse_json_string(value)
-        if not isinstance(parsed_data):
+        parsed_data = json.loads(value)
+        if not isinstance(parsed_data, dict):
             raise AssertionError(
                 "Parsed value is {} but object is expected".format(
                     str(type(parsed_data))))
@@ -85,14 +81,14 @@ class IntegrateHierarchyProfile(BaseSettingsModel):
     status_name: str = Field("", title="Status name")
 
 
-class IntegrateHierarchyToFtrackPlugin(BaseSettingsModel):
+class IntegrateHierarchyToFtrackModel(BaseSettingsModel):
     _isGroup = True
     create_task_status_profiles: list[IntegrateHierarchyProfile] = Field(
         default_factory=list,
     )
 
 
-class IntegrateFtrackNotePlugin(BaseSettingsModel):
+class IntegrateFtrackNoteModel(BaseSettingsModel):
     _isGroup = True
     enabled: bool = True
     note_template: str = Field(
@@ -110,7 +106,7 @@ class IntegrateFtrackNotePlugin(BaseSettingsModel):
     )
 
 
-class IntegrateFtrackDescriptionPlugin(BaseSettingsModel):
+class IntegrateFtrackDescriptionModel(BaseSettingsModel):
     _isGroup = True
     enabled: bool = True
     optional: bool = Field(False, title="Optional")
@@ -125,7 +121,7 @@ class IntegrateFtrackDescriptionPlugin(BaseSettingsModel):
     )
 
 
-class IntegrateFtrackComponentOverwritePlugin(BaseSettingsModel):
+class IntegrateFtrackComponentOverwriteModel(BaseSettingsModel):
     _isGroup = True
     enabled: bool = True
 
@@ -149,9 +145,27 @@ class AssetVersionStatusProfile(BaseSettingsModel):
     )
 
 
-class IntegrateFtrackInstancePlugin(BaseSettingsModel):
+class IntegrateFtrackFamilyMapping(BaseSettingsModel):
+    name: str = Field("", title="Family")
+    asset_type: str = Field("", title="Asset Type")
+
+
+def integrate_ftrack_metadata_enum():
+    return [
+        {"value": "openpype_version", "label": "OpenPype version"},
+        {"value": "frame_start", "label": "Frame start"},
+        {"value": "frame_end", "label": "Frame end"},
+        {"value": "duration", "label": "Duration"},
+        {"value": "width", "label": "Resolution width"},
+        {"value": "height", "label": "Resolution height"},
+        {"value": "fps", "label": "FPS"},
+        {"value": "codec", "label": "Codec"}
+    ]
+
+
+class IntegrateFtrackInstanceModel(BaseSettingsModel):
     _isGroup = True
-    family_mapping: list[str] = Field(
+    family_mapping: list[IntegrateFtrackFamilyMapping] = Field(
         title="Family Mapping",
         default_factory=list,
     )
@@ -163,28 +177,16 @@ class IntegrateFtrackInstancePlugin(BaseSettingsModel):
         title="AssetVersion status on publish",
         default_factory=list,
     )
-    # These values did have a different label then value is
-    # {"openpype_version": "OpenPype version"},
-    # {"frame_start": "Frame start"},
-    # {"frame_end": "Frame end"},
-    # {"duration": "Duration"},
-    # {"width": "Resolution width"},
-    # {"height": "Resolution height"},
-    # {"fps": "FPS"},
-    # {"code": "Codec"}
     additional_metadata_keys: list[str] = Field(
+        default_factory=list,
         title="Additional metadata keys on components",
-        enum_resolver=lambda: [
-            "openpype_version",
-            "frame_start",
-            "frame_end",
-            "duration",
-            "width",
-            "height",
-            "fps",
-            "codec"
-        ],
+        enum_resolver=integrate_ftrack_metadata_enum
     )
+
+    @validator("family_mapping")
+    def validate_unique_outputs(cls, value):
+        ensure_unique_names(value)
+        return value
 
 
 class IntegrateFarmStartusProfile(BaseSettingsModel):
@@ -214,9 +216,9 @@ class IntegrateFarmStartusProfile(BaseSettingsModel):
     )
 
 
-class IntegrateFtrackFarmStatusPlugin(BaseSettingsModel):
+class IntegrateFtrackFarmStatusModel(BaseSettingsModel):
     _isGroup = True
-    farm_status_profiles: list = Field(
+    farm_status_profiles: list[IntegrateFarmStartusProfile] = Field(
         title="Farm status profiles",
         default_factory=list,
     )
@@ -229,46 +231,48 @@ class FtrackPublishPlugins(BaseSettingsModel):
         title="Collect Ftrack Family",
         default_factory=CollectFtrackFamilyPlugin,
     )
-    CollectFtrackCustomAttributeData: CollectFtrackCustomAttributeDataPlugin = Field(
-        title="Collect Custom Attribute Data",
-        default_factory=CollectFtrackCustomAttributeDataPlugin,
-        description=(
-            "Collect custom attributes from ftrack for ftrack entities"
-            " that can be used in some templates during publishing."
+    CollectFtrackCustomAttributeData: CollectFtrackCustomAttributeDataModel = (
+        Field(
+            title="Collect Custom Attribute Data",
+            default_factory=CollectFtrackCustomAttributeDataModel,
+            description=(
+                "Collect custom attributes from ftrack for ftrack entities"
+                " that can be used in some templates during publishing."
+            )
         )
     )
-    ValidateFtrackAttributes: ValidateFtrackAttributesPlugin = Field(
+    ValidateFtrackAttributes: ValidateFtrackAttributesModel = Field(
         title="Validate Ftrack Attributes",
-        default_factory=ValidateFtrackAttributesPlugin,
+        default_factory=ValidateFtrackAttributesModel,
     )
-    IntegrateHierarchyToFtrack: IntegrateHierarchyToFtrackPlugin = Field(
+    IntegrateHierarchyToFtrack: IntegrateHierarchyToFtrackModel = Field(
         title="Integrate Hierarchy to ftrack",
-        default_factory=IntegrateHierarchyToFtrackPlugin,
+        default_factory=IntegrateHierarchyToFtrackModel,
         description=(
             "Set task status on new task creation."
             " Ftrack's default status is used otherwise."
         )
     )
-    IntegrateFtrackNote: IntegrateFtrackNotePlugin = Field(
+    IntegrateFtrackNote: IntegrateFtrackNoteModel = Field(
         title="Integrate Ftrack Note",
-        default_factory=IntegrateFtrackNotePlugin,
+        default_factory=IntegrateFtrackNoteModel,
     )
-    IntegrateFtrackDescription: IntegrateFtrackDescriptionPlugin = Field(
+    IntegrateFtrackDescription: IntegrateFtrackDescriptionModel = Field(
         title="Integrate Ftrack Description",
-        default_factory=IntegrateFtrackDescriptionPlugin,
+        default_factory=IntegrateFtrackDescriptionModel,
         description="Add description to integrated AssetVersion.",
     )
-    IntegrateFtrackComponentOverwrite: IntegrateFtrackComponentOverwritePlugin = Field(
+    IntegrateFtrackComponentOverwrite: IntegrateFtrackComponentOverwriteModel = Field(
         title="Integrate Ftrack Component Overwrite",
-        default_factory=IntegrateFtrackComponentOverwritePlugin,
+        default_factory=IntegrateFtrackComponentOverwriteModel,
     )
-    IntegrateFtrackInstance: IntegrateFtrackInstancePlugin = Field(
+    IntegrateFtrackInstance: IntegrateFtrackInstanceModel = Field(
         title="Integrate Ftrack Instance",
-        default_factory=IntegrateFtrackInstancePlugin,
+        default_factory=IntegrateFtrackInstanceModel,
     )
-    IntegrateFtrackFarmStatus: IntegrateFtrackFarmStatusPlugin = Field(
+    IntegrateFtrackFarmStatus: IntegrateFtrackFarmStatusModel = Field(
         title="Integrate Ftrack Farm Status",
-        default_factory=IntegrateFtrackFarmStatusPlugin,
+        default_factory=IntegrateFtrackFarmStatusModel,
         description=(
             "Change status of task when it's subset is submitted to farm"
         ),
@@ -499,46 +503,111 @@ DEFAULT_PUBLISH_SETTINGS = {
     },
     "ValidateFtrackAttributes": {
         "enabled": False,
-        "ftrack_custom_attributes": {}
+        "ftrack_custom_attributes": "{}"
     },
     "IntegrateFtrackComponentOverwrite": {
         "enabled": True
     },
     "IntegrateFtrackInstance": {
-        "family_mapping": {
-            "camera": "cam",
-            "look": "look",
-            "mayaAscii": "scene",
-            "model": "geo",
-            "rig": "rig",
-            "setdress": "setdress",
-            "pointcache": "cache",
-            "render": "render",
-            "prerender": "render",
-            "render2d": "render",
-            "nukescript": "comp",
-            "write": "render",
-            "review": "mov",
-            "plate": "img",
-            "audio": "audio",
-            "workfile": "scene",
-            "animation": "cache",
-            "image": "img",
-            "reference": "reference",
-            "ass": "cache",
-            "mayaScene": "scene",
-            "camerarig": "rig",
-            "yeticache": "cache",
-            "yetiRig": "rig",
-            "xgen": "xgen",
-            "rendersetup": "rendersetup",
-            "assembly": "assembly",
-            "layout": "layout",
-            "unrealStaticMesh": "geo",
-            "vrayproxy": "cache",
-            "redshiftproxy": "cache",
-            "usd": "usd"
-        },
+        "family_mapping": [
+            {
+                "name": "camera",
+                "asset_type": "cam"
+            }, {
+                "name": "look",
+                "asset_type": "look"
+            }, {
+                "name": "mayaAscii",
+                "asset_type": "scene"
+            }, {
+                "name": "model",
+                "asset_type": "geo"
+            }, {
+                "name": "rig",
+                "asset_type": "rig"
+            }, {
+                "name": "setdress",
+                "asset_type": "setdress"
+            }, {
+                "name": "pointcache",
+                "asset_type": "cache"
+            }, {
+                "name": "render",
+                "asset_type": "render"
+            }, {
+                "name": "prerender",
+                "asset_type": "render"
+            }, {
+                "name": "render2d",
+                "asset_type": "render"
+            }, {
+                "name": "nukescript",
+                "asset_type": "comp"
+            }, {
+                "name": "write",
+                "asset_type": "render"
+            }, {
+                "name": "review",
+                "asset_type": "mov"
+            }, {
+                "name": "plate",
+                "asset_type": "img"
+            }, {
+                "name": "audio",
+                "asset_type": "audio"
+            }, {
+                "name": "workfile",
+                "asset_type": "scene"
+            }, {
+                "name": "animation",
+                "asset_type": "cache"
+            }, {
+                "name": "image",
+                "asset_type": "img"
+            }, {
+                "name": "reference",
+                "asset_type": "reference"
+            }, {
+                "name": "ass",
+                "asset_type": "cache"
+            }, {
+                "name": "mayaScene",
+                "asset_type": "scene"
+            }, {
+                "name": "camerarig",
+                "asset_type": "rig"
+            }, {
+                "name": "yeticache",
+                "asset_type": "cache"
+            }, {
+                "name": "yetiRig",
+                "asset_type": "rig"
+            }, {
+                "name": "xgen",
+                "asset_type": "xgen"
+            }, {
+                "name": "rendersetup",
+                "asset_type": "rendersetup"
+            }, {
+                "name": "assembly",
+                "asset_type": "assembly"
+            }, {
+                "name": "layout",
+                "asset_type": "layout"
+            }, {
+                "name": "unrealStaticMesh",
+                "asset_type": "geo"
+            }, {
+                "name": "vrayproxy",
+                "asset_type": "cache"
+            }, {
+                "name": "redshiftproxy",
+                "asset_type": "cache",
+            }, {
+                "name": "usd",
+                "asset_type": "usd"
+            }
+        ],
         "keep_first_subset_name_for_review": True,
         "asset_versions_status_profiles": [],
         "additional_metadata_keys": []

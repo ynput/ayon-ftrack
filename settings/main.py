@@ -38,7 +38,7 @@ class FtrackSettings(BaseSettingsModel):
     """Ftrack addon settings."""
 
     ftrack_server: str = Field(
-        "https://ftrackapp.com",
+        "",
         title="Ftrack server url",
     )
 
