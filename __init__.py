@@ -66,7 +66,7 @@ class FtrackAddon(BaseServerAddon):
                 ($1, $2, $3, $4)
             ON CONFLICT (name)
             DO UPDATE SET
-                scope = $3
+                scope = $3,
                 data = $4
             """,
             FTRACK_ID_ATTRIB,
