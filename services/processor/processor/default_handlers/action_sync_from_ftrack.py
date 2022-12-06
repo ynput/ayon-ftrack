@@ -1,4 +1,3 @@
-from ftrack_common import CUST_ATTR_AUTO_SYNC
 from ftrack_common.event_handlers import ServerAction
 from processor.lib import get_icon_url
 from processor.lib.sync_from_ftrack import SyncFromFtrack
@@ -15,7 +14,7 @@ class SyncFromFtrackAction(ServerAction):
 
     role_list = ["Pypeclub", "Administrator", "Project Manager"]
 
-    # settings_key = "prepare_project"
+    settings_key = "sync_from_ftrack"
 
     item_splitter = {"type": "label", "value": "---"}
 
@@ -26,7 +25,6 @@ class SyncFromFtrackAction(ServerAction):
             or entities[0].entity_type.lower() != "project"
         ):
             return False
-
         return self.valid_roles(session, entities, event)
 
     def launch(self, session, entities, event):

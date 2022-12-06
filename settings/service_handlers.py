@@ -11,6 +11,11 @@ class PrepareProjectAction(BaseSettingsModel):
     role_list: list[str] = Field(default_factory=list, title=ROLES_TITLE)
 
 
+class SyncFromFtrackAction(BaseSettingsModel):
+    enabled: bool = True
+    role_list: list[str] = Field(default_factory=list, title=ROLES_TITLE)
+
+
 class SyncHierarchicalAttributes(BaseSettingsModel):
     enabled: bool = True
     interest_entity_types: list[str] = Field(
@@ -177,6 +182,10 @@ class FtrackServiceHandlers(BaseSettingsModel):
         title="Prepare Project",
         default_factory=PrepareProjectAction,
     )
+    sync_from_ftrack: SyncFromFtrackAction = Field(
+        title="Sync from ftrack",
+        default_factory=SyncFromFtrackAction,
+    )
     sync_hier_entity_attributes: SyncHierarchicalAttributes = Field(
         title="Sync Hierarchical and Entity Attributes",
         default_factory=SyncHierarchicalAttributes,
@@ -217,6 +226,13 @@ class FtrackServiceHandlers(BaseSettingsModel):
 
 DEFAULT_SERVICE_HANDLERS_SETTINGS = {
     "prepare_project": {
+        "enabled": True,
+        "role_list": [
+            "Administrator",
+            "Project manager"
+        ]
+    },
+    "sync_from_ftrack": {
         "enabled": True,
         "role_list": [
             "Administrator",
