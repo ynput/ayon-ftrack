@@ -315,7 +315,7 @@ class BaseAction(BaseHandler):
                     "{} \"{}\" Missing required keys"
                     " \"success\" and \"message\" in callback output. This is"
                     " soft fail."
-                ).format(self.handler_type, self.label))
+                ).format(self.handler_type, self.full_label))
 
             elif "message" in result:
                 if "success" not in result:
@@ -329,11 +329,11 @@ class BaseAction(BaseHandler):
             if result:
                 return {
                     "success": True,
-                    "message": "{} finished.".format(self.label)
+                    "message": "{} finished.".format(self.full_label)
                 }
             return {
                 "success": False,
-                "message": "{} failed.".format(self.label)
+                "message": "{} failed.".format(self.full_label)
             }
 
         return result
