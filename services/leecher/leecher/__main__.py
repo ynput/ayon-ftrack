@@ -1,41 +1,6 @@
-import ayclient
-
-from typing import Any
-from nxtools import logging
-
-from .listener import listen
-
-IGNORE_TOPICS = {}
-
-
-def create_description(payload: dict[str, Any]):
-    uname = payload.get("source", {}).get("user", {}).get("username")
-    if not uname:
-        return f"Leeched {payload['topic']}"
-    return f"Leeched {payload['topic']} by {uname}"
-
-
-def callback(event):
-    if event["topic"] in IGNORE_TOPICS:
-        return
-
-    event_data = event._data
-    description = create_description(event_data)
-    ayclient.dispatch_event(
-        "ftrack.leech",
-        sender=ayclient.config.service_name,
-        hash=event_data["id"],
-        description=description,
-        payload=event_data,
-    )
-    logging.info("Stored event", event_data["topic"])
+from .listener import main
 
 
 if __name__ == "__main__":
-    settings = ayclient.addon_settings()
-    listen(
-        url=settings["ftrack_server"],
-        api_key=settings["service_settings"]["api_key"],
-        username=settings["service_settings"]["username"],
-        callback=callback,
-    )
+    main()
+
