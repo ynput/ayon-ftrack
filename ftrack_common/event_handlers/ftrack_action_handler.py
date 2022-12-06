@@ -44,7 +44,9 @@ class BaseAction(BaseHandler):
     description = None
     icon = None
     handler_type = "Action"
+    preactions = []
 
+    _full_label = None
     _discover_identifier = None
     _launch_identifier = None
 
@@ -185,6 +187,58 @@ class BaseAction(BaseHandler):
             bool: True if action should be returned.
         """
 
+        return False
+
+    def _handle_preactions(self, session, event):
+        """Launch actions before launching this action.
+
+        Concept came from Pype and got deprecated (and used) over time. Should
+        be probably removed.
+
+        Note:
+            Added warning log that this functionlity is deprecated and will
+                be removed in the future.
+
+        Args:
+            session (ftrack_api.Session): Ftrack sesison.
+            event (ftrack_api.Event): Event which triggered launch of this
+                action.
+
+        Returns:
+            bool: Preactions were launched or not.
+
+        Deprecated:
+            Preactions are marked as deprecated. Server actions should not
+                use preactions and local actions use local identifier which
+                is hard to handle automatically
+        """
+
+        # If preactions are not set
+        if len(self.preactions) == 0:
+            return True
+
+        if not event.get("data", {}).get("selection"):
+            return False
+
+        # If preactions were already started
+        if event["data"].get("preactions_launched") is True:
+            return True
+
+        self.log.warning((
+            "DEPRECATION WARNING: Action \"{}\" is using 'preactions'"
+            " which are deprecated and will be removed Q2 2023."
+        ).format(self.full_label))
+
+        # Launch preactions
+        for preaction in self.preactions:
+            self.trigger_action(preaction, event)
+
+        # Relaunch this action
+        self.trigger_action(
+            self.launch_identifier,
+            event,
+            additional_event_data={"preactions_launched": True}
+        )
         return False
 
     def launch_wrapper(self, func):
