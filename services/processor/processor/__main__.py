@@ -1,30 +1,4 @@
-import os
-
-from ayclient import addon_settings
-from .ftrack_session import OPServerSession
-from .ftrack_server import FtrackServer
-
-
-def get_handler_paths() -> list[str]:
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    handler_paths = [
-        os.path.join(current_dir, "default_handlers"),
-    ]
-    return handler_paths
-
-
-def main():
-    handler_paths = get_handler_paths()
-    settings = addon_settings()
-    service_settings = settings["service_settings"]
-    session = OPServerSession(
-        settings["ftrack_server"],
-        service_settings["api_key"],
-        service_settings["username"],
-        auto_connect_event_hub=False
-    )
-    server = FtrackServer(handler_paths)
-    server.run_server(session)
+from .ftrack_server import main
 
 
 if __name__ == "__main__":

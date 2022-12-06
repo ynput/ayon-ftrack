@@ -84,6 +84,7 @@ class ProcessEventHub(ftrack_api.event.hub.EventHub):
         Event are loaded from Mongo DB when queue is empty. Handled event is
         set as processed in Mongo DB.
         """
+
         started = time.time()
         self.prepare_server_connection()
         while True:

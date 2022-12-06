@@ -5,7 +5,9 @@ import logging
 import traceback
 
 import ftrack_api
+from openpype_api import get_project_settings
 
+from .ftrack_session import OPServerSession
 from .lib import modules_from_path
 
 """
@@ -13,12 +15,6 @@ from .lib import modules_from_path
 FTRACK_SERVER # Ftrack server e.g. "https://myFtrack.ftrackapp.com"
 FTRACK_API_KEY # Ftrack user's API key "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 FTRACK_API_USER # Ftrack username e.g. "user.name"
-
-# Required - Paths to folder with actions
-FTRACK_ACTIONS_PATH # Paths to folders where are located actions
-    - EXAMPLE: "M:/FtrackApi/../actions/"
-FTRACK_EVENTS_PATH # Paths to folders where are located actions
-    - EXAMPLE: "M:/FtrackApi/../events/"
 
 # Required - Needed for import included modules
 PYTHONPATH # Path to ftrack_api and paths to all modules used in actions
@@ -160,3 +156,29 @@ class FtrackServer:
         # keep event_hub on session running
         self.session.event_hub.wait()
         self.is_running = False
+
+
+def get_handler_paths() -> list[str]:
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    handler_paths = [
+        os.path.join(current_dir, "default_handlers"),
+    ]
+    return handler_paths
+
+
+def main():
+    os.environ["OPENPYPE_SERVER_URL"] = os.environ["AY_SERVER_URL"]
+    os.environ["OPENPYPE_TOKEN"] = os.environ["AY_API_KEY"]
+
+    handler_paths = get_handler_paths()
+    settings = get_project_settings()
+    ftrack_settings = settings["ftrack"]
+    service_settings = ftrack_settings["service_settings"]
+    session = OPServerSession(
+        ftrack_settings["ftrack_server"],
+        service_settings["api_key"],
+        service_settings["username"],
+        auto_connect_event_hub=False
+    )
+    server = FtrackServer(handler_paths)
+    server.run_server(session)
