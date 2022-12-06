@@ -18,67 +18,72 @@ if available.
 Package contains server side files directly,
 client side code zipped in `private` subfolder.
 """
+
 import os
 import sys
 import re
 import shutil
 import argparse
 import logging
+import collections
+
+COMMON_DIR_NAME = "ftrack_common"
 
 # Files or directories that won't be copied to server part of addon
-IGNORED_FILENAMES_FOR_SERVER = {
-    "package",
-    "__pycache__",
-    "client",
-    "create_package.py",
-    "LICENSE",
-    # TODO move content of ftrack sync elsewhere
-    "ftrack_sync",
+SERVER_ADDON_SUBPATHS = {
+    COMMON_DIR_NAME,
+    "private",
+    "public",
+    "services",
+    "settings",
+    "__init__.py",
+    "version.py",
 }
 
 # Patterns of directories to be skipped for server part of addon
 IGNORE_DIR_PATTERNS = [
     re.compile(pattern)
-    for pattern in {r"^\."}
+    for pattern in {
+        # Skip directories starting with '.'
+        r"^\.",
+        # Skip any pycache folders
+        "^__pycache__$"
+    }
 ]
 
 # Patterns of files to be skipped for server part of addon
 IGNORE_FILE_PATTERNS = [
     re.compile(pattern)
-    for pattern in {r"^\.", r"\.pyc$"}
+    for pattern in {
+        # Skip files starting with '.'
+        # NOTE this could be an issue in some cases
+        r"^\.",
+        # Skip '.pyc' files
+        r"\.pyc$"
+    }
 ]
 
 
-def copy_dir(src_dir, dst_dir):
-    """Copy directory to destination directory.
+def safe_copy_file(src_path, dst_path):
+    """Copy file and make sure destination directory exists.
 
     Ignore if destination already contains directories from source.
 
     Args:
-        src_dir (str): Directory path that will be copied to destination
-            directory.
-        dst_dir (str): Directory path where source directory content will be
-            copied.
+        src_path (str): File path that will be copied.
+        dst_path (str): Path to destination file.
     """
 
-    version_info = sys.version_info
-    # Use 'dirs_exist_ok=True' which is available since Python 3.8
-    if version_info[0] == 3 and version_info[1] >= 8:
-        shutil.copytree(src_dir, dst_dir, dirs_exist_ok=True)
+    if src_path == dst_path:
         return
 
+    dst_dir = os.path.dirname(dst_path)
     try:
         os.makedirs(dst_dir)
     except Exception:
         pass
 
-    for item in os.listdir(src_dir):
-        src_path = os.path.join(src_dir, item)
-        dst_path = os.path.join(dst_dir, item)
-        if os.path.isdir(src_path):
-            copy_dir(src_path, dst_path)
-        else:
-            shutil.copy2(src_path, dst_path)
+    shutil.copy2(src_path, dst_path)
 
 
 def _value_match_regexes(value, regexes):
@@ -86,6 +91,40 @@ def _value_match_regexes(value, regexes):
         if regex.search(value):
             return True
     return False
+
+
+def find_files_in_subdir(
+    src_path,
+    ignore_file_patterns=None,
+    ignore_dir_patterns=None
+):
+    if ignore_file_patterns is None:
+        ignore_file_patterns = IGNORE_FILE_PATTERNS
+
+    if ignore_dir_patterns is None:
+        ignore_dir_patterns = IGNORE_DIR_PATTERNS
+    output = []
+
+    hierarchy_queue = collections.deque()
+    hierarchy_queue.append((src_path, []))
+    while hierarchy_queue:
+        item = hierarchy_queue.popleft()
+        dirpath, parents = item
+        for name in os.listdir(dirpath):
+            path = os.path.join(dirpath, name)
+            if os.path.isfile(path):
+                if not _value_match_regexes(name, ignore_file_patterns):
+                    items = list(parents)
+                    items.append(name)
+                    output.append((path, os.path.sep.join(items)))
+                continue
+
+            if not _value_match_regexes(name, ignore_dir_patterns):
+                items = list(parents)
+                items.append(name)
+                hierarchy_queue.append((path, items))
+
+    return output
 
 
 def copy_server_content(addon_output_dir, current_dir, log):
@@ -99,41 +138,50 @@ def copy_server_content(addon_output_dir, current_dir, log):
 
     log.info("Copying server content")
 
-    for filename in os.listdir(current_dir):
-        if filename in IGNORED_FILENAMES_FOR_SERVER:
-            continue
-
+    filepaths_to_copy = []
+    for filename in SERVER_ADDON_SUBPATHS:
         src_path = os.path.join(current_dir, filename)
         dst_path = os.path.join(addon_output_dir, filename)
-        if (
-            os.path.isfile(src_path)
-            and not _value_match_regexes(filename, IGNORE_FILE_PATTERNS)
-        ):
-            shutil.copy(src_path, dst_path)
+        if os.path.isfile(src_path):
+            if not _value_match_regexes(filename, IGNORE_FILE_PATTERNS):
+                filepaths_to_copy.append((src_path, dst_path))
+            continue
 
-        elif (
-            os.path.isdir(src_path)
-            and not _value_match_regexes(filename, IGNORE_DIR_PATTERNS)
-        ):
-            shutil.copytree(src_path, dst_path)
+        for path, sub_path in find_files_in_subdir(src_path):
+            filepaths_to_copy.append(
+                (path, os.path.join(dst_path, sub_path))
+            )
 
-    # Copy ftrack common
-    ftrack_common_name = "ftrack_common"
-    ftrack_common_dir = os.path.join(current_dir, ftrack_common_name)
-    processor_dir = os.path.join(
-        addon_output_dir, "services", "processor", ftrack_common_name)
-    copy_dir(ftrack_common_dir, processor_dir)
+    # Copy ftrack common to 'processor' service
+    src_ftrack_common = os.path.join(
+        current_dir,
+        COMMON_DIR_NAME
+    )
+    dst_processor_dir = os.path.join(
+        addon_output_dir,
+        "services",
+        "processor",
+        COMMON_DIR_NAME
+    )
+    for path, sub_path in find_files_in_subdir(src_ftrack_common):
+        filepaths_to_copy.append(
+            (path, os.path.join(dst_processor_dir, sub_path))
+        )
+
+    # Copy files
+    for src_path, dst_path in filepaths_to_copy:
+        safe_copy_file(src_path, dst_path)
 
 
 def zip_client_side(addon_package_dir, current_dir, zip_file_name, log):
     """Copy and zip `client` content into `addon_package_dir'.
 
     Args:
-        addon_package_dir (str): package dir in addon repo dir
-        current_dir (str): addon repo dir
-        zip_file_name (str): file name in format {ADDON_NAME}_{ADDON_VERSION}
-            (eg. 'sitesync_1.0.0')
-        log (logging.Logger)
+        addon_package_dir (str): Output package directory path.
+        current_dir (str): Directoy path of addon source.
+        zip_file_name (str): Output zip file name in format
+            '{ADDON_NAME}_{ADDON_VERSION}'.
+        log (logging.Logger): Logger object.
     """
 
     client_dir = os.path.join(current_dir, "client")
@@ -145,11 +193,9 @@ def zip_client_side(addon_package_dir, current_dir, zip_file_name, log):
     private_dir = os.path.join(addon_package_dir, "private")
     temp_dir_to_zip = os.path.join(private_dir, "temp")
     # shutil.copytree expects glob-style patterns, not regex
-    shutil.copytree(
-        client_dir,
-        os.path.join(temp_dir_to_zip, zip_file_name),
-        ignore=shutil.ignore_patterns("*.pyc", "*__pycache__*")
-    )
+    zip_dir_path = os.path.join(temp_dir_to_zip, zip_file_name)
+    for path, sub_path in find_files_in_subdir(client_dir):
+        safe_copy_file(path, os.path.join(zip_dir_path, sub_path))
 
     toml_path = os.path.join(client_dir, "pyproject.toml")
     if os.path.exists(toml_path):
