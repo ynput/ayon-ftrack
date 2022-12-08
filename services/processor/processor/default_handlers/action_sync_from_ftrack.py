@@ -28,10 +28,12 @@ class SyncFromFtrackAction(ServerAction):
         return self.valid_roles(session, entities, event)
 
     def launch(self, session, entities, event):
+        self.log.info("Synchronization begins")
         project = self.get_project_from_entity(entities[0])
         project_name = project["full_name"]
         syncer = SyncFromFtrack(session, project_name, self.log)
         syncer.sync_to_server()
+        self.log.info("Synchronization finished")
         return True
 
 

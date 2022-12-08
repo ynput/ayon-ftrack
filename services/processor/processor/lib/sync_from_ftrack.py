@@ -378,8 +378,9 @@ class SyncFromFtrack:
         ft_object_type_name_by_id,
         cust_attr_value_by_entity_id,
     ):
+        self.log.debug("Validation of immutable entities started")
         immutable_queue = collections.deque()
-        for entity in self._entity_hub.project_entity:
+        for entity in self._entity_hub.project_entity.children:
             if entity.immutable_for_hierarchy:
                 immutable_queue.append((entity, ft_project))
 
@@ -404,6 +405,13 @@ class SyncFromFtrack:
             )
 
             if matching_ft_entity is None:
+                hierarchy = [str(link) for link in ft_parent["link"]]
+                hierarchy.append(entity.name)
+                path = "/".join(hierarchy)
+                self.log.info((
+                    f"Didn't find immutable entity {path}."
+                    " Handling the situation"
+                ))
                 matching_ft_entity = self._handle_not_found_immutable(
                     entity,
                     ft_parent,
@@ -415,13 +423,20 @@ class SyncFromFtrack:
                 )
 
             entity.attribs[FTRACK_ID_ATTRIB] = matching_ft_entity["id"]
+            # TODO slugify name and handle labels
+            # TODO validate entity type based on server entity type
             if matching_ft_entity["name"] != entity.name:
+                self.log.debug((
+                    "Name of entity does not match exactly. "
+                    f"Changing \"{matching_ft_entity['name']}\""
+                    f" -> \"{entity.name}\""
+                ))
                 matching_ft_entity["name"] = entity.name
 
             self._ids_mapping.set_server_to_ftrack(
                 entity.id, matching_ft_entity["id"])
 
-            for child in entity:
+            for child in entity.children:
                 if child.immutable_for_hierarchy:
                     immutable_queue.append((child, matching_ft_entity))
             immutable_queue.append(commit_object)
@@ -449,20 +464,21 @@ class SyncFromFtrack:
         entity_type = ft_entity.entity_type
         if entity_type.lower() == "task":
             task_type_name = ft_type_names_by_id[ft_entity["type_id"]]
-            new_entity = parent_entity.add_task(
+            new_entity = self._entity_hub.add_new_task(
                 task_type_name,
-                ft_entity["name"],
+                name=ft_entity["name"],
                 entity_id=entity_id,
-                is_new=True
+                parent_id=parent_entity.id
             )
 
         else:
-            object_type = ft_object_type_name_by_id[ft_entity["object_type_id"]]
-            new_entity = parent_entity.add_folder(
+            object_type = ft_object_type_name_by_id[
+                ft_entity["object_type_id"]]
+            new_entity = self._entity_hub.add_new_folder(
                 object_type,
-                ft_entity["name"],
+                name=ft_entity["name"],
                 entity_id=entity_id,
-                is_new=True
+                parent_id=parent_entity.id
             )
 
         return new_entity
@@ -519,11 +535,11 @@ class SyncFromFtrack:
 
                 # Find entity based on same name on same hierarchy level
                 is_task = ft_child.entity_type.lower() == "task"
-                if entity_match is None and entity is not None:
+                if entity_match is None:
                     entity_match = next(
                         (
                             child
-                            for child in entity
+                            for child in entity.children
                             if (
                                 # Ftrack is case insensitive ("Bob" == "bob")
                                 ft_low_name == child.name.lower()
@@ -537,11 +553,11 @@ class SyncFromFtrack:
                     ftrack_id = ft_child["id"]
                     expected_entity = server_entity_by_ftrack_id.get(ftrack_id)
                     if expected_entity is not None:
-                        expected_entity.set_parent(entity)
                         entity_match = expected_entity
+                        entity_match.set_parent(entity)
 
                 if entity_match is None:
-                    print("Creating new entity")
+                    self.log.info("Creating new entity")
                     entity_match = self._create_new_entity(
                         entity,
                         ft_child,
@@ -550,6 +566,9 @@ class SyncFromFtrack:
                         cust_attr_value_by_entity_id,
                     )
 
+                else:
+                    entity_match.name = ft_child["name"]
+
                 if is_task:
                     task_type_id = ft_child["type_id"]
                     task_type_name = ft_type_names_by_id[task_type_id]
@@ -557,7 +576,8 @@ class SyncFromFtrack:
                         entity_match.task_type = task_type_name
                 else:
                     object_type_id = ft_child["object_type_id"]
-                    object_type_name = ft_object_type_name_by_id[object_type_id]
+                    object_type_name = ft_object_type_name_by_id[
+                        object_type_id]
                     if entity_match.folder_type != object_type_name:
                         entity_match.folder_type = object_type_name
 
@@ -568,10 +588,7 @@ class SyncFromFtrack:
                 )
                 fill_queue.append((entity_match, ft_child))
 
-            if entity is None:
-                continue
-
-            for child in tuple(entity):
+            for child in tuple(entity.children):
                 if child.name.lower() not in ft_names:
                     entity.remove_child(child)
 
@@ -581,7 +598,7 @@ class SyncFromFtrack:
         while hierarchy_queue:
             entity = hierarchy_queue.popleft()
             # Add children to queue
-            for child_entity in entity:
+            for child_entity in entity.children:
                 hierarchy_queue.append(child_entity)
 
             ftrack_id = self._ids_mapping.get_ftrack_mapping(entity.id)
@@ -609,13 +626,13 @@ class SyncFromFtrack:
         server_id_conf,
     ):
         fill_queue = collections.deque()
-        for child in self._entity_hub.project_entity:
+        for child in self._entity_hub.project_entity.children:
             fill_queue.append(child)
 
         operations = []
         while fill_queue:
             entity = fill_queue.popleft()
-            for child in entity:
+            for child in entity.children:
                 fill_queue.append(child)
 
             ftrack_id = self._ids_mapping.get_ftrack_mapping(entity.id)

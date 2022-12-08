@@ -7,6 +7,10 @@ from openpype_api import get_server_api_connection
 from openpype_api.graphql import GraphQlQueryFailed
 from openpype_api.utils import create_entity_id
 
+UNKNOWN_VALUE = object()
+PROJECT_PARENT_ID = object()
+_NOT_SET = object()
+
 
 class EntityHub:
     def __init__(
@@ -18,7 +22,8 @@ class EntityHub:
 
         self._project_name = project_name
         self._entities_by_id = {}
-        self._project_entity = None
+        self._entities_by_parent_id = collections.defaultdict(list)
+        self._project_entity = UNKNOWN_VALUE
 
         self._allow_data_changes = allow_data_changes
 
@@ -32,29 +37,81 @@ class EntityHub:
 
     @property
     def project_entity(self):
+        if self._project_entity is UNKNOWN_VALUE:
+            self.fill_project_from_server()
         return self._project_entity
 
     def get_attributes_for_type(self, entity_type):
         return self._connection.get_attributes_for_type(entity_type)
 
     def get_entity_by_id(self, entity_id):
+        """Receive entity by its id without entity type.
+
+        The entity must be already existing in cached objects.
+
+        Args:
+            entity_id (str): Id of entity.
+
+        Returns:
+            Union[BaseEntity, None]: Entity object or None.
+        """
+
         return self._entities_by_id.get(entity_id)
+
+    def get_folder_by_id(self, entity_id, allow_query=True):
+        if allow_query:
+            return self.get_or_query_entity_by_id(entity_id, ["folder"])
+        return self._entities_by_id.get(entity_id)
+
+    def get_task_by_id(self, entity_id, allow_query=True):
+        if allow_query:
+            return self.get_or_query_entity_by_id(entity_id, ["task"])
+        return self._entities_by_id.get(entity_id)
+
+    def get_or_query_entity_by_id(self, entity_id, entity_types):
+        existing_entity = self._entities_by_id.get(entity_id)
+        if existing_entity is None:
+            return existing_entity
+
+        if not entity_types:
+            return None
+
+        entity_data = None
+        for entity_type in entity_types:
+            if entity_type == "folder":
+                entity_data = self._connection.get_folder_by_id(
+                    self.project_name,
+                    entity_id,
+                    fields=self._get_folder_fields()
+                )
+            elif entity_type == "task":
+                entity_data = self._connection.get_task_by_id(
+                    self.project_name, entity_id
+                )
+            else:
+                raise ValueError(
+                    "Unknonwn entity type \"{}\"".format(entity_type)
+                )
+
+            if entity_data:
+                break
+
+        if not entity_data:
+            return None
+
+        if entity_type == "folder":
+            return self.add_folder(entity_data)
+        elif entity_type == "task":
+            return self.add_task(entity_data)
+
+        return None
 
     @property
     def entities(self):
         for entity in self._entities_by_id.values():
             yield entity
 
-    @property
-    def entitites_by_id(self):
-        return dict(self._entities_by_id)
-
-    def add_project(self, *args, **kwargs):
-        project_entity = ProjectEntity(*args, **kwargs, entity_hub=self)
-        self.add_entity(project_entity)
-        return project_entity
-
-    def add_folder(self, parent, *args, **kwargs):
+    def add_new_folder(self, *args, created=True, **kwargs):
         """Create folder object and add it to entity hub.
 
         Args:
@@ -65,52 +122,218 @@ class EntityHub:
             FolderEntity: Added folder entity.
         """
 
-        folder_entity = FolderEntity(*args, **kwargs, entity_hub=self)
-        self.add_entity(folder_entity, parent)
+        folder_entity = FolderEntity(
+            *args, **kwargs, created=created, entity_hub=self
+        )
+        self.add_entity(folder_entity)
         return folder_entity
 
-    def add_task(self, parent, *args, **kwargs):
-        task_entity = TaskEntity(*args, **kwargs, entity_hub=self)
-        self.add_entity(task_entity, parent)
+    def add_new_task(self, *args, created=True, **kwargs):
+        task_entity = TaskEntity(
+            *args, **kwargs, created=created, entity_hub=self
+        )
+        self.add_entity(task_entity)
         return task_entity
 
-    def add_entity(self, entity, parent=None):
-        entity_id = entity.id
-        if entity_id not in self._entities_by_id:
-            self._entities_by_id[entity_id] = entity
+    def add_folder(self, folder):
+        """Create folder object and add it to entity hub.
 
-        self.set_entity_parent(entity, parent)
+        Args:
+            parent (Union[ProjectEntity, FolderEntity]): Parent of added
+                folder.
 
-        if isinstance(entity, ProjectEntity):
-            if self._project_entity is None:
-                self._project_entity = entity
+        Returns:
+            FolderEntity: Added folder entity.
+        """
 
-            elif self._project_entity is not entity:
-                raise ValueError("Got more then one project entity")
+        folder_entity = FolderEntity.from_entity_data(folder, entity_hub=self)
+        self.add_entity(folder_entity)
+        return folder_entity
 
-    def set_entity_parent(self, entity, parent):
-        old_parent = entity.parent
-        if old_parent is parent:
+    def add_task(self, task):
+        task_entity = TaskEntity.from_entity_data(task, entity_hub=self)
+        self.add_entity(task_entity)
+        return task_entity
+
+    def add_entity(self, entity):
+        self._entities_by_id[entity.id] = entity
+        parent_children = self._entities_by_parent_id[entity.parent_id]
+        if entity not in parent_children:
+            parent_children.append(entity)
+
+        if entity.parent_id is PROJECT_PARENT_ID:
             return
 
-        if old_parent is not None:
-            old_parent.remove_child(entity, use_hub=False)
-            old_parent.reset_immutable_for_hierarchy_cache()
-
-        entity.set_parent(parent, use_hub=False)
+        parent = self._entities_by_id.get(entity.parent_id)
         if parent is not None:
-            parent.add_child(entity, use_hub=False)
-            parent.reset_immutable_for_hierarchy_cache()
+            parent.add_child(entity.id)
 
-    def remove_entity(self, entity):
-        parent = entity.parent
-        if parent is None:
+    def unset_entity_parent(self, entity_id, parent_id):
+        entity = self._entities_by_id.get(entity_id)
+        parent = self._entities_by_id.get(parent_id)
+        children_ids = UNKNOWN_VALUE
+        if parent is not None:
+            children_ids = parent.get_children_ids(False)
+
+        has_set_parent = False
+        if entity is not None:
+            has_set_parent = entity.parent_id == parent_id
+
+        new_parent_id = None
+        if has_set_parent:
+            entity.parent_id = new_parent_id
+
+        if children_ids is not UNKNOWN_VALUE and entity_id in children_ids:
+            parent.remove_child(entity_id)
+
+        if entity is None or not has_set_parent:
+            self.reset_immutable_for_hierarchy_cache(parent_id)
             return
 
-        parent.remove_child(entity, use_hub=False)
-        parent.reset_immutable_for_hierarchy_cache()
+        orig_parent_children = self._entities_by_parent_id[parent_id]
+        if entity in orig_parent_children:
+            orig_parent_children.remove(entity)
 
-    def query_project_from_server(self):
+        new_parent_children = self._entities_by_parent_id[new_parent_id]
+        if entity not in new_parent_children:
+            new_parent_children.append(entity)
+        self.reset_immutable_for_hierarchy_cache(parent_id)
+
+    def set_entity_parent(self, entity_id, parent_id, orig_parent_id=_NOT_SET):
+        parent = self._entities_by_id.get(parent_id)
+        entity = self._entities_by_id.get(entity_id)
+        if entity is None:
+            if parent is not None:
+                children_ids = parent.get_children_ids(False)
+                if (
+                    children_ids is not UNKNOWN_VALUE
+                    and entity_id in children_ids
+                ):
+                    parent.remove_child(entity_id)
+                self.reset_immutable_for_hierarchy_cache(parent.id)
+            return
+
+        if orig_parent_id is _NOT_SET:
+            orig_parent_id = entity.parent_id
+            if orig_parent_id == parent_id:
+                return
+
+        orig_parent_children = self._entities_by_parent_id[orig_parent_id]
+        if entity in orig_parent_children:
+            orig_parent_children.remove(entity)
+        self.reset_immutable_for_hierarchy_cache(orig_parent_id)
+
+        orig_parent = self._entities_by_id.get(orig_parent_id)
+        if orig_parent is not None:
+            orig_parent.remove_child(entity_id)
+
+        parent_children = self._entities_by_parent_id[parent_id]
+        if entity not in parent_children:
+            parent_children.append(entity)
+
+        entity.parent_id = parent_id
+        if parent is None or parent.get_children_ids(False) is UNKNOWN_VALUE:
+            return
+
+        parent.add_child(entity_id)
+        self.reset_immutable_for_hierarchy_cache(parent_id)
+
+    def _query_entity_children(self, entity):
+        folder_fields = self._get_folder_fields()
+        tasks = []
+        folders = []
+        if entity.entity_type == "project":
+            folders = list(self._connection.get_folders(
+                entity["name"],
+                parent_ids=[entity.id],
+                fields=folder_fields
+            ))
+
+        elif entity.entity_type == "folder":
+            folders = list(self._connection.get_folders(
+                self._project_entity["name"],
+                parent_ids=[entity.id],
+                fields=folder_fields
+            ))
+            tasks = list(self._connection.get_tasks(
+                self._project_entity["name"],
+                parent_ids=[entity.id]
+            ))
+
+        children_ids = {
+            child.id
+            for child in self._entities_by_parent_id[entity.id]
+        }
+        for folder in folders:
+            folder_entity = self._entities_by_id.get(folder["id"])
+            if folder_entity is not None:
+                if folder_entity.parent_id == entity.id:
+                    children_ids.add(folder_entity.id)
+                continue
+
+            folder_entity = self.add_folder(folder)
+            children_ids.add(folder_entity.id)
+
+        for task in tasks:
+            task_entity = self._entities_by_id.get(task["id"])
+            if task_entity is not None:
+                if task_entity.parent_id == entity.id:
+                    children_ids.add(task_entity.id)
+                continue
+
+            task_entity = self.add_task(task)
+            children_ids.add(task_entity.id)
+
+        entity.fill_children_ids(children_ids)
+
+    def get_entity_children(self, entity, allow_query=True):
+        children_ids = entity.get_children_ids(allow_query=False)
+        if children_ids is not UNKNOWN_VALUE:
+            return entity.get_children()
+
+        if children_ids is UNKNOWN_VALUE and not allow_query:
+            return UNKNOWN_VALUE
+
+        self._query_entity_children(entity)
+
+        return entity.get_children()
+
+    def delete_entity(self, entity):
+        parent_id = entity.parent_id
+        if parent_id is None:
+            return
+
+        parent = self._entities_by_parent_id.get(parent_id)
+        if parent is not None:
+            parent.remove_child(entity.id)
+
+    def reset_immutable_for_hierarchy_cache(
+        self, entity_id, bottom_to_top=True
+    ):
+        if bottom_to_top is None or entity_id is None:
+            return
+
+        reset_queue = collections.deque()
+        reset_queue.append(entity_id)
+        if bottom_to_top:
+            while reset_queue:
+                entity_id = reset_queue.popleft()
+                entity = self.get_entity_by_id(entity_id)
+                if entity is None:
+                    continue
+                entity.reset_immutable_for_hierarchy_cache(None)
+                reset_queue.append(entity.parent_id)
+        else:
+            while reset_queue:
+                entity_id = reset_queue.popleft()
+                entity = self.get_entity_by_id(entity_id)
+                if entity is None:
+                    continue
+                entity.reset_immutable_for_hierarchy_cache(None)
+                for child in self._entities_by_parent_id[entity.id]:
+                    reset_queue.append(child.id)
+
+    def fill_project_from_server(self):
         project_name = self.project_name
         project = self._connection.get_project(
             project_name,
@@ -121,27 +344,35 @@ class EntityHub:
                 "Project \"{}\" was not found.".format(project_name)
             )
 
-        return self.add_project(
+        self._project_entity = ProjectEntity(
             project["code"],
+            parent_id=PROJECT_PARENT_ID,
+            entity_id=project["name"],
             library=project["library"],
             folder_types=project["folderTypes"],
             task_types=project["taskTypes"],
             name=project["name"],
             attribs=project["ownAttrib"],
             data=project["data"],
-            entity_id=project["name"],
-            active=project["active"]
+            active=project["active"],
+            entity_hub=self
         )
+        self.add_entity(self._project_entity)
+        return self._project_entity
 
-    def query_entities_from_server(self):
-        project_entity = self.query_project_from_server()
-
+    def _get_folder_fields(self):
         folder_fields = set(
             self._connection.get_default_fields_for_type("folder")
         )
         folder_fields.add("hasSubsets")
         if self._allow_data_changes:
             folder_fields.add("data")
+        return folder_fields
+
+    def query_entities_from_server(self):
+        project_entity = self.fill_project_from_server()
+
+        folder_fields = self._get_folder_fields()
 
         folders = self._connection.get_folders(
             project_entity.name,
@@ -172,67 +403,105 @@ class EntityHub:
             item = hierarchy_queue.popleft()
             parent_id, parent_entity = item
 
+            children_ids = set()
             for folder in folders_by_parent_id[parent_id]:
-                folder_entity = parent_entity.add_folder(
-                    folder["folderType"],
-                    name=folder["name"],
-                    entity_id=folder["id"],
-                    data=folder.get("data"),
-                    attribs=folder["ownAttrib"],
-                    active=folder["active"],
-                    thumbnail_id=folder["thumbnailId"],
-                    is_new=False
-                )
+                folder_entity = self.add_folder(folder)
+                children_ids.add(folder_entity.id)
                 folder_entity.has_published_content = folder["hasSubsets"]
                 hierarchy_queue.append((folder_entity.id, folder_entity))
 
             for task in tasks_by_parent_id[parent_id]:
-                parent_entity.add_task(
-                    task["taskType"],
-                    name=task["name"],
-                    entity_id=task["id"],
-                    data=task.get("data"),
-                    attribs=task["ownAttrib"],
-                    active=task["active"],
-                    is_new=False
-                )
+                task_entity = self.add_task(task)
+                children_ids.add(task_entity.id)
 
+            parent_entity.fill_children_ids(children_ids)
         self.lock()
 
     def lock(self):
-        entities_by_id = {}
         if self._project_entity is None:
-            self._entities_by_id = entities_by_id
             return
 
-        entity_queue = collections.deque()
-        entity_queue.append(self._project_entity)
-        while entity_queue:
-            entity = entity_queue.popleft()
+        for entity in self._entities_by_id.values():
             entity.lock()
-            entities_by_id[entity.id] = entity
-            for child in entity:
-                entity_queue.append(child)
 
-        self._entities_by_id = entities_by_id
+    def _get_top_entities(self):
+        all_ids = set(self._entities_by_id.keys())
+        return [
+            entity
+            for entity in self._entities_by_id.values()
+            if entity.parent_id not in all_ids
+        ]
+
+    def _split_entities(self):
+        top_entities = self._get_top_entities()
+        entities_queue = collections.deque(top_entities)
+        removed_entity_ids = []
+        created_entity_ids = []
+        other_entity_ids = []
+        while entities_queue:
+            entity = entities_queue.popleft()
+            removed = entity.removed
+            if removed:
+                removed_entity_ids.append(entity.id)
+            elif entity.created:
+                created_entity_ids.append(entity.id)
+            else:
+                other_entity_ids.append(entity.id)
+
+            for child in tuple(self._entities_by_parent_id[entity.id]):
+                if removed:
+                    self.unset_entity_parent(child.id, entity.id)
+                entities_queue.append(child)
+        return created_entity_ids, other_entity_ids, removed_entity_ids
+
+    def _get_update_body(self, entity, changes=None):
+        if changes is None:
+            changes = entity.changes
+
+        if not changes:
+            return None
+        return {
+            "type": "update",
+            "entityType": entity.entity_type,
+            "entityId": entity.id,
+            "data": changes
+        }
+
+    def _get_create_body(self, entity):
+        return {
+            "type": "create",
+            "entityType": entity.entity_type,
+            "entityId": entity.id,
+            "data": entity.to_create_body_data()
+        }
+
+    def _get_delete_body(self, entity):
+        return {
+            "type": "delete",
+            "entityType": entity.entity_type,
+            "entityId": entity.id
+        }
 
     def commit_changes(self):
         # TODO use Operations Session instead of known operations body
         # TODO have option to commit changes out of hierarchy
-        hier_queue = collections.deque()
-        hier_queue.append(self.project_entity)
-        all_entity_ids = set(self._entities_by_id.keys())
         operations_body = []
-        while hier_queue:
-            entity = hier_queue.popleft()
-            for child in entity:
-                hier_queue.append(child)
 
-            all_entity_ids.discard(entity.id)
+        created_entity_ids, other_entity_ids, removed_entity_ids = (
+            self._split_entities()
+        )
+        processed_ids = set()
+        for entity_id in other_entity_ids:
+            if entity_id in processed_ids:
+                continue
 
-            # Project cannot be updated using operations
-            if entity.entity_type.lower() == "project":
-                changes = entity.changes
+            entity = self._entities_by_id[entity_id]
+            changes = entity.changes
+            processed_ids.add(entity_id)
+            if not changes:
+                continue
+
+            if entity.entity_type == "project":
                 response = self._connection.patch(
                     "projects/{}".format(self.project_name),
                     **changes
@@ -241,31 +510,44 @@ class EntityHub:
                     raise ValueError("Failed to update project")
                 continue
 
-            if entity.is_new:
-                operations_body.append({
-                    "type": "create",
-                    "entityType": entity.entity_type,
-                    "entityId": entity.id,
-                    "data": entity.to_entity_data()
-                })
+            bodies = [self._get_update_body(entity, changes)]
+            # Parent was created and was not yet added to operations body
+            parent_queue = collections.deque()
+            parent_queue.append(entity.parent_id)
+            while parent_queue:
+                # Make sure entity's parents are created
+                parent_id = parent_queue.popleft()
+                if (
+                    parent_id is UNKNOWN_VALUE
+                    or parent_id in processed_ids
+                    or parent_id not in created_entity_ids
+                ):
+                    continue
+
+                parent = self._entities_by_id.get(parent_id)
+                processed_ids.add(parent.id)
+                bodies.append(self._get_create_body(parent))
+                parent_queue.append(parent.id)
+
+            operations_body.extend(reversed(bodies))
+
+        for entity_id in created_entity_ids:
+            if entity_id in processed_ids:
+                continue
+            entity = self._entities_by_id[entity_id]
+            operations_body.append(self._get_create_body(entity))
+
+        for entity_id in reversed(removed_entity_ids):
+            if entity_id in processed_ids:
                 continue
 
-            changes = entity.changes
-            if changes:
-                operations_body.append({
-                    "type": "update",
-                    "entityType": entity.entity_type,
-                    "entityId": entity.id,
-                    "data": changes
-                })
+            parent_children = self._entities_by_parent_id[entity.parent_id]
+            if entity in parent_children:
+                parent_children.remove(entity)
 
-        for entity_id in all_entity_ids:
-            entity = self._entities_by_id[entity_id]
-            operations_body.append({
-                "type": "delete",
-                "entityType": entity.entity_type,
-                "entityId": entity_id
-            })
+            entity = self._entities_by_id.pop(entity_id)
+            if not entity.created:
+                operations_body.append(self._get_delete_body(entity))
 
         self._connection.send_batch_operations(
             self.project_name, operations_body
@@ -308,8 +590,9 @@ class Attributes(object):
         values (Union[None, Dict[str, Any]]): Values of attributes.
     """
 
-    def __init__(self, attrib_keys, values=None):
-        values = values or {}
+    def __init__(self, attrib_keys, values=UNKNOWN_VALUE):
+        if values in (UNKNOWN_VALUE, None):
+            values = {}
         self._attributes = {
             key: AttributeValue(values.get(key))
             for key in attrib_keys
@@ -397,11 +680,16 @@ class Attributes(object):
         }
 
     def to_dict(self, ignore_none=True):
-        return {
-            key: value
-            for key, value in self.items()
-            if not ignore_none or value is not None
-        }
+        output = {}
+        for key, value in self.items():
+            if (
+                value is UNKNOWN_VALUE
+                or (ignore_none and value is None)
+            ):
+                continue
+
+            output[key] = value
+        return output
 
 
 @six.add_metaclass(ABCMeta)
@@ -409,7 +697,7 @@ class BaseEntity(object):
     """Object representation of entity from server which is capturing changes.
 
     All data on created object are expected as "current data" on server entity
-    unless the entity has set 'is_new' to 'True'. So if new data should be
+    unless the entity has set 'created' to 'True'. So if new data should be
     stored to server entity then fill entity with server data first and
     then change them.
 
@@ -427,27 +715,29 @@ class BaseEntity(object):
         active (bool): Is entity active.
         entity_hub (EntityHub): Object of entity hub which created object of
             the entity.
-        is_new (Union[bool, None]): Entity is new. When 'None' is passed the
+        created (Union[bool, None]): Entity is new. When 'None' is passed the
             value is defined based on value of 'entity_id'.
     """
 
     def __init__(
         self,
-        name,
-        attribs=None,
-        data=None,
-        parent_id=None,
-        entity_id=None,
-        thumbnail_id=None,
-        active=True,
+        entity_id,
+        parent_id=UNKNOWN_VALUE,
+        name=UNKNOWN_VALUE,
+        attribs=UNKNOWN_VALUE,
+        data=UNKNOWN_VALUE,
+        thumbnail_id=UNKNOWN_VALUE,
+        active=UNKNOWN_VALUE,
         entity_hub=None,
-        is_new=None
+        created=None
     ):
         if entity_hub is None:
             raise ValueError("Missing required kwarg 'entity_hub'")
 
-        if is_new is None:
-            is_new = entity_id is None
+        self._entity_hub = entity_hub
+
+        if created is None:
+            created = entity_id is None
 
         if entity_id is None:
             entity_id = create_entity_id()
@@ -455,21 +745,28 @@ class BaseEntity(object):
         if data is None:
             data = {}
 
+        children_ids = UNKNOWN_VALUE
+        if created:
+            children_ids = set()
+
+        if not created and parent_id is UNKNOWN_VALUE:
+            raise ValueError("Existing entity is missing parent id.")
+
         # These are public without any validation at this moment
         #   may change in future (e.g. name will have regex validation)
+        self._entity_id = entity_id
+
+        self._parent_id = parent_id
         self._name = name
         self.active = active
-        self._is_new = is_new
+        self._created = created
         self._thumbnail_id = thumbnail_id
-        self._entity_hub = entity_hub
-        self._parent_id = parent_id
         self._attribs = Attributes(
             self._get_attributes_for_type(self.entity_type),
             attribs
         )
         self._data = data
-        self._entity_id = entity_id
-        self._children = []
+        self._children_ids = children_ids
 
         self._orig_parent_id = parent_id
         self._orig_name = name
@@ -478,16 +775,6 @@ class BaseEntity(object):
         self._orig_active = active
 
         self._immutable_for_hierarchy_cache = None
-
-    def __iter__(self):
-        """Iterate over entity children.
-
-        Returns:
-            Iterable[BaseEntity]: Iteration over children.
-        """
-
-        for child in self._children:
-            yield child
 
     def __repr__(self):
         return "<{} - {}>".format(self.__class__.__name__, self.id)
@@ -507,6 +794,14 @@ class BaseEntity(object):
         """
 
         return self._entity_id
+
+    @property
+    def removed(self):
+        return self._parent_id is None
+
+    @property
+    def orig_parent_id(self):
+        return self._orig_parent_id
 
     @property
     def attribs(self):
@@ -553,14 +848,11 @@ class BaseEntity(object):
         pass
 
     @abstractproperty
-    def has_valid_parent(self):
-        """Object has set valid parent for creation/update.
-
-        Similar to 'validate_parent' but can be also used for cases when parent
-            is not set on entity.
+    def parent_entity_types(self):
+        """Entity type coresponding to server.
 
         Returns:
-            bool: Parent is valid.
+            Iterable[str]: Possible entity types of parent.
         """
 
         pass
@@ -576,34 +868,24 @@ class BaseEntity(object):
 
         pass
 
+    @classmethod
     @abstractmethod
-    def validate_parent(self, parent):
-        """Validate if parent can be used as parent for entity.
+    def from_entity_data(cls, entity_data, entity_hub):
+        """Create entity based on queried data from server.
 
         Args:
-            parent (Union[BaseEntity, None]): Object of parent to validate.
+            entity_data (Dict[str, Any]): Entity data from server.
+            entity_hub (EntityHub): Hub which handle the entity.
 
-        Raises:
-            TypeError: When parent is invalid type of parent for the entity.
+        Returns:
+            BaseEntity: Object of the class.
         """
 
         pass
 
     @abstractmethod
-    def validate_child(self, child):
-        """Validate if child can be added under the object.
-
-        Args:
-            child (BaseEntity): Object of child to validate.
-        """
-
-        pass
-
-    @abstractmethod
-    def to_entity_data(self):
-        """Convert object of entity to data for server.
-
-        Can be used when entity is created on server.
+    def to_create_body_data(self):
+        """Convert object of entity to data for server on creation.
 
         Returns:
             Dict[str, Any]: Entity data.
@@ -629,7 +911,7 @@ class BaseEntity(object):
             self._immutable_for_hierarchy_cache = immutable_for_hierarchy
             return self._immutable_for_hierarchy_cache
 
-        for child in self:
+        for child in self._entity_hub.get_entity_children(self):
             if child.immutable_for_hierarchy:
                 self._immutable_for_hierarchy_cache = True
                 return self._immutable_for_hierarchy_cache
@@ -651,6 +933,10 @@ class BaseEntity(object):
 
         return None
 
+    @property
+    def has_cached_immutable_hierarchy(self):
+        return self._immutable_for_hierarchy_cache is not None
+
     def reset_immutable_for_hierarchy_cache(self, bottom_to_top=True):
         """Clear cache of immutable hierarchy property.
 
@@ -662,14 +948,9 @@ class BaseEntity(object):
         """
 
         self._immutable_for_hierarchy_cache = None
-        if bottom_to_top:
-            parent = self.parent
-            if parent is not None:
-                parent.reset_immutable_for_hierarchy_cache(bottom_to_top)
-
-        else:
-            for child in self:
-                child.reset_immutable_for_hierarchy_cache(bottom_to_top)
+        self._entity_hub.reset_immutable_for_hierarchy_cache(
+            self.id, bottom_to_top
+        )
 
     def _get_default_changes(self):
         """Collect changes of common data on entity.
@@ -679,15 +960,15 @@ class BaseEntity(object):
         """
 
         changes = {}
-        if self._orig_name != self.name:
-            changes["name"] = self._orig_name
+        if self._orig_name != self._name:
+            changes["name"] = self._name
 
         if self._entity_hub.allow_data_changes:
             if self._orig_data != self._data:
                 changes["data"] = self._data
 
-        if self._orig_thumbnail_id != self.thumbnail_id:
-            changes["thumbnailId"] = self.thumbnail_id
+        if self._orig_thumbnail_id != self._thumbnail_id:
+            changes["thumbnailId"] = self._thumbnail_id
 
         if self._orig_active != self.active:
             changes["active"] = self.active
@@ -743,23 +1024,37 @@ class BaseEntity(object):
             TypeError: If validation of parent does not pass.
         """
 
-        parent = self._get_entity_by_id(parent_id)
-        if not parent and parent_id:
-            raise ValueError(
-                "Entity with id \"{}\" was not found.".format(parent_id)
+        if parent_id != self._parent_id:
+            orig_parent_id = self._parent_id
+            self._parent_id = parent_id
+            self._entity_hub.set_entity_parent(
+                self.id, parent_id, orig_parent_id
             )
-        self.set_parent(self._get_entity_by_id(parent_id))
 
-    def get_parent(self):
+    parent_id = property(get_parent_id, set_parent_id)
+
+    def get_parent(self, allow_query=True):
         """Parent entity.
 
         Returns:
             Union[BaseEntity, None]: Parent object.
         """
 
-        return self._get_entity_by_id(self._parent_id)
+        parent = self._entity_hub.get_entity_by_id(self._parent_id)
+        if parent is not None:
+            return parent
 
-    def set_parent(self, parent, use_hub=True):
+        if not allow_query:
+            return self._parent_id
+
+        if self._parent_id is UNKNOWN_VALUE:
+            return self._parent_id
+
+        return self._entity_hub.get_or_query_entity_by_id(
+            self._parent_id, self.parent_entity_types
+        )
+
+    def set_parent(self, parent):
         """Change parent object.
 
         Args:
@@ -769,31 +1064,54 @@ class BaseEntity(object):
             TypeError: If validation of parent does not pass.
         """
 
-        if use_hub:
-            self._entity_hub.set_entity_parent(self, parent)
-            return
-
         parent_id = None
         if parent is not None:
             parent_id = parent.id
-        if parent_id != self._parent_id:
-            self.validate_parent(parent)
-            self._parent_id = parent_id
+        self._entity_hub.set_entity_parent(self.id, parent_id)
 
-    parent_id = property(get_parent_id, set_parent_id)
     parent = property(get_parent, set_parent)
 
-    @property
-    def children(self):
+    def get_children_ids(self, allow_query=True):
+        """Access to children objects.
+
+        Todos:
+            Children should be maybe handled by EntityHub instead of entities
+                themselves. That would simplify 'set_entity_parent',
+                'unset_entity_parent' and other logic related to changing
+                hierarchy.
+
+        Returns:
+            Union[List[str], Type[UNKNOWN_VALUE]]: Children iterator.
+        """
+
+        if self._children_ids is UNKNOWN_VALUE:
+            if not allow_query:
+                return self._children_ids
+            self._entity_hub.get_entity_children(self, True)
+        return set(self._children_ids)
+
+    children_ids = property(get_children_ids)
+
+    def get_children(self, allow_query=True):
         """Access to children objects.
 
         Returns:
-            List[BaseEntity]: Children iterator.
+            Union[List[BaseEntity], Type[UNKNOWN_VALUE]]: Children iterator.
         """
 
-        return list(self._children)
+        if self._children_ids is UNKNOWN_VALUE:
+            if not allow_query:
+                return self._children_ids
+            return self._entity_hub.get_entity_children(self, True)
 
-    def add_child(self, child, use_hub=True):
+        return [
+            self._entity_hub.get_entity_by_id(children_id)
+            for children_id in self._children_ids
+        ]
+
+    children = property(get_children)
+
+    def add_child(self, child):
         """Add child entity.
 
         Args:
@@ -803,29 +1121,31 @@ class BaseEntity(object):
             TypeError: When child object has invalid type to be children.
         """
 
-        if use_hub:
-            self._event_hub.set_entity_parent(child, self)
-            return
+        child_id = child
+        if isinstance(child_id, BaseEntity):
+            child_id = child.id
 
-        if child not in self._children:
-            self.validate_child(child)
-            self._children.append(child)
+        if self._children_ids is not UNKNOWN_VALUE:
+            self._children_ids.add(child_id)
 
-    def remove_child(self, child, use_hub=True):
+        self._entity_hub.set_entity_parent(child_id, self.id)
+
+    def remove_child(self, child):
         """Remove child entity.
 
         Is ignored if child is not in children.
 
         Args:
-            child (BaseEntity): Child object to remove.
+            child (Union[str, BaseEntity]): Child object or child id to remove.
         """
 
-        if use_hub:
-            self._entity_hub.set_entity_parent(child, None)
-            return
+        child_id = child
+        if isinstance(child_id, BaseEntity):
+            child_id = child.id
 
-        if child in self._children:
-            self._children.remove(child)
+        if self._children_ids is not UNKNOWN_VALUE:
+            self._children_ids.discard(child_id)
+        self._entity_hub.unset_entity_parent(child_id, self.id)
 
     def get_thumbnail_id(self):
         """Thumbnail id of entity.
@@ -848,18 +1168,28 @@ class BaseEntity(object):
     thumbnail_id = property(get_thumbnail_id, set_thumbnail_id)
 
     @property
-    def is_new(self):
+    def created(self):
         """Entity is new.
 
         Returns:
             bool: Entity is newly created.
         """
 
-        return self._is_new
+        return self._created
+
+    def fill_children_ids(self, children_ids):
+        """Fill children ids on entity.
+
+        Warning:
+            This is not an api call but is called from entity hub.
+        """
+
+        self._children_ids = set(children_ids)
 
 
 class ProjectEntity(BaseEntity):
     entity_type = "project"
+    parent_entity_types = []
     # TODO These are hardcoded but maybe should be used from server???
     default_folder_type_icon = "folder"
     default_task_type_icon = "task_alt"
@@ -878,6 +1208,16 @@ class ProjectEntity(BaseEntity):
         self._orig_library_project = library
         self._orig_folder_types = copy.deepcopy(folder_types)
         self._orig_task_types = copy.deepcopy(task_types)
+
+    def get_parent(self, *args, **kwargs):
+        return None
+
+    def set_parent(self, parent):
+        raise ValueError(
+            "Parent of project cannot be set to {}".format(parent)
+        )
+
+    parent = property(get_parent, set_parent)
 
     def get_folder_types(self):
         return copy.deepcopy(self._folder_types)
@@ -905,10 +1245,6 @@ class ProjectEntity(BaseEntity):
     task_types = property(get_task_types, set_task_types)
 
     @property
-    def has_valid_parent(self):
-        return self._parent is None
-
-    @property
     def changes(self):
         changes = self._get_default_changes()
         if self._orig_folder_types != self._folder_types:
@@ -919,48 +1255,31 @@ class ProjectEntity(BaseEntity):
 
         return changes
 
-    def to_entity_data(self):
-        raise NotImplementedError(
-            "ProjectEntity does not support conversion to entity data"
+    @classmethod
+    def from_entity_data(cls, project, entity_hub):
+        return cls(
+            project["code"],
+            parent_id=PROJECT_PARENT_ID,
+            entity_id=project["name"],
+            library=project["library"],
+            folder_types=project["folderTypes"],
+            task_types=project["taskTypes"],
+            name=project["name"],
+            attribs=project["ownAttrib"],
+            data=project["data"],
+            active=project["active"],
+            entity_hub=entity_hub
         )
 
-    def add_folder(self, *args, **kwargs):
-        """Create folder object and add it to entity hub.
-
-        Args:
-            folder_type (str): Folder type of folder.
-            name (str): Name of folder.
-            attribs (Union[Dict[str, Any], None]): Attribute values.
-            data (Union[Dict[str, Any], None]): Custom entity data.
-            entity_id (Union[str, None]): Entity id.
-            thumbnail_id (Union[str, None]): Thumbnail id.
-            active (bool): Entity is active.
-
-        Returns:
-            FolderEntity: Added folder entity.
-        """
-
-        return self._entity_hub.add_folder(self, *args, **kwargs)
-
-    def validate_parent(self, parent):
-        if parent is not None:
-            raise TypeError("Project cannot have set parent. Got {}".format(
-                str(type(parent))
-            ))
-
-    def validate_child(self, child):
-        if isinstance(child, FolderEntity):
-            return
-
-        raise TypeError(
-            "Got invalid child \"{}\". Expected 'FolderEntity'".format(
-                str(type(child))
-            )
+    def to_create_body_data(self):
+        raise NotImplementedError(
+            "ProjectEntity does not support conversion to entity data"
         )
 
 
 class FolderEntity(BaseEntity):
     entity_type = "folder"
+    parent_entity_types = ["folder", "project"]
 
     def __init__(self, folder_type, *args, **kwargs):
         super(FolderEntity, self).__init__(*args, **kwargs)
@@ -971,19 +1290,9 @@ class FolderEntity(BaseEntity):
         # - is used to know if folder allows hierarchy changes
         self._has_published_content = False
 
-    def add_folder(self, *args, **kwargs):
-        return self._entity_hub.add_folder(self, *args, **kwargs)
-
-    def add_task(self, *args, **kwargs):
-        return self._entity_hub.add_task(self, *args, **kwargs)
-
     def lock(self):
         super(FolderEntity, self).lock()
         self._orig_folder_type = self._folder_type
-
-    @property
-    def has_valid_parent(self):
-        return isinstance(self._parent, (ProjectEntity, FolderEntity))
 
     @property
     def changes(self):
@@ -1000,18 +1309,50 @@ class FolderEntity(BaseEntity):
 
         return changes
 
-    def to_entity_data(self):
+    @classmethod
+    def from_entity_data(cls, folder, entity_hub):
+        parent_id = folder["parentId"]
+        if parent_id is None:
+            parent_id = entity_hub.project_entity.id
+        return cls(
+            folder["folderType"],
+            entity_id=folder["id"],
+            parent_id=parent_id,
+            name=folder["name"],
+            data=folder.get("data"),
+            attribs=folder["ownAttrib"],
+            active=folder["active"],
+            thumbnail_id=folder["thumbnailId"],
+            created=False,
+            entity_hub=entity_hub
+        )
+
+    def to_create_body_data(self):
         parent_id = self._parent_id
+        if parent_id is UNKNOWN_VALUE:
+            raise ValueError("Folder does not have set 'parent_id'")
+
         if parent_id == self.project_name:
             parent_id = None
+
+        if not self.name or self.name is UNKNOWN_VALUE:
+            raise ValueError("Folder does not have set 'name'")
+
         output = {
             "name": self.name,
             "folderType": self.folder_type,
             "parentId": parent_id,
-            "thumbnailId": self.thumbnail_id,
-            "attrib": self.attribs.to_dict(),
-            "active": self.active,
         }
+        attrib = self.attribs.to_dict()
+        if attrib:
+            output["attrib"] = attrib
+
+        if self.active is not UNKNOWN_VALUE:
+            output["active"] = self.active
+
+        if self.thumbnail_id is not UNKNOWN_VALUE:
+            output["thumbnailId"] = self.thumbnail_id
+
         if self._entity_hub.allow_data_changes:
             output["data"] = self._data
         return output
@@ -1033,7 +1374,7 @@ class FolderEntity(BaseEntity):
 
         self._has_published_content = has_published_content
         # Reset immutable cache of parents
-        self.reset_immutable_for_hierarchy_cache()
+        self._entity_hub.reset_immutable_for_hierarchy_cache(self.id)
 
     has_published_content = property(
         get_has_published_content, set_has_published_content
@@ -1045,36 +1386,17 @@ class FolderEntity(BaseEntity):
             return True
         return None
 
-    def validate_parent(self, parent):
-        if parent is None or isinstance(parent, (ProjectEntity, FolderEntity)):
-            return
-
-        raise TypeError((
-            "Invalid type of parent. Got {}."
-            " Expected 'None', 'ProjectEntity' or 'FolderEntity'"
-        ).format(str(type(parent))))
-
-    def validate_child(self, child):
-        if isinstance(child, (FolderEntity, TaskEntity)):
-            return
-
-        raise TypeError((
-            "Got invalid child \"{}\". Expected 'FolderEntity' or 'TaskEntity'"
-        ).format(str(type(child))))
-
 
 class TaskEntity(BaseEntity):
     entity_type = "task"
+    parent_entity_types = ["folder"]
 
     def __init__(self, task_type, *args, **kwargs):
         super(TaskEntity, self).__init__(*args, **kwargs)
 
         self._task_type = task_type
         self._orig_task_type = task_type
-
-    @property
-    def has_valid_parent(self):
-        return isinstance(self._parent, FolderEntity)
+        self._children_ids = set()
 
     def lock(self):
         super(TaskEntity, self).lock()
@@ -1088,19 +1410,8 @@ class TaskEntity(BaseEntity):
 
     task_type = property(get_task_type, set_task_type)
 
-    def validate_parent(self, parent):
-        if parent is None:
-            return
-
-        if not isinstance(parent, FolderEntity):
-            raise TypeError((
-                "Invalid type of parent. Got {}."
-                " Expected 'None' or 'FolderEntity'"
-            ).format(str(type(parent))))
-
-    def validate_child(self, child):
-        raise ValueError("{} does not support children assignment".format(
-            self.__class__.__name__))
+    def add_child(self, child):
+        raise ValueError("Task does not support to add children")
 
     @property
     def changes(self):
@@ -1114,15 +1425,40 @@ class TaskEntity(BaseEntity):
 
         return changes
 
-    def to_entity_data(self):
+    @classmethod
+    def from_entity_data(cls, task, entity_hub):
+        return cls(
+            task["taskType"],
+            entity_id=task["id"],
+            parent_id=task["folderId"],
+            name=task["name"],
+            data=task.get("data"),
+            attribs=task["ownAttrib"],
+            active=task["active"],
+            created=False,
+            entity_hub=entity_hub
+        )
+
+    def to_create_body_data(self):
+        if self.parent_id is UNKNOWN_VALUE:
+            raise ValueError("Task does not have set 'parent_id'")
+
         output = {
             "name": self.name,
             "taskType": self.task_type,
             "folderId": self.parent_id,
             "attrib": self.attribs.to_dict(),
-            "active": self.active,
         }
+        attrib = self.attribs.to_dict()
+        if attrib:
+            output["attrib"] = attrib
 
-        if self._entity_hub.allow_data_changes:
+        if self.active is not UNKNOWN_VALUE:
+            output["active"] = self.active
+
+        if (
+            self._entity_hub.allow_data_changes
+            and self._data is not UNKNOWN_VALUE
+        ):
             output["data"] = self._data
         return output
