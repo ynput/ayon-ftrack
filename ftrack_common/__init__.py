@@ -12,6 +12,7 @@ from .constants import (
     CUST_ATTR_KEY_SERVER_ID,
     CUST_ATTR_GROUP,
     CUST_ATTR_AUTO_SYNC,
+    FPS_KEYS,
 )
 
 from .custom_attributes import (
@@ -31,6 +32,7 @@ __all__ = (
     "CUST_ATTR_KEY_SERVER_ID",
     "CUST_ATTR_GROUP",
     "CUST_ATTR_AUTO_SYNC",
+    "FPS_KEYS",
 
     "get_custom_attr_configs",
     "query_custom_attribute_values",

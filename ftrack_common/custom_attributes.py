@@ -41,7 +41,7 @@ def get_custom_attr_configs(session, query_keys=None, split_hierarchical=True):
         " where group.name in (\"{}\")"
     ).format(
         join_filter_values(query_keys),
-        CUST_ATTR_GROUP
+        join_filter_values([CUST_ATTR_GROUP])
     )
     all_avalon_attr = session.query(cust_attrs_query).all()
     for cust_attr in all_avalon_attr:
