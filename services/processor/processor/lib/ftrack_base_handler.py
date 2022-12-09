@@ -52,7 +52,7 @@ class BaseHandler(object):
 
     def __init__(self, session):
         '''Expects a ftrack_api.Session instance'''
-        self.log = logging.getLogger(self.__class__.__name__)
+        self._log = None
         if not isinstance(session, ftrack_api.session.Session):
             raise Exception((
                 "Session object entered with args is instance of \"{}\""
@@ -67,6 +67,13 @@ class BaseHandler(object):
         # Using decorator
         self.register = self.register_decorator(self.register)
         self.launch = self.launch_log(self.launch)
+
+    @property
+    def log(self):
+        if self._log is None:
+            self._log = logging.getLogger(self.__class__.__name__)
+            self._log.setLevel(logging.DEBUG)
+        return self._log
 
     @staticmethod
     def process_identifier():
