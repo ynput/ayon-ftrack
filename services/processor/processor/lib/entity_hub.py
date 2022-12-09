@@ -1307,6 +1307,14 @@ class FolderEntity(BaseEntity):
         # - is used to know if folder allows hierarchy changes
         self._has_published_content = False
 
+    def get_folder_type(self):
+        return self._folder_type
+
+    def set_folder_type(self, folder_type):
+        self._folder_type = folder_type
+
+    folder_type = property(get_folder_type, set_folder_type)
+
     def get_label(self):
         return self._label
 
@@ -1314,6 +1322,28 @@ class FolderEntity(BaseEntity):
         self._label = label
 
     label = property(get_label, set_label)
+
+    def get_has_published_content(self):
+        return self._has_published_content
+
+    def set_has_published_content(self, has_published_content):
+        if self._has_published_content is has_published_content:
+            return
+
+        self._has_published_content = has_published_content
+        # Reset immutable cache of parents
+        self._entity_hub.reset_immutable_for_hierarchy_cache(self.id)
+
+    has_published_content = property(
+        get_has_published_content, set_has_published_content
+    )
+
+    @property
+    def _immutable_for_hierarchy(self):
+        if self.has_published_content:
+            return True
+        return None
+
     def lock(self):
         super(FolderEntity, self).lock()
         self._orig_folder_type = self._folder_type
@@ -1388,35 +1418,6 @@ class FolderEntity(BaseEntity):
         if self._entity_hub.allow_data_changes:
             output["data"] = self._data
         return output
-
-    def get_folder_type(self):
-        return self._folder_type
-
-    def set_folder_type(self, folder_type):
-        self._folder_type = folder_type
-
-    folder_type = property(get_folder_type, set_folder_type)
-
-    def get_has_published_content(self):
-        return self._has_published_content
-
-    def set_has_published_content(self, has_published_content):
-        if self._has_published_content is has_published_content:
-            return
-
-        self._has_published_content = has_published_content
-        # Reset immutable cache of parents
-        self._entity_hub.reset_immutable_for_hierarchy_cache(self.id)
-
-    has_published_content = property(
-        get_has_published_content, set_has_published_content
-    )
-
-    @property
-    def _immutable_for_hierarchy(self):
-        if self.has_published_content:
-            return True
-        return None
 
 
 class TaskEntity(BaseEntity):
