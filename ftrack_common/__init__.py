@@ -15,6 +15,10 @@ from .constants import (
     FPS_KEYS,
 )
 
+from .exceptions import (
+    InvalidFpsValue,
+)
+
 from .custom_attributes import (
     get_custom_attr_configs,
     query_custom_attribute_values,
@@ -24,6 +28,7 @@ from .custom_attributes import (
 from .lib import (
     join_filter_values,
     create_chunks,
+    convert_to_fps,
 )
 
 
@@ -34,10 +39,13 @@ __all__ = (
     "CUST_ATTR_AUTO_SYNC",
     "FPS_KEYS",
 
+    "InvalidFpsValue",
+
     "get_custom_attr_configs",
     "query_custom_attribute_values",
     "get_custom_attributes_by_entity_id",
 
     "join_filter_values",
     "create_chunks",
+    "convert_to_fps",
 )
