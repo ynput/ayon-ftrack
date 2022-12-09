@@ -7,9 +7,23 @@ from openpype_api import get_server_api_connection
 from openpype_api.graphql import GraphQlQueryFailed
 from openpype_api.utils import create_entity_id
 
+from nxtools import slugify
+
 UNKNOWN_VALUE = object()
 PROJECT_PARENT_ID = object()
 _NOT_SET = object()
+
+
+def slugify_name(name, separator="_"):
+    """Prepare name ready for server regex.
+
+    This function should probably be part of python api.
+
+    Function should expect possible characters as that may change over time on
+    server. The separator should be received from server.
+    """
+
+    return slugify(name, separator)
 
 
 class EntityHub:
