@@ -1281,15 +1281,25 @@ class FolderEntity(BaseEntity):
     entity_type = "folder"
     parent_entity_types = ["folder", "project"]
 
-    def __init__(self, folder_type, *args, **kwargs):
+    def __init__(self, folder_type, *args, label=None, **kwargs):
         super(FolderEntity, self).__init__(*args, **kwargs)
 
         self._folder_type = folder_type
+        self._label = label
+
         self._orig_folder_type = folder_type
+        self._orig_label = label
         # Know if folder has any subsets
         # - is used to know if folder allows hierarchy changes
         self._has_published_content = False
 
+    def get_label(self):
+        return self._label
+
+    def set_label(self, label):
+        self._label = label
+
+    label = property(get_label, set_label)
     def lock(self):
         super(FolderEntity, self).lock()
         self._orig_folder_type = self._folder_type
@@ -1307,6 +1317,13 @@ class FolderEntity(BaseEntity):
         if self._orig_folder_type != self._folder_type:
             changes["folderType"] = self._folder_type
 
+        # label = self._label
+        # if self._name == label:
+        #     label = None
+        #
+        # if label != self._orig_label:
+        #     changes["label"] = label
+
         return changes
 
     @classmethod
@@ -1316,6 +1333,7 @@ class FolderEntity(BaseEntity):
             parent_id = entity_hub.project_entity.id
         return cls(
             folder["folderType"],
+            # label=folder["label"],
             entity_id=folder["id"],
             parent_id=parent_id,
             name=folder["name"],
@@ -1391,11 +1409,15 @@ class TaskEntity(BaseEntity):
     entity_type = "task"
     parent_entity_types = ["folder"]
 
-    def __init__(self, task_type, *args, **kwargs):
+    def __init__(self, task_type, *args, label=None, **kwargs):
         super(TaskEntity, self).__init__(*args, **kwargs)
 
         self._task_type = task_type
+        self._label = label
+
         self._orig_task_type = task_type
+        self._orig_label = label
+
         self._children_ids = set()
 
     def lock(self):
@@ -1410,6 +1432,14 @@ class TaskEntity(BaseEntity):
 
     task_type = property(get_task_type, set_task_type)
 
+    def get_label(self):
+        return self._label
+
+    def set_label(self, label):
+        self._label = label
+
+    label = property(get_label, set_label)
+
     def add_child(self, child):
         raise ValueError("Task does not support to add children")
 
@@ -1423,6 +1453,13 @@ class TaskEntity(BaseEntity):
         if self._orig_task_type != self._task_type:
             changes["taskType"] = self._task_type
 
+        # label = self._label
+        # if self._name == label:
+        #     label = None
+        #
+        # if label != self._orig_label:
+        #     changes["label"] = label
+
         return changes
 
     @classmethod
@@ -1430,6 +1467,7 @@ class TaskEntity(BaseEntity):
         return cls(
             task["taskType"],
             entity_id=task["id"],
+            # label=task["label"],
             parent_id=task["folderId"],
             name=task["name"],
             data=task.get("data"),
