@@ -260,18 +260,22 @@ class EntityHub:
             folders = list(self._connection.get_folders(
                 entity["name"],
                 parent_ids=[entity.id],
-                fields=folder_fields
+                fields=folder_fields,
+                own_attributes=True
             ))
 
         elif entity.entity_type == "folder":
             folders = list(self._connection.get_folders(
-                self._project_entity["name"],
+                self.project_entity["name"],
                 parent_ids=[entity.id],
-                fields=folder_fields
+                fields=folder_fields,
+                own_attributes=True
             ))
+
             tasks = list(self._connection.get_tasks(
-                self._project_entity["name"],
-                parent_ids=[entity.id]
+                self.project_entity["name"],
+                folder_ids=[entity.id],
+                own_attributes=True
             ))
 
         children_ids = {
@@ -398,13 +402,9 @@ class EntityHub:
             own_attributes=True
         )
         folders_by_parent_id = collections.defaultdict(list)
-        try:
-            for folder in folders:
-                parent_id = folder["parentId"]
-                folders_by_parent_id[parent_id].append(folder)
-        except GraphQlQueryFailed as exc:
-            print(exc.query)
-            raise
+        for folder in folders:
+            parent_id = folder["parentId"]
+            folders_by_parent_id[parent_id].append(folder)
 
         tasks_by_parent_id = collections.defaultdict(list)
         for task in tasks:
@@ -555,11 +555,11 @@ class EntityHub:
             if entity_id in processed_ids:
                 continue
 
+            entity = self._entities_by_id.pop(entity_id)
             parent_children = self._entities_by_parent_id[entity.parent_id]
             if entity in parent_children:
                 parent_children.remove(entity)
 
-            entity = self._entities_by_id.pop(entity_id)
             if not entity.created:
                 operations_body.append(self._get_delete_body(entity))
 
