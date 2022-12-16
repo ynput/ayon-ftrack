@@ -991,9 +991,8 @@ class BaseEntity(object):
             changes["active"] = self.active
 
         attrib_changes = self.attribs.changes
-        for name, value in attrib_changes.items():
-            key = "attrib.{}".format(name)
-            changes[key] = value
+        if attrib_changes:
+            changes["attrib"] = attrib_changes
         return changes
 
     def _get_attributes_for_type(self, entity_type):
