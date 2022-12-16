@@ -738,7 +738,7 @@ class BaseEntity(object):
 
     def __init__(
         self,
-        entity_id,
+        entity_id=None,
         parent_id=UNKNOWN_VALUE,
         name=UNKNOWN_VALUE,
         attribs=UNKNOWN_VALUE,
