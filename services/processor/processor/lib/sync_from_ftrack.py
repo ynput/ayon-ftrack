@@ -10,7 +10,10 @@ from openpype_api import (
 import ftrack_api
 from ftrack_common import (
     CUST_ATTR_KEY_SERVER_ID,
+    CUST_ATTR_KEY_SERVER_PATH,
+    CUST_ATTR_KEY_SYNC_FAIL,
     FTRACK_ID_ATTRIB,
+    FTRACK_PATH_ATTRIB,
     create_chunks,
     get_custom_attributes_by_entity_id,
 )
@@ -116,18 +119,39 @@ class SyncFromFtrack:
         # Get ftrack custom attributes to sync
         attr_confs, hier_attr_confs = _get_custom_attr_configs(ft_session)
         # Check if there is custom attribute to store server id
-        server_id_conf = next(
-            (
-                attr_conf
-                for attr_conf in hier_attr_confs
-                if attr_conf["key"] == CUST_ATTR_KEY_SERVER_ID
-            ), None
-        )
+        server_id_conf = None
+        server_path_conf = None
+        sync_failed_conf = None
+        for attr_conf in hier_attr_confs:
+            if attr_conf["key"] == CUST_ATTR_KEY_SERVER_ID:
+                server_id_conf = attr_conf
+            elif attr_conf["key"] == CUST_ATTR_KEY_SERVER_PATH:
+                server_path_conf = attr_conf
+            elif attr_conf["key"] == CUST_ATTR_KEY_SYNC_FAIL:
+                sync_failed_conf = attr_conf
+
+        missing_attrs = []
         if not server_id_conf:
+            missing_attrs.append(CUST_ATTR_KEY_SERVER_ID)
+
+        if not server_path_conf:
+            missing_attrs.append(CUST_ATTR_KEY_SERVER_PATH)
+
+        if not sync_failed_conf:
+            missing_attrs.append(CUST_ATTR_KEY_SYNC_FAIL)
+
+        if missing_attrs:
+            attr_end = ""
+            was_were = "was"
+            if len(missing_attrs) > 1:
+                attr_end = "s"
+                was_were = "were"
+            joined_attrs = ", ".join([f'"{attr}"'for attr in missing_attrs])
             msg = (
-                f"Hierarchical attribute \"{CUST_ATTR_KEY_SERVER_ID}\""
-                " was not found in Ftrack"
+                f"Hierarchical attribute{attr_end} {joined_attrs}"
+                f" {was_were} not found in Ftrack"
             )
+
             self.log.warning(msg)
             raise ValueError(msg)
 
@@ -238,13 +262,18 @@ class SyncFromFtrack:
         )
 
         self.log.info("Updating attributes of entities")
-        self.update_attributes_from_ftrack(cust_attr_value_by_entity_id)
+        self.update_attributes_from_ftrack(
+            cust_attr_value_by_entity_id,
+            ft_entities_by_id
+        )
         self._entity_hub.commit_changes()
 
         self.log.info("Updating server ids on ftrack entities")
         self.update_ftrack_attributes(
             cust_attr_value_by_entity_id,
-            server_id_conf
+            server_id_conf,
+            server_path_conf,
+            sync_failed_conf
         )
         t_end = time.perf_counter()
         self.log.info((
@@ -759,7 +788,9 @@ class SyncFromFtrack:
                 if child not in matched_children:
                     child.active = False
 
-    def update_attributes_from_ftrack(self, cust_attr_value_by_entity_id):
+    def update_attributes_from_ftrack(
+        self, cust_attr_value_by_entity_id, ft_entities_by_id
+    ):
         hierarchy_queue = collections.deque()
         hierarchy_queue.append(self._entity_hub.project_entity)
         while hierarchy_queue:
@@ -772,7 +803,14 @@ class SyncFromFtrack:
             if ftrack_id is None:
                 continue
 
+            ft_entity = ft_entities_by_id[ftrack_id]
+            path = "/".join([
+                item["name"]
+                for item in ft_entity["link"]
+                if item["type"] != "Project"
+            ])
             entity.attribs[FTRACK_ID_ATTRIB] = ftrack_id
+            entity.attribs[FTRACK_PATH_ATTRIB] = path
             # Ftrack id can not be available if ftrack entity was recreated
             #   during immutable entity processing
             attribute_values = cust_attr_value_by_entity_id[ftrack_id]
@@ -790,10 +828,34 @@ class SyncFromFtrack:
                 if key in entity.attribs:
                     entity.attribs[key] = value
 
+    def _create_ft_operation(
+        self, conf_id, entity_id, is_new, new_value, old_value=None
+    ):
+        entity_key = collections.OrderedDict((
+            ("configuration_id", conf_id),
+            ("entity_id", entity_id)
+        ))
+        if is_new:
+            return ftrack_api.operation.CreateEntityOperation(
+                "CustomAttributeValue",
+                entity_key,
+                {"value": new_value}
+            )
+
+        return ftrack_api.operation.UpdateEntityOperation(
+            "CustomAttributeValue",
+            entity_key,
+            "value",
+            new_value,
+            old_value
+        )
+
     def update_ftrack_attributes(
         self,
         cust_attr_value_by_entity_id,
         server_id_conf,
+        server_path_conf,
+        sync_failed_conf
     ):
         fill_queue = collections.deque()
         for child in self._entity_hub.project_entity.children:
@@ -808,32 +870,34 @@ class SyncFromFtrack:
             ftrack_id = self._ids_mapping.get_ftrack_mapping(entity.id)
             custom_attributes = cust_attr_value_by_entity_id[ftrack_id]
             server_id = custom_attributes.get(CUST_ATTR_KEY_SERVER_ID)
-            if server_id == entity.id or ftrack_id is None:
+            server_path = custom_attributes.get(CUST_ATTR_KEY_SERVER_PATH)
+            if ftrack_id is None:
                 continue
 
-            entity_key = collections.OrderedDict((
-                ("configuration_id", server_id_conf["id"]),
-                ("entity_id", ftrack_id)
-            ))
-            if CUST_ATTR_KEY_SERVER_ID not in custom_attributes:
+            if server_id != entity.id:
                 operations.append(
-                    ftrack_api.operation.CreateEntityOperation(
-                        "CustomAttributeValue",
-                        entity_key,
-                        {"value": entity.id}
+                    self._create_ft_operation(
+                        server_id_conf["id"],
+                        ftrack_id,
+                        CUST_ATTR_KEY_SERVER_ID not in custom_attributes,
+                        entity.id,
+                        server_id
                     )
                 )
 
-            else:
-                operations.append(
-                    ftrack_api.operation.UpdateEntityOperation(
-                        "CustomAttributeValue",
-                        entity_key,
-                        "value",
-                        server_id,
-                        entity.id
+            if entity.entity_type == "folder":
+                path = entity.path
+                if path != server_path:
+                    print(path)
+                    operations.append(
+                        self._create_ft_operation(
+                            server_path_conf["id"],
+                            ftrack_id,
+                            CUST_ATTR_KEY_SERVER_PATH not in custom_attributes,
+                            path,
+                            server_path
+                        )
                     )
-                )
 
         if not operations:
             return
