@@ -2,6 +2,7 @@
 CUST_ATTR_GROUPS = {
     "pype",
     "openpype",
+    "ayon",
 }
 
 # name of Custom attribute that stores mongo_id from avalon db
