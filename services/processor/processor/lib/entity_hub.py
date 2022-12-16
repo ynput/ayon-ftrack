@@ -84,7 +84,7 @@ class EntityHub:
 
     def get_or_query_entity_by_id(self, entity_id, entity_types):
         existing_entity = self._entities_by_id.get(entity_id)
-        if existing_entity is None:
+        if existing_entity is not None:
             return existing_entity
 
         if not entity_types:
@@ -96,11 +96,14 @@ class EntityHub:
                 entity_data = self._connection.get_folder_by_id(
                     self.project_name,
                     entity_id,
-                    fields=self._get_folder_fields()
+                    fields=self._get_folder_fields(),
+                    own_attributes=True
                 )
             elif entity_type == "task":
                 entity_data = self._connection.get_task_by_id(
-                    self.project_name, entity_id
+                    self.project_name,
+                    entity_id,
+                    own_attributes=True
                 )
             else:
                 raise ValueError(
