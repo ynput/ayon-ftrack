@@ -23,7 +23,7 @@ def slugify_name(name, separator="_"):
     server. The separator should be received from server.
     """
 
-    return slugify(name, separator)
+    return slugify(name, separator, lower=False)
 
 
 class EntityHub:
