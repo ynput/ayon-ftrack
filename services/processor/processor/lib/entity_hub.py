@@ -41,6 +41,8 @@ class EntityHub:
 
         self._allow_data_changes = allow_data_changes
 
+        self._path_reset_queue = None
+
     @property
     def allow_data_changes(self):
         return self._allow_data_changes
@@ -184,6 +186,24 @@ class EntityHub:
         parent = self._entities_by_id.get(entity.parent_id)
         if parent is not None:
             parent.add_child(entity.id)
+
+    def folder_path_reseted(self, folder_id):
+        if self._path_reset_queue is not None:
+            self._path_reset_queue.append(folder_id)
+            return
+
+        self._path_reset_queue = collections.deque()
+        self._path_reset_queue.append(folder_id)
+        while self._path_reset_queue:
+            children = self._entities_by_parent_id[folder_id]
+            for child in children:
+                path = child.get_path(False)
+                if path is not None:
+                    child.reset_path()
+                else:
+                    self._path_reset_queue.append(child.id)
+
+        self._path_reset_queue = None
 
     def unset_entity_parent(self, entity_id, parent_id):
         entity = self._entities_by_id.get(entity_id)
@@ -1297,7 +1317,7 @@ class FolderEntity(BaseEntity):
     entity_type = "folder"
     parent_entity_types = ["folder", "project"]
 
-    def __init__(self, folder_type, *args, label=None, **kwargs):
+    def __init__(self, folder_type, *args, label=None, path=None, **kwargs):
         super(FolderEntity, self).__init__(*args, **kwargs)
 
         self._folder_type = folder_type
@@ -1308,6 +1328,7 @@ class FolderEntity(BaseEntity):
         # Know if folder has any subsets
         # - is used to know if folder allows hierarchy changes
         self._has_published_content = False
+        self._path = path
 
     def get_folder_type(self):
         return self._folder_type
@@ -1324,6 +1345,25 @@ class FolderEntity(BaseEntity):
         self._label = label
 
     label = property(get_label, set_label)
+
+    def get_path(self, dynamic_value=True):
+        if not dynamic_value:
+            return self._path
+
+        if self._path is None:
+            parent = self.parent
+            path = self.name
+            if parent.entity_type == "folder":
+                parent_path = parent.path
+                path = "/".join([parent_path, path])
+            self._path = path
+        return self._path
+
+    def reset_path(self):
+        self._path = None
+        self._entity_hub.folder_path_reseted(self.id)
+
+    path = property(get_path)
 
     def get_has_published_content(self):
         return self._has_published_content
