@@ -1361,12 +1361,12 @@ class FolderEntity(BaseEntity):
         if self._orig_folder_type != self._folder_type:
             changes["folderType"] = self._folder_type
 
-        # label = self._label
-        # if self._name == label:
-        #     label = None
-        #
-        # if label != self._orig_label:
-        #     changes["label"] = label
+        label = self._label
+        if self._name == label:
+            label = None
+
+        if label != self._orig_label:
+            changes["label"] = label
 
         return changes
 
@@ -1377,7 +1377,8 @@ class FolderEntity(BaseEntity):
             parent_id = entity_hub.project_entity.id
         return cls(
             folder["folderType"],
-            # label=folder["label"],
+            label=folder["label"],
+            path=folder["path"],
             entity_id=folder["id"],
             parent_id=parent_id,
             name=folder["name"],
@@ -1468,12 +1469,12 @@ class TaskEntity(BaseEntity):
         if self._orig_task_type != self._task_type:
             changes["taskType"] = self._task_type
 
-        # label = self._label
-        # if self._name == label:
-        #     label = None
-        #
-        # if label != self._orig_label:
-        #     changes["label"] = label
+        label = self._label
+        if self._name == label:
+            label = None
+
+        if label != self._orig_label:
+            changes["label"] = label
 
         return changes
 
@@ -1482,7 +1483,7 @@ class TaskEntity(BaseEntity):
         return cls(
             task["taskType"],
             entity_id=task["id"],
-            # label=task["label"],
+            label=task["label"],
             parent_id=task["folderId"],
             name=task["name"],
             data=task.get("data"),
