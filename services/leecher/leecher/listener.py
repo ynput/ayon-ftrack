@@ -45,10 +45,12 @@ def listen_loop(session, callback):
 
 
 def main(func: Union[Callable, None] = None):
+    print("Starting listener")
     if func is None:
         func = callback
     settings = ayclient.addon_settings()
 
+    print("Creating ftrack session")
     session = ftrack_api.Session(
         settings["ftrack_server"],
         settings["service_settings"]["api_key"],
@@ -58,7 +60,7 @@ def main(func: Union[Callable, None] = None):
 
     # Register interrupt signal
     def signal_handler(sig, frame):
-        logging.warning("You pressed Ctrl+C. Terminating process.")
+        logging.warning("Process stop requested. Terminating process.")
         if session.event_hub.connected is True:
             session.event_hub.disconnect()
         session.close()
@@ -68,4 +70,6 @@ def main(func: Union[Callable, None] = None):
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
+    print("Main loop starting")
     sys.exit(listen_loop(session, func))
+    print("Process stopped")
