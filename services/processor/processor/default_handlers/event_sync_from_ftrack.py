@@ -19,6 +19,9 @@ from ftrack_common import (
     InvalidFpsValue,
 
     CUST_ATTR_KEY_SERVER_ID,
+    CUST_ATTR_KEY_SERVER_PATH,
+    CUST_ATTR_KEY_SYNC_FAIL,
+
     CUST_ATTR_AUTO_SYNC,
     FPS_KEYS,
 
@@ -27,6 +30,7 @@ from ftrack_common import (
 
     convert_to_fps,
 
+    create_chunks,
     join_filter_values,
 )
 from ftrack_common.event_handlers import BaseEventHandler
@@ -90,8 +94,8 @@ class SyncProcess:
         self._ft_object_type_name_by_id = None
         self._ft_task_type_name_by_id = None
         
-        self._created_entity_ids = {}
-        self._hierarchy_change_entity_ids = set()
+        self._created_entity_by_ftrack_id = {}
+        self._hierarchy_changed_by_ftrack_id = {}
         self._ft_failed_sync_ids = set()
 
     def get_ftrack_entity_by_ids(self, entity_ids):
@@ -617,6 +621,7 @@ class SyncProcess:
                         entity_ids.remove(matching_entity_id)
                     matching_ftrack_id = None
 
+            # If ftrack id on matching entity does not exist we can "reuse" it
             if matching_ftrack_id is None:
                 matching_entity.label = label
                 self.folder_ids_by_ftrack_id[matching_ftrack_id].append(
@@ -631,18 +636,15 @@ class SyncProcess:
             for item in ft_entity["link"]
             if item["type"] != "Project"
         ])
-        # TODO query custom attributes for new created entities
-        #   the values can not come from event data
-        # - we should be able to expect that all created entities already have
-        #   synchronized attributes
+
         hier_attrs_by_id = {
             attr["id"]: attr
-            for attr in self.ft_hier_cust_attrs
+            for attr in self.ft_hier_cust_attrs.values()
         }
         obj_type_id = ft_entity["object_type_id"]
         std_attrs_by_id = {
             attr["id"]: attr
-            for attr in self.ft_std_cust_attrs[obj_type_id]
+            for attr in self.ft_std_cust_attrs[obj_type_id].values()
         }
         attr_ids = set(hier_attrs_by_id.keys()) | set(std_attrs_by_id.keys())
         value_items = query_custom_attribute_values(
@@ -678,7 +680,7 @@ class SyncProcess:
             for key, value in attr_values_by_key.items():
                 if key in folder.attribs:
                     folder.attribs[key] = value
-            self._created_entity_ids[folder.id] = ftrack_id
+            self._created_entity_by_ftrack_id[ftrack_id] = folder
             self.folder_ids_by_ftrack_id[ftrack_id].append(folder.id)
             return folder
 
@@ -690,8 +692,8 @@ class SyncProcess:
             label=label,
             parent_id=parent.id
         )
-        self._created_entity_ids[task.id] = ftrack_id
-        self._task_ids_by_ftrack_id[ftrack_id] = task.id
+        self._created_entity_by_ftrack_id[ftrack_id] = task
+        self.task_ids_by_ftrack_id[ftrack_id] = task.id
         task.attribs["ftrackId"] = ftrack_id
         task.attribs["ftrackPath"] = ft_path
         for key, value in attr_values_by_key.items():
@@ -715,6 +717,7 @@ class SyncProcess:
                 trigger special actions.
         """
 
+        # Separate folder and task changes
         folder_hierarchy_changes = {}
         task_hierarchy_changes = {}
 
@@ -731,7 +734,7 @@ class SyncProcess:
 
         ftrack_ids_to_create = set(self.entities_by_action["add"].keys())
         allowed_changes = {}
-        immutable_ftrack_ids = set()
+        immutable_entities_changed = set()
         for ftrack_id, info in tuple(folder_hierarchy_changes.items()):
             # Do not exist in current folders (nothing to validate)
             entity_ids = self.folder_ids_by_ftrack_id[ftrack_id]
@@ -740,6 +743,7 @@ class SyncProcess:
                 continue
 
             if len(entity_ids) != 1:
+                # TODO handle this cases somehow
                 self.log.warning((
                     "Found more then one matching entity on server for"
                     f" ftrack id {ftrack_id} ({entity_ids}). Skipping"
@@ -750,7 +754,8 @@ class SyncProcess:
                 entity_ids[0], ["folder"])
 
             if entity.immutable_for_hierarchy:
-                immutable_ftrack_ids.add(ftrack_id)
+                self._ft_failed_sync_ids.add(ftrack_id)
+                immutable_entities_changed.add(entity)
                 continue
 
             allowed_changes[ftrack_id] = (info, entity)
@@ -822,7 +827,7 @@ class SyncProcess:
             if matching_entities:
                 continue
 
-            self._hierarchy_change_entity_ids.add(entity.id)
+            self._hierarchy_changed_by_ftrack_id[ftrack_id] = entity
             if "name" in changes:
                 entity.name = name
                 entity.label = label
@@ -838,36 +843,48 @@ class SyncProcess:
                 if item["type"] != "Project"
             ])
 
+        # Handle removed entities
+        # TODO it is possible to look for parent's children that can replace
+        #   previously synchronized entity
+        # - if removed entity has equivalent we can not remove it directly but
+        #       look for "same name" (slugified) next to it if parent still
+        #       exists (only if was not already synchronized).
         removed_items = list(self.entities_by_action["remove"].values())
         removed_items.sort(key=lambda info: len(info["parents"]))
         for info in reversed(removed_items):
-            entity_id = info["entityId"]
+            ftrack_id = info["entityId"]
             if info["entity_type"] == "Task":
-                entity_ids = self.task_ids_by_ftrack_id[entity_id]
+                entity_ids = self.task_ids_by_ftrack_id[ftrack_id]
                 entity_type = "task"
             else:
-                entity_ids = self.folder_ids_by_ftrack_id[entity_id]
+                entity_ids = self.folder_ids_by_ftrack_id[ftrack_id]
                 entity_type = "folder"
 
             if not entity_ids:
                 continue
 
             if len(entity_ids) > 1:
+                # TODO handle this case somehow
                 continue
 
             entity_id = entity_ids[0]
             entity = self.entity_hub.get_or_query_entity_by_id(
                 entity_id, [entity_type])
+            # Skip if entity was not found
             if entity is None:
                 continue
 
-            if entity.entity_type == "folder":
-                if entity.immutable_for_hierarchy:
-                    immutable_ftrack_ids.append(entity_id)
-                    continue
+            if (
+                entity.entity_type == "folder"
+                and entity.immutable_for_hierarchy
+            ):
+                immutable_entities_changed.add(entity)
+                continue
+
+            # This will remove the entity
             entity.parent_id = None
 
-        created_ftrack_ids = set(self._created_entity_ids.values())
+        created_ftrack_ids = set(self._created_entity_by_ftrack_id.keys())
         for ftrack_id in ftrack_ids_to_create:
             if (
                 ftrack_id in created_ftrack_ids
@@ -876,58 +893,6 @@ class SyncProcess:
                 continue
 
             self._try_create_entity(ftrack_id)
-
-        # self._mark_as_invalid_sync(invalid_ftrack_ids)
-
-        # parent_ids = []
-        # for parent in hierarchy_change["parents"]:
-        #     if parent["entityType"] == "show":
-        #         break
-        #
-        #     parent_id = parent["entityId"]
-        #     parent_ids.append(
-        #         recreated_mapping.get(parent_id, parent_id)
-        #     )
-        # ftrack_ids = list(parent_ids)
-        # name_change = hierarchy_change["changes"].get("name")
-        # name = None
-        # if name_change:
-        #     name = name_change["old"]
-        # else:
-        #     ftrack_ids.append(entity_id)
-        #
-        # result = self.session.query(
-        #     "select id, name from TypedContext where id in ({})".format(
-        #         join_filter_values(ftrack_ids)
-        #     )
-        # ).all()
-        # entities_by_id = {
-        #     parent["id"]: parent
-        #     for parent in result
-        # }
-        # parents = [
-        #     entities_by_id.get(parent_id)
-        #     for parent_id in parent_ids
-        # ]
-        # if None in parents:
-        #     self.log.error((
-        #         f"Couldn't query parents of entity {hierarchy_change}"
-        #     ))
-        #     continue
-        #
-        # if name is None:
-        #     entity = entities_by_id.get(entity_id)
-        #     if not entity:
-        #         self.log.error((
-        #             f"Couldn't query entity {hierarchy_change}"
-        #         ))
-        #         continue
-        #     name = entity["name"]
-        #
-        # path = "/".join(
-        #     [parent["name"] for parent in parents] + [name]
-        # )
-        # print(path)
 
     def _convert_value_by_cust_attr_conf(self, value, cust_attr_conf):
         type_id = cust_attr_conf["type_id"]
@@ -968,7 +933,14 @@ class SyncProcess:
         std_cust_attr = self.ft_std_cust_attrs
         hier_cust_attr = self.ft_hier_cust_attrs
 
+        # Prepare all created ftrack ids
+        # - in that case it is not needed to update attributes as they have
+        #   set all attributes from ftrack
+        created_ftrack_ids = set(self._created_entity_by_ftrack_id.keys())
         for ftrack_id, info in self.entities_by_action["update"].items():
+            if ftrack_id in created_ftrack_ids:
+                continue
+
             is_task = info["entity_type"] == "Task"
             if is_task:
                 entity_ids = self.task_ids_by_ftrack_id[ftrack_id]
@@ -993,14 +965,150 @@ class SyncProcess:
 
                 value = change_info["new"]
                 if value is not None:
-                    attr = hier_cust_attr.get(key)
-                    if attr is None:
-                        attr = std_cust_attr[object_type_id].get(key)
+                    if key in FPS_KEYS:
+                        value = convert_to_fps(value)
+                    else:
+                        attr = hier_cust_attr.get(key)
                         if attr is None:
-                            continue
-
-                    value = self._convert_value_by_cust_attr_conf(value, attr)
+                            attr = std_cust_attr[object_type_id].get(key)
+                            if attr is None:
+                                continue
+                        value = self._convert_value_by_cust_attr_conf(
+                            value, attr)
                 entity.attribs[key] = value
+
+    def _create_ft_attr_operation(
+        self, conf_id, entity_id, is_new, new_value, old_value=None
+    ):
+        entity_key = collections.OrderedDict((
+            ("configuration_id", conf_id),
+            ("entity_id", entity_id)
+        ))
+        if is_new:
+            return ftrack_api.operation.CreateEntityOperation(
+                "CustomAttributeValue",
+                entity_key,
+                {"value": new_value}
+            )
+
+        return ftrack_api.operation.UpdateEntityOperation(
+            "CustomAttributeValue",
+            entity_key,
+            "value",
+            new_value,
+            old_value
+        )
+
+    def _propagate_ftrack_attributes(self):
+        entities_by_ftrack_id = {}
+        for ftrack_id, entity in self._created_entity_by_ftrack_id.items():
+            entities_by_ftrack_id[ftrack_id] = entity
+
+        for ftrack_id, entity in self._hierarchy_changed_by_ftrack_id.items():
+            entities_by_ftrack_id[ftrack_id] = entity
+
+        ftrack_ids = set(entities_by_ftrack_id.keys())
+        ftrack_ids |= self._ft_failed_sync_ids
+        if not ftrack_ids:
+            print("No ftrack ids")
+            return
+
+        # Query ftrack entities to find out which ftrack entities actually
+        #   exists
+        # - they may be removed meanwhile this event is processed and ftrack
+        #   session would crash if we would try to change custom attributes
+        #   of not existing entities
+        ft_entities = self.session.query((
+            "select id from TypedContext"
+            f" where id in ({join_filter_values(ftrack_ids)})"
+        )).all()
+        ftrack_ids = {
+            ft_entity["id"]
+            for ft_entity in ft_entities
+        }
+        if not ftrack_ids:
+            print("No ftrack ids (after query)")
+            return
+
+        server_id_attr = self.ft_hier_cust_attrs[CUST_ATTR_KEY_SERVER_ID]
+        path_attr = self.ft_hier_cust_attrs[CUST_ATTR_KEY_SERVER_PATH]
+        fail_attr = self.ft_hier_cust_attrs[CUST_ATTR_KEY_SYNC_FAIL]
+        server_id_attr_id = server_id_attr["id"]
+        path_attr_id = path_attr["id"]
+        fail_attr_id = fail_attr["id"]
+        attr_key_by_id = {
+            attr["id"]: attr["key"]
+            for attr in (server_id_attr, path_attr, fail_attr)
+        }
+
+        value_items = query_custom_attribute_values(
+            self.session,
+            set(attr_key_by_id.keys()),
+            ftrack_ids,
+        )
+
+        current_values = {
+            ftrack_id: {}
+            for ftrack_id in ftrack_ids
+        }
+        for item in value_items:
+            attr_id = item["configuration_id"]
+            entity_id = item["entity_id"]
+            current_values[entity_id][attr_id] = item["value"]
+
+        expected_values = {
+            ftrack_id: {}
+            for ftrack_id in ftrack_ids
+        }
+        for ftrack_id in ftrack_ids:
+            entity_values = expected_values[ftrack_id]
+            entity = entities_by_ftrack_id.get(ftrack_id)
+            failed = entity is None
+            entity_values[fail_attr_id] = failed
+            if failed:
+                # Limit attribute updates only to failed boolean if sync failed
+                # - we want to keep path and id to potentially fix the issue by
+                #   knowing the path (without ftrack path user may have issues
+                #   to recreate it)
+                # Set default values to avoid inheritance from parent
+                current_entity_values = current_values[ftrack_id]
+                for key, value in (
+                    (path_attr_id, ""),
+                    (server_id_attr_id, "")
+                ):
+                    if not current_entity_values.get(key):
+                        entity_values[key] = value
+                continue
+
+            # TODO we should probably add path to tasks too
+            # - what the format should look like?
+            path = ""
+            if entity.entity_type == "folder":
+                path = entity.path
+            entity_values[path_attr_id] = path
+            entity_values[server_id_attr_id] = entity.id
+
+        operations = []
+        for ftrack_id, entity_values in expected_values.items():
+            current_entity_values = current_values[ftrack_id]
+            for attr_id, value in entity_values.items():
+                cur_value = current_entity_values.get(attr_id)
+                if value != cur_value:
+                    operations.append(
+                        self._create_ft_attr_operation(
+                            attr_id,
+                            ftrack_id,
+                            attr_id not in current_entity_values,
+                            value,
+                            old_value=cur_value
+                        )
+                    )
+
+        if operations:
+            for chunk in create_chunks(operations, 500):
+                for operation in chunk:
+                    self.session.recorded_operations.push(operation)
+                self.session.commit()
 
     def process_event_data(self):
         # Check if auto-sync custom attribute exists
@@ -1041,18 +1149,24 @@ class SyncProcess:
             time_3 = time.time()
             # 3. Commit changes to server
             self.entity_hub.commit_changes()
+            # 4. Propagate entity changes to ftack
+            time_4 = time.time()
+            self._propagate_ftrack_attributes()
             # TODO propagate entities to ftrack
             #  - server id, server path, sync failed
-            time_4 = time.time()
+            time_5 = time.time()
 
-            self.log.debug((
-                "Process time: {:.2f} <{:.2f}, {:.2f}, {:.2f}>"
-            ).format(
-                time_4 - time_1,
-                time_2 - time_1,
-                time_3 - time_2,
-                time_4 - time_3
-            ))
+            total_time = f"{time_5 - time_1:.2f}"
+            mid_times = ", ".join([
+                f"{diff:.2f}"
+                for diff in (
+                    time_2 - time_1,
+                    time_3 - time_2,
+                    time_4 - time_3,
+                    time_5 - time_4,
+                )
+            ])
+            self.log.debug(f"Process time: {total_time} <{mid_times}>")
 
         except Exception:
             msg = "An error has happened during synchronization"
