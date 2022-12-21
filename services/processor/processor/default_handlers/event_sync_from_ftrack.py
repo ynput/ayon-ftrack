@@ -18,6 +18,10 @@ from processor.lib.entity_hub import EntityHub, slugify_name
 from ftrack_common import (
     InvalidFpsValue,
 
+    FTRACK_ID_ATTRIB,
+    FTRACK_PATH_ATTRIB,
+    REMOVED_ID_VALUE,
+
     CUST_ATTR_KEY_SERVER_ID,
     CUST_ATTR_KEY_SERVER_PATH,
     CUST_ATTR_KEY_SYNC_FAIL,
@@ -291,10 +295,10 @@ class SyncProcess:
             task_ids_by_ftrack_id = collections.defaultdict(list)
             tasks = get_tasks(
                 self.project_name,
-                fields=["id", "attrib.ftrackId"]
+                fields=["id", f"attrib.{FTRACK_ID_ATTRIB}"]
             )
             for task in tasks:
-                ftrack_id = task.get("attrib", {}).get("ftrackId")
+                ftrack_id = task.get("attrib", {}).get(FTRACK_ID_ATTRIB)
                 task_ids_by_ftrack_id[ftrack_id].append(task["id"])
 
             self._task_ids_by_ftrack_id = task_ids_by_ftrack_id
@@ -306,10 +310,10 @@ class SyncProcess:
             folder_ids_by_ftrack_id = collections.defaultdict(list)
             folders = get_folders(
                 self.project_name,
-                fields=["id", "attrib.ftrackId"]
+                fields=["id", f"attrib.{FTRACK_ID_ATTRIB}"]
             )
             for folder in folders:
-                ftrack_id = folder.get("attrib", {}).get("ftrackId")
+                ftrack_id = folder.get("attrib", {}).get(FTRACK_ID_ATTRIB)
                 folder_ids_by_ftrack_id[ftrack_id].append(folder["id"])
 
             self._folder_ids_by_ftrack_id = folder_ids_by_ftrack_id
@@ -610,7 +614,7 @@ class SyncProcess:
             # - when does not have set then we can match it to just processed
             #   ftrack entity
             matching_entity_id = matching_entity.id
-            matching_ftrack_id = matching_entity.attribs["ftrackId"]
+            matching_ftrack_id = matching_entity.attribs[FTRACK_ID_ATTRIB]
             # When ftrack id is not empty then make sure the ftrack id leads
             #   to ftrack existing entity and unset the id if it does not
             if matching_ftrack_id is not None:
@@ -836,8 +840,8 @@ class SyncProcess:
                 entity.parent_id = parent.id
 
             ft_entity = self.get_ftrack_entity_by_id(ftrack_id)
-            entity.attribs["ftrackId"] = ftrack_id
-            entity.attribs["ftrackPath"] = "/".join([
+            entity.attribs[FTRACK_ID_ATTRIB] = ftrack_id
+            entity.attribs[FTRACK_PATH_ATTRIB] = "/".join([
                 item["name"]
                 for item in ft_entity["link"]
                 if item["type"] != "Project"
