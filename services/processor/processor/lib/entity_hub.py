@@ -522,6 +522,18 @@ class EntityHub:
     def commit_changes(self):
         # TODO use Operations Session instead of known operations body
         # TODO have option to commit changes out of hierarchy
+
+        project_changes = self.project_entity.changes
+        if project_changes:
+            response = self._connection.patch(
+                "projects/{}".format(self.project_name),
+                **project_changes
+            )
+            if response.status_code != 204:
+                raise ValueError("Failed to update project")
+
+        self.project_entity.lock()
+
         operations_body = []
 
         created_entity_ids, other_entity_ids, removed_entity_ids = (
@@ -536,15 +548,6 @@ class EntityHub:
             changes = entity.changes
             processed_ids.add(entity_id)
             if not changes:
-                continue
-
-            if entity.entity_type == "project":
-                response = self._connection.patch(
-                    "projects/{}".format(self.project_name),
-                    **changes
-                )
-                if response.status_code != 204:
-                    raise ValueError("Failed to update project")
                 continue
 
             bodies = [self._get_update_body(entity, changes)]
