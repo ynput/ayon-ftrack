@@ -1,9 +1,8 @@
+import re
 import collections
 import json
 import time
 import atexit
-import traceback
-import itertools
 
 import arrow
 import ftrack_api
@@ -52,10 +51,19 @@ class SyncProcess:
         " project_schema._task_type_schema.types.name"
         " from Project where id is \"{}\""
     )
+    entities_columns = (
+        "id",
+        "name",
+        "object_type_id",
+        "type_id",
+        "parent_id",
+        "link",
+        "description",
+    )
+    entities_columns_str = ", ".join(entities_columns)
     entities_query_by_id = (
-        "select id, name, object_type_id, type_id, parent_id,"
-        " link, description from TypedContext "
-        "where project_id is \"{}\" and id in ({})"
+        f"select {entities_columns_str} from TypedContext"
+        " where project_id is \"{}\" and id in ({})"
     )
     cust_attr_query_keys = [
         "id",
@@ -100,6 +108,7 @@ class SyncProcess:
         
         self._created_entity_by_ftrack_id = {}
         self._hierarchy_changed_by_ftrack_id = {}
+        self._remapped_entity_by_ftrack_id = {}
         self._ft_failed_sync_ids = set()
 
     def get_ftrack_entity_by_ids(self, entity_ids):
@@ -439,8 +448,8 @@ class SyncProcess:
         auto_sync = ft_project["custom_attributes"][CUST_ATTR_AUTO_SYNC]
         is_event_valid = auto_sync is True
         if is_event_valid:
-            # TODO probably should be handled (somehow?)
-            # TODO add logs
+            # TODO probably should be handled
+            # TODO add logs - with detail what is wrong
             # - project is not available on server
             if not self.entity_hub.project_entity:
                 is_event_valid = False
@@ -555,11 +564,16 @@ class SyncProcess:
             entity_type = "folder"
             entity_ids = self.folder_ids_by_ftrack_id[ftrack_id]
 
-        # TODO find out what to do in that case
-        # Skip if there is there is more then one server entity id matching
+        # Skip if there is more than one server entity id matching
         #   ftrack id
         if len(entity_ids) > 1:
+            # TODO find out what to do in that case
+            # TODO handle this case somehow
             self._ft_failed_sync_ids.add(ftrack_id)
+            self.log.warning((
+                "Found more then one matching entity on server for"
+                f" ftrack id {ftrack_id} ({entity_ids}). Skipping"
+            ))
             return None
 
         # Just return entity if already exists
@@ -577,7 +591,12 @@ class SyncProcess:
         parent = None
         if ft_parent_id == self.ft_project_id:
             parent = self.entity_hub.project_entity
-        else:
+            # Skip creation if task was created under project
+            if entity_type == "task":
+                self._ft_failed_sync_ids.add(ftrack_id)
+                return None
+
+        if parent is None:
             # TODO missing check if there are multiple mathching entity ids
             parent_ids = self.folder_ids_by_ftrack_id[ft_parent_id]
             if len(parent_ids) == 1:
@@ -589,20 +608,24 @@ class SyncProcess:
             elif not parent_ids:
                 parent = self._try_create_entity(ft_parent_id)
 
+        # Entity can't be created without parent
         if parent is None:
             self._ft_failed_sync_ids.add(ftrack_id)
             return None
 
         label = ft_entity["name"]
         name = slugify_name(label)
+        # Try to find matching entity by name in same parent
         matching_entity = None
         for child in parent.children:
             # Find matching entity by entity type and name
             # - this is to avoid duplication or to find entity without
             #   ftrack id in attributes (or old ftrack id)
+            # TODO add lower cased comparison for entities which are not
+            #   immutable
             if (
                 child.entity_type == entity_type
-                and child.name.lower() == name.lower()
+                and child.name == name
             ):
                 matching_entity = child
                 break
@@ -610,6 +633,11 @@ class SyncProcess:
         # Handle cases when there already is entity with matching name and
         #   type
         if matching_entity is not None:
+            # WARNING this won't update entity attributes!!!
+            # TODO if there is entity that can be used "instead" also fill
+            #   it's attributes as expected
+            # - all created entities should have filled all attributes
+
             # Check if entity has set ftrack id
             # - when does not have set then we can match it to just processed
             #   ftrack entity
@@ -618,22 +646,18 @@ class SyncProcess:
             # When ftrack id is not empty then make sure the ftrack id leads
             #   to ftrack existing entity and unset the id if it does not
             if matching_ftrack_id is not None:
-                ft_entity = self.get_ftrack_entity_by_id(matching_ftrack_id)
+                matching_ft_entity = self.get_ftrack_entity_by_id(
+                    matching_ftrack_id)
                 entity_ids = self.folder_ids_by_ftrack_id[matching_ftrack_id]
-                if ft_entity is None:
+                if matching_ft_entity is None:
                     if matching_entity_id in entity_ids:
                         entity_ids.remove(matching_entity_id)
                     matching_ftrack_id = None
 
             # If ftrack id on matching entity does not exist we can "reuse" it
-            if matching_ftrack_id is None:
-                matching_entity.label = label
-                self.folder_ids_by_ftrack_id[matching_ftrack_id].append(
-                    matching_entity_id)
-                return matching_entity
-
-            self._ft_failed_sync_ids.add(ftrack_id)
-            return None
+            if matching_ftrack_id is not None:
+                self._ft_failed_sync_ids.add(ftrack_id)
+                return None
 
         ft_path = "/".join([
             item["name"]
@@ -670,40 +694,415 @@ class SyncProcess:
             if key not in attr_values_by_key or is_hier:
                 attr_values_by_key[key] = value
 
-        if entity_type == "folder":
+        if matching_entity is not None:
+            entity = matching_entity
+            entity.label = label
+
+        elif entity_type == "folder":
             object_type_id = ft_entity["object_type_id"]
             folder_type = self.ft_object_type_name_by_id[object_type_id]
-            folder = self.entity_hub.add_new_folder(
+            entity = self.entity_hub.add_new_folder(
                 folder_type=folder_type,
                 name=name,
                 label=label,
                 parent_id=parent.id
             )
-            folder.attribs["ftrackId"] = ftrack_id
-            folder.attribs["ftrackPath"] = ft_path
-            for key, value in attr_values_by_key.items():
-                if key in folder.attribs:
-                    folder.attribs[key] = value
-            self._created_entity_by_ftrack_id[ftrack_id] = folder
-            self.folder_ids_by_ftrack_id[ftrack_id].append(folder.id)
-            return folder
 
-        task_type_id = ft_entity["type_id"]
-        task_type = self.ft_task_type_name_by_id[task_type_id]
-        task = self.entity_hub.add_new_task(
-            task_type=task_type,
-            name=name,
-            label=label,
-            parent_id=parent.id
-        )
-        self._created_entity_by_ftrack_id[ftrack_id] = task
-        self.task_ids_by_ftrack_id[ftrack_id] = task.id
-        task.attribs["ftrackId"] = ftrack_id
-        task.attribs["ftrackPath"] = ft_path
+        else:
+            task_type_id = ft_entity["type_id"]
+            task_type = self.ft_task_type_name_by_id[task_type_id]
+            entity = self.entity_hub.add_new_task(
+                task_type=task_type,
+                name=name,
+                label=label,
+                parent_id=parent.id
+            )
+
+        if entity_type == "folder":
+            entity_id_mapping = self.folder_ids_by_ftrack_id[ftrack_id]
+        else:
+            entity_id_mapping = self.task_ids_by_ftrack_id[ftrack_id]
+
+        if entity.id not in entity_id_mapping:
+            entity_id_mapping.append(entity.id)
+
+        entity.attribs[FTRACK_ID_ATTRIB] = ftrack_id
+        entity.attribs[FTRACK_PATH_ATTRIB] = ft_path
         for key, value in attr_values_by_key.items():
-            if key in task.attribs:
-                task.attribs[key] = value
-        return task
+            if key in entity.attribs:
+                entity.attribs[key] = value
+        self._created_entity_by_ftrack_id[ftrack_id] = entity
+        return entity
+
+    def _try_find_other_match(self, info, entity):
+        parent_id = info["parentId"]
+        if parent_id == self.ft_project_id:
+            ft_parent = self.ft_project
+        else:
+            ft_parent = self.session.query((
+                "select id, name from TypedContext"
+                f" where id is {parent_id}"
+            )).first()
+
+        if ft_parent is None:
+            return False
+
+        new_ft_match = None
+        ft_other_children = self.session.query((
+            f"select {self.entities_columns_str} from TypedContext"
+            f" where parent_id is {parent_id}"
+        )).all()
+        for child in ft_other_children:
+            label = child["name"]
+            name = slugify_name(label)
+            if name == entity.name:
+                new_ft_match = child
+                break
+
+        if new_ft_match is None:
+            return False
+
+        ft_is_task =  new_ft_match.entity_type == "Task"
+        entity_is_task = entity.entity_type == "task"
+        if ft_is_task != entity_is_task:
+            return False
+
+        ftrack_id = new_ft_match["id"]
+        entity_id = self.folder_ids_by_ftrack_id.get(ftrack_id)
+        if entity_id == entity.id:
+            return True
+
+        if entity_id is not None:
+            return False
+
+        entity.attribs[FTRACK_ID_ATTRIB] = ftrack_id
+        # TODO add task path?
+        if not entity_is_task:
+            entity.attribs[FTRACK_PATH_ATTRIB] = "/".join([
+                item["name"]
+                for item in new_ft_match["link"]
+                if item["type"] != "Project"
+            ])
+        self._remapped_entity_by_ftrack_id[ftrack_id] = entity
+        return True
+
+    def _prepare_folder_allowed_hierarchy_changes(
+        self, folder_hierarchy_changes, ftrack_ids_to_create
+    ):
+        allowed_changes = {}
+        for ftrack_id, info in folder_hierarchy_changes.items():
+            # Do not exist in current folders (nothing to validate)
+            entity_ids = self.folder_ids_by_ftrack_id[ftrack_id]
+            if not entity_ids:
+                ftrack_ids_to_create.add(ftrack_id)
+                continue
+
+            if len(entity_ids) != 1:
+                # TODO handle this cases somehow
+                self.log.warning((
+                    "Found more then one matching entity on server for"
+                    f" ftrack id {ftrack_id} ({entity_ids}). Skipping"
+                ))
+                continue
+
+            entity = self.entity_hub.get_or_query_entity_by_id(
+                entity_ids[0], ["folder"])
+
+            allow_change = not entity.immutable_for_hierarchy
+            if not allow_change:
+                changes = info["changes"]
+                # It is valid change if parent did not change and name
+                #   did not change for server (after slugify)
+                if "parent_id" not in changes and "name" in changes:
+                    new_name = changes["name"]["new"]
+                    if slugify_name(new_name) == entity.name:
+                        allow_change = True
+
+            if allow_change:
+                allowed_changes[ftrack_id] = (info, entity)
+                continue
+
+            self._ft_failed_sync_ids.add(ftrack_id)
+            self.log.warning(
+                f"Hierarchy changes are not allow on entity {entity.path}"
+            )
+
+        return allowed_changes
+
+    def _process_folder_hierarchy_changes(
+        self,
+        folder_hierarchy_changes,
+        ftrack_ids_to_create
+    ):
+        if not folder_hierarchy_changes:
+            return
+
+        changes_count = len(folder_hierarchy_changes)
+        self.log.debug(
+            f"Looking into {changes_count} folder hierarchy changes"
+        )
+
+        allowed_changes = self._prepare_folder_allowed_hierarchy_changes(
+            folder_hierarchy_changes,
+            ftrack_ids_to_create
+        )
+        if not allowed_changes:
+            self.log.debug("All folder hierarchy changes are not possible")
+            return
+
+        diff_count = changes_count - len(allowed_changes)
+        if diff_count:
+            self.log.debug(f"Filtered {diff_count} changes.")
+
+        changes_queue = collections.deque()
+        for item in allowed_changes.items():
+            changes_queue.append(item)
+        changes_queue.append(len(changes_queue))
+
+        self.log.debug("Starting folder changes queue")
+        while changes_queue:
+            item = changes_queue.popleft()
+            if isinstance(item, int):
+                current_len = len(changes_queue)
+                if current_len == item:
+                    # Mark all remaining items as failed
+                    while changes_queue:
+                        item = changes_queue.popleft()
+                        if not isinstance(item, int):
+                            self._ft_failed_sync_ids.add(item[0])
+
+                else:
+                    # Add current len for next iteration
+                    changes_queue.append(current_len)
+                continue
+
+            ftrack_id, (info, entity) = item
+            if ftrack_id in self._ft_failed_sync_ids:
+                continue
+
+            self.log.debug(
+                f"Trying to apply hierarchy changes of {ftrack_id}"
+            )
+
+            changes = info["changes"]
+            if "name" in changes:
+                label = changes["name"]["new"]
+                name = slugify_name(label)
+            else:
+                name = entity.name
+
+            parent = None
+            if "parent_id" not in changes:
+                parent = entity.parent
+            else:
+                ft_parent_id = changes["parent_id"]["new"]
+                if ft_parent_id == self.ft_project_id:
+                    parent = self.entity_hub.project_entity
+
+                elif ft_parent_id in ftrack_ids_to_create:
+                    if ft_parent_id not in self._ft_failed_sync_ids:
+                        parent = self._try_create_entity(ft_parent_id)
+
+                elif ft_parent_id in folder_hierarchy_changes:
+                    # If parent is also in hierarchy changes then make
+                    #   sure the parent is already processed
+                    # WARNING This may cause infinite loop or skip entities
+                    #   accidentally if process of parent is missing
+                    sources = (
+                        self._ft_failed_sync_ids,
+                        self._hierarchy_changed_by_ftrack_id,
+                        self._created_entity_by_ftrack_id,
+                    )
+                    if all(
+                        ft_parent_id not in source
+                        for source in sources
+                    ):
+                        changes_queue.append(item)
+                        continue
+
+                else:
+                    entity_ids = self.folder_ids_by_ftrack_id[ft_parent_id]
+                    if len(entity_ids) == 1:
+                        parent = self.entity_hub.get_or_query_entity_by_id(
+                            entity_ids[0], ["folder"])
+
+            if parent is None:
+                self.log.info(f"Couldn't define parent of entity {entity.id}")
+                self._ft_failed_sync_ids.add(ftrack_id)
+                continue
+
+            matching_entities = [
+                child
+                for child in parent.children
+                if child.name == name
+            ]
+            if entity in matching_entities:
+                matching_entities.remove(entity)
+
+            if matching_entities:
+                self.log.warning((
+                    "Found more then one children with same name"
+                    f" \"{entity.name}\" under parent {parent.path}."
+                ))
+                self._ft_failed_sync_ids.add(ftrack_id)
+                continue
+
+            self._hierarchy_changed_by_ftrack_id[ftrack_id] = entity
+            if "name" in changes:
+                entity.name = name
+                entity.label = label
+
+            if "parent_id" in changes:
+                entity.parent_id = parent.id
+
+            ft_entity = self.get_ftrack_entity_by_id(ftrack_id)
+            entity.attribs[FTRACK_ID_ATTRIB] = ftrack_id
+            entity.attribs[FTRACK_PATH_ATTRIB] = "/".join([
+                item["name"]
+                for item in ft_entity["link"]
+                if item["type"] != "Project"
+            ])
+            self.log.debug(f"Updated hierarchy of {entity.path}")
+
+        self.log.debug("Folder changes queue finished")
+
+    def _process_removed_hierarchy_changes(self):
+        # Handle removed entities
+        # TODO it is possible to look for parent's children that can replace
+        #   previously synchronized entity
+        # - if removed entity has equivalent we can not remove it directly but
+        #       look for "same name" (slugified) next to it if parent still
+        #       exists (only if was not already synchronized).
+        removed_items = list(self.entities_by_action["remove"].values())
+        removed_items.sort(key=lambda info: len(info["parents"]))
+        for info in reversed(removed_items):
+            ftrack_id = info["entityId"]
+            if info["entity_type"] == "Task":
+                entity_ids = self.task_ids_by_ftrack_id[ftrack_id]
+                entity_type = "task"
+            else:
+                entity_ids = self.folder_ids_by_ftrack_id[ftrack_id]
+                entity_type = "folder"
+
+            # We don't change if entity was not found
+            if not entity_ids:
+                continue
+
+            # This can happen in some weird cases
+            if len(entity_ids) > 1:
+                # TODO handle this case somehow
+                self.log.warning((
+                    "Found more then one matching entity on server for"
+                    f" ftrack id {ftrack_id} ({entity_ids}). Skipping"
+                ))
+                continue
+
+            entity_id = entity_ids[0]
+            entity = self.entity_hub.get_or_query_entity_by_id(
+                entity_id, [entity_type])
+            # Skip if entity was not found
+            if entity is None:
+                continue
+
+            # First try find different ftrack entity that can "replace" the
+            #   entity instead of previous
+            #   - e.g. 'sh-01' was removed but 'sh_01' is there
+            if self._try_find_other_match(info, entity):
+                continue
+
+            if (
+                entity.entity_type == "folder"
+                and entity.immutable_for_hierarchy
+            ):
+                # Change ftrack id to something else
+                entity.attribs[FTRACK_ID_ATTRIB] = REMOVED_ID_VALUE
+                continue
+
+            # This will remove the entity
+            self.log.debug(f"Removing entity {entity.path}")
+            entity.parent_id = None
+
+    def _process_created_hierarchy_changes(
+        self, ftrack_ids_to_create
+    ):
+        created_ftrack_ids = set(self._created_entity_by_ftrack_id.keys())
+        filtered_ftrack_ids_to_create = {
+            ftrack_id
+            for ftrack_id in ftrack_ids_to_create
+            if (
+                ftrack_id not in created_ftrack_ids
+                and ftrack_id not in self._ft_failed_sync_ids
+            )
+        }
+        if not filtered_ftrack_ids_to_create:
+            return
+
+        # TODO query entity id for entities from custom attributes
+        #   they may be already filled there even if the entity is new
+        for ftrack_id in filtered_ftrack_ids_to_create:
+            self._try_create_entity(ftrack_id)
+
+    def _process_task_hierarchy_changes(self, task_hierarchy_changes):
+        # TODO finish task name and parent changes
+        for ftrack_id, info in task_hierarchy_changes.items():
+            entity_ids = self.task_ids_by_ftrack_id[ftrack_id]
+            if len(entity_ids) != 1:
+                continue
+            entity = self.entity_hub.get_or_query_entity_by_id(
+                entity_ids[0], ["task"])
+
+            if entity is None:
+                continue
+
+            changes = info["changes"]
+            if "name" in changes:
+                label = changes["name"]["new"]
+                name = slugify_name(label)
+            else:
+                name = entity.name
+
+            parent = None
+            if "parent_id" not in changes:
+                parent = entity.parent
+            else:
+                ft_parent_id = changes["parent_id"]["new"]
+                # Cannot add task under project
+                if ft_parent_id == self.ft_project_id:
+                    self._ft_failed_sync_ids.add(ftrack_id)
+                    continue
+
+                entity_ids = self.folder_ids_by_ftrack_id[ft_parent_id]
+                if len(entity_ids) == 1:
+                    parent = self.entity_hub.get_or_query_entity_by_id(
+                        entity_ids[0], ["folder"])
+
+            if parent is None:
+                self._ft_failed_sync_ids.add(ftrack_id)
+                continue
+
+            matching_entities = [
+                child
+                for child in parent.children
+                if child.name == name
+            ]
+            if entity in matching_entities:
+                matching_entities.remove(entity)
+
+            # TODO if this happens we should maybe check if other matching task
+            #   has set ftrack id?
+            if matching_entities:
+                self._ft_failed_sync_ids.add(ftrack_id)
+                continue
+
+            self._hierarchy_changed_by_ftrack_id[ftrack_id] = entity
+            if "name" in changes:
+                entity.name = name
+                entity.label = label
+
+            if "parent_id" in changes:
+                entity.parent_id = parent.id
+
+            entity.attribs[FTRACK_ID_ATTRIB] = ftrack_id
 
     def _process_hierarchy_changes(self):
         """Handle all hierarchy changes.
@@ -737,166 +1136,17 @@ class SyncProcess:
                     folder_hierarchy_changes[ftrack_id] = info
 
         ftrack_ids_to_create = set(self.entities_by_action["add"].keys())
-        allowed_changes = {}
-        immutable_entities_changed = set()
-        for ftrack_id, info in tuple(folder_hierarchy_changes.items()):
-            # Do not exist in current folders (nothing to validate)
-            entity_ids = self.folder_ids_by_ftrack_id[ftrack_id]
-            if not entity_ids:
-                ftrack_ids_to_create.add(ftrack_id)
-                continue
-
-            if len(entity_ids) != 1:
-                # TODO handle this cases somehow
-                self.log.warning((
-                    "Found more then one matching entity on server for"
-                    f" ftrack id {ftrack_id} ({entity_ids}). Skipping"
-                ))
-                continue
-
-            entity = self.entity_hub.get_or_query_entity_by_id(
-                entity_ids[0], ["folder"])
-
-            if entity.immutable_for_hierarchy:
-                self._ft_failed_sync_ids.add(ftrack_id)
-                immutable_entities_changed.add(entity)
-                continue
-
-            allowed_changes[ftrack_id] = (info, entity)
-
-        changes_queue = collections.deque()
-        for item in allowed_changes.items():
-            changes_queue.append(item)
-        changes_queue.append(len(changes_queue))
-
-        while changes_queue:
-            item = changes_queue.popleft()
-            if isinstance(item, int):
-                current_len = len(changes_queue)
-                if current_len == item:
-                    while changes_queue:
-                        item = changes_queue.popleft()
-                        self._ft_failed_sync_ids.add(item[0])
-
-                else:
-                    changes_queue.append(current_len)
-                continue
-
-            ftrack_id, (info, entity) = item
-            if ftrack_id in self._ft_failed_sync_ids:
-                continue
-
-            changes = info["changes"]
-            if "name" in changes:
-                label = changes["name"]["new"]
-                name = slugify_name(label)
-            else:
-                name = entity.name
-
-            parent = None
-            if "parent_id" not in changes:
-                parent = entity.parent
-            else:
-                ft_parent_id = changes["parent_id"]["new"]
-                if ft_parent_id == self.ft_project_id:
-                    parent = self.entity_hub.project_entity
-
-                elif ft_parent_id in ftrack_ids_to_create:
-                    if ft_parent_id not in self._ft_failed_sync_ids:
-                        parent = self._try_create_entity(ft_parent_id)
-
-                elif ft_parent_id in folder_hierarchy_changes:
-                    if ft_parent_id not in self._ft_failed_sync_ids:
-                        changes_queue.append(item)
-                        continue
-
-                else:
-                    entity_ids = self.folder_ids_by_ftrack_id[ft_parent_id]
-                    if len(entity_ids) == 1:
-                        parent = self.entity_hub.get_or_query_entity_by_id(
-                            entity_ids[0], ["folder"])
-
-            if parent is None:
-                self._ft_failed_sync_ids.add(ftrack_id)
-                continue
-
-            matching_entities = [
-                child
-                for child in parent.children
-                if child.name == name
-            ]
-            if entity in matching_entities:
-                matching_entities.remove(entity)
-
-            if matching_entities:
-                continue
-
-            self._hierarchy_changed_by_ftrack_id[ftrack_id] = entity
-            if "name" in changes:
-                entity.name = name
-                entity.label = label
-
-            if "parent_id" in changes:
-                entity.parent_id = parent.id
-
-            ft_entity = self.get_ftrack_entity_by_id(ftrack_id)
-            entity.attribs[FTRACK_ID_ATTRIB] = ftrack_id
-            entity.attribs[FTRACK_PATH_ATTRIB] = "/".join([
-                item["name"]
-                for item in ft_entity["link"]
-                if item["type"] != "Project"
-            ])
-
-        # Handle removed entities
-        # TODO it is possible to look for parent's children that can replace
-        #   previously synchronized entity
-        # - if removed entity has equivalent we can not remove it directly but
-        #       look for "same name" (slugified) next to it if parent still
-        #       exists (only if was not already synchronized).
-        removed_items = list(self.entities_by_action["remove"].values())
-        removed_items.sort(key=lambda info: len(info["parents"]))
-        for info in reversed(removed_items):
-            ftrack_id = info["entityId"]
-            if info["entity_type"] == "Task":
-                entity_ids = self.task_ids_by_ftrack_id[ftrack_id]
-                entity_type = "task"
-            else:
-                entity_ids = self.folder_ids_by_ftrack_id[ftrack_id]
-                entity_type = "folder"
-
-            if not entity_ids:
-                continue
-
-            if len(entity_ids) > 1:
-                # TODO handle this case somehow
-                continue
-
-            entity_id = entity_ids[0]
-            entity = self.entity_hub.get_or_query_entity_by_id(
-                entity_id, [entity_type])
-            # Skip if entity was not found
-            if entity is None:
-                continue
-
-            if (
-                entity.entity_type == "folder"
-                and entity.immutable_for_hierarchy
-            ):
-                immutable_entities_changed.add(entity)
-                continue
-
-            # This will remove the entity
-            entity.parent_id = None
-
-        created_ftrack_ids = set(self._created_entity_by_ftrack_id.keys())
-        for ftrack_id in ftrack_ids_to_create:
-            if (
-                ftrack_id in created_ftrack_ids
-                or ftrack_id in self._ft_failed_sync_ids
-            ):
-                continue
-
-            self._try_create_entity(ftrack_id)
+        self._process_folder_hierarchy_changes(
+            folder_hierarchy_changes,
+            ftrack_ids_to_create
+        )
+        self._process_removed_hierarchy_changes()
+        self._process_created_hierarchy_changes(
+            ftrack_ids_to_create
+        )
+        self._process_task_hierarchy_changes(
+            task_hierarchy_changes
+        )
 
     def _convert_value_by_cust_attr_conf(self, value, cust_attr_conf):
         type_id = cust_attr_conf["type_id"]
@@ -933,6 +1183,60 @@ class SyncProcess:
             return value.split(", ")
         return value
 
+    def _update_project_task_types(self):
+        project_entity = self.entity_hub.project_entity
+        src_task_types = {
+            task_type["name"]: task_type
+            for task_type in project_entity.task_types
+        }
+
+        new_task_types = []
+        project_schema = self.ft_project["project_schema"]
+        for task_type in project_schema["task_type_schema"]["types"]:
+            task_type_name = task_type["name"]
+            if task_type_name in src_task_types:
+                new_task_types.append(src_task_types[task_type_name])
+            else:
+                new_task_types.append({
+                    "name": task_type_name,
+                    "short_name": re.sub(r"\W+", "", task_type_name.lower())
+                })
+
+        project_entity.task_types = new_task_types
+
+    def _propagate_task_type_changes(self, task_type_changes):
+        if not task_type_changes:
+            return
+
+        project_entity = self.entity_hub.project_entity
+        task_types_names = {
+            task_type["name"]
+            for task_type in project_entity.task_types
+        }
+        task_types = self.ft_task_type_name_by_id
+
+        to_change = []
+        project_need_update = False
+        for ftrack_id, (entity, info) in task_type_changes.items():
+            new_type_id = info["changes"]["typeid"]["new"]
+            new_type_name = task_types[new_type_id]
+            if entity.task_type == new_type_name:
+                continue
+
+            if not new_type_name in task_types_names:
+                project_need_update = True
+
+            to_change.append((entity, new_type_name))
+
+        if project_need_update:
+            self._update_project_task_types()
+
+        for entity, new_type_name in to_change:
+            prev_task_type = entity.task_type
+            entity.task_type = new_type_name
+            self.log.debug(
+                f"Changed task type {prev_task_type} -> {new_type_name}")
+
     def _propagate_attrib_changes(self):
         std_cust_attr = self.ft_std_cust_attrs
         hier_cust_attr = self.ft_hier_cust_attrs
@@ -941,33 +1245,42 @@ class SyncProcess:
         # - in that case it is not needed to update attributes as they have
         #   set all attributes from ftrack
         created_ftrack_ids = set(self._created_entity_by_ftrack_id.keys())
+        task_type_changes = {}
         for ftrack_id, info in self.entities_by_action["update"].items():
             if ftrack_id in created_ftrack_ids:
                 continue
 
-            is_task = info["entity_type"] == "Task"
-            if is_task:
-                entity_ids = self.task_ids_by_ftrack_id[ftrack_id]
-                entity_types = ["task"]
-            else:
-                entity_ids = self.folder_ids_by_ftrack_id[ftrack_id]
-                entity_types = ["folder"]
+            object_type_id = None
+            if info["entityType"] == "show":
+                entity = self.entity_hub.project_entity
 
-            if len(entity_ids) != 1:
+            elif info["entityType"] == "task":
+                object_type_id = info["objectTypeId"]
+                if info["entity_type"] == "Task":
+                    entity_ids = self.task_ids_by_ftrack_id[ftrack_id]
+                    entity_types = ["task"]
+                else:
+                    entity_ids = self.folder_ids_by_ftrack_id[ftrack_id]
+                    entity_types = ["folder"]
+
+                if len(entity_ids) != 1:
+                    continue
+
+                entity_id = entity_ids[0]
+                entity = self.entity_hub.get_or_query_entity_by_id(
+                    entity_id, entity_types)
+
+            else:
                 continue
 
-            entity_id = entity_ids[0]
-            entity = self.entity_hub.get_or_query_entity_by_id(
-                entity_id, entity_types)
-
-            object_type_id = None
-            if info["entityType"] == "task":
-                object_type_id = info["objectTypeId"]
             for key, change_info in info["changes"].items():
+                value = change_info["new"]
+                if key == "typeid" and entity.entity_type == "task":
+                    task_type_changes[ftrack_id] = (entity, info)
+
                 if key not in entity.attribs:
                     continue
 
-                value = change_info["new"]
                 if value is not None:
                     if key in FPS_KEYS:
                         value = convert_to_fps(value)
@@ -980,6 +1293,8 @@ class SyncProcess:
                         value = self._convert_value_by_cust_attr_conf(
                             value, attr)
                 entity.attribs[key] = value
+
+        self._propagate_task_type_changes(task_type_changes)
 
     def _create_ft_attr_operation(
         self, conf_id, entity_id, is_new, new_value, old_value=None
@@ -1005,16 +1320,17 @@ class SyncProcess:
 
     def _propagate_ftrack_attributes(self):
         entities_by_ftrack_id = {}
-        for ftrack_id, entity in self._created_entity_by_ftrack_id.items():
-            entities_by_ftrack_id[ftrack_id] = entity
-
-        for ftrack_id, entity in self._hierarchy_changed_by_ftrack_id.items():
-            entities_by_ftrack_id[ftrack_id] = entity
+        for source in (
+            self._created_entity_by_ftrack_id,
+            self._hierarchy_changed_by_ftrack_id,
+            self._remapped_entity_by_ftrack_id,
+        ):
+            for ftrack_id, entity in source.items():
+                entities_by_ftrack_id[ftrack_id] = entity
 
         ftrack_ids = set(entities_by_ftrack_id.keys())
         ftrack_ids |= self._ft_failed_sync_ids
         if not ftrack_ids:
-            print("No ftrack ids")
             return
 
         # Query ftrack entities to find out which ftrack entities actually
@@ -1031,7 +1347,6 @@ class SyncProcess:
             for ft_entity in ft_entities
         }
         if not ftrack_ids:
-            print("No ftrack ids (after query)")
             return
 
         server_id_attr = self.ft_hier_cust_attrs[CUST_ATTR_KEY_SERVER_ID]
@@ -1205,30 +1520,6 @@ class AutoSyncFromFtrack(BaseEventHandler):
             auto_connect_event_hub=True
         )
         atexit.register(lambda: self.process_session.close())
-
-    def get_ent_path(self, ftrack_id):
-        """
-            Looks for entity in FTrack with 'ftrack_id'. If found returns
-            concatenated paths from its 'link' elemenent's names. Describes
-            location of entity in tree.
-        Args:
-            ftrack_id (string): entityId of FTrack entity
-
-        Returns:
-            (string) - example : "/test_project/assets/my_asset"
-        """
-        entity = self.ftrack_ents_by_id.get(ftrack_id)
-        if not entity:
-            entity = self.process_session.query(
-                self.entities_query_by_id.format(
-                    self.cur_project["id"], ftrack_id
-                )
-            ).first()
-            if entity:
-                self.ftrack_ents_by_id[ftrack_id] = entity
-            else:
-                return "unknown hierarchy"
-        return "/".join([ent["name"] for ent in entity["link"]])
 
     def launch(self, session, event):
         """
