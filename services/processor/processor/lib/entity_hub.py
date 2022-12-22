@@ -1283,6 +1283,11 @@ class ProjectEntity(BaseEntity):
     folder_types = property(get_folder_types, set_folder_types)
     task_types = property(get_task_types, set_task_types)
 
+    def lock(self):
+        super(ProjectEntity, self).lock()
+        self._orig_folder_types = copy.deepcopy(self._folder_types)
+        self._orig_task_types = copy.deepcopy(self._task_types)
+
     @property
     def changes(self):
         changes = self._get_default_changes()
