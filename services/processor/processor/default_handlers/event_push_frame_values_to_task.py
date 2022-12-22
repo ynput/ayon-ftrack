@@ -298,9 +298,22 @@ class PushFrameValuesToTaskEvent(BaseEventHandler):
         # Query custom attribute values
         # - result does not contain values for all entities only result of
         #   query callback to ftrack server
+        hierarchy_ids_with_tasks = whole_hierarchy_ids | task_ids
         result = query_custom_attributes(
-            session, list(hier_attr_ids), whole_hierarchy_ids, True
+            session, list(hier_attr_ids), hierarchy_ids_with_tasks, True
         )
+        task_real_values = {
+            task_id: {}
+            for task_id in task_ids
+        }
+        for item in result:
+            entity_id = item["entity_id"]
+            if entity_id not in task_ids:
+                continue
+
+            attr_id = item["configuration_id"]
+            task_real_values[entity_id][attr_id] = item["value"]
+
         result.extend(
             query_custom_attributes(
                 session, task_conf_ids, whole_hierarchy_ids, False
@@ -362,6 +375,7 @@ class PushFrameValuesToTaskEvent(BaseEventHandler):
         changes = []
         for task_id in tuple(task_ids):
             parent_id = parent_id_by_entity_id[task_id]
+            task_values = task_real_values[task_id]
             for attr_id in hier_attr_ids:
                 attr_key = attr_key_by_id[attr_id]
                 nonhier_id = nonhier_id_by_key[attr_key]
@@ -836,8 +850,6 @@ class PushFrameValuesToTaskEvent(BaseEventHandler):
             if entity_id in task_entity_ids and attr_id in hier_attrs:
                 continue
 
-            if entity_id not in current_values_by_id:
-                current_values_by_id[entity_id] = {}
             current_values_by_id[entity_id][attr_id] = item["value"]
         return current_values_by_id
 
