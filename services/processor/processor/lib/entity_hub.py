@@ -5,7 +5,7 @@ from abc import ABCMeta, abstractmethod, abstractproperty
 import six
 from openpype_api import get_server_api_connection
 from openpype_api.graphql import GraphQlQueryFailed
-from openpype_api.utils import create_entity_id
+from openpype_api.utils import create_entity_id, convert_entity_id
 
 from nxtools import slugify
 
@@ -779,6 +779,7 @@ class BaseEntity(object):
         if created is None:
             created = entity_id is None
 
+        entity_id = convert_entity_id(entity_id)
         if entity_id is None:
             entity_id = create_entity_id()
 
