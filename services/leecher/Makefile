@@ -1,4 +1,4 @@
-image := openpype/ay-ftrack-leecher:1.0.0
+image := ynput/ayon-ftrack-leecher:0.0.1
 
 build:
 	docker build -t $(image)  . 
