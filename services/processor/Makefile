@@ -2,7 +2,7 @@ image := ynput/ayon-ftrack-processor:0.0.1
 
 build:
 	cp -r ../../ftrack_common .
-	docker build -t $(image)  . 
+	docker build -t $(image) .
 	rm -rf ftrack_common
 
 clean:
