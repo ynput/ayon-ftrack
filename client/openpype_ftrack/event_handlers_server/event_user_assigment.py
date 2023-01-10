@@ -4,8 +4,8 @@ import subprocess
 from openpype.client import get_asset_by_id, get_asset_by_name
 from openpype.settings import get_project_settings
 from openpype.pipeline import Anatomy
-from openpype_ftrack.lib import BaseEvent
-from openpype_ftrack.lib.avalon_sync import CUST_ATTR_ID_KEY
+from ayon_ftrack.lib import BaseEvent
+from ayon_ftrack.lib.avalon_sync import CUST_ATTR_ID_KEY
 
 
 class UserAssigmentEvent(BaseEvent):

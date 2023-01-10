@@ -1,4 +1,4 @@
-from openpype_ftrack.lib import ServerAction
+from ayon_ftrack.lib import ServerAction
 
 
 class MultipleNotesServer(ServerAction):

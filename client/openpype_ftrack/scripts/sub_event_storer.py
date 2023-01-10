@@ -8,19 +8,19 @@ import pymongo
 import ftrack_api
 
 from openpype.client import OpenPypeMongoConnection
-from openpype_ftrack.ftrack_server.ftrack_server import FtrackServer
-from openpype_ftrack.ftrack_server.lib import (
-    SocketSession,
-    StorerEventHub,
-    TOPIC_STATUS_SERVER,
-    TOPIC_STATUS_SERVER_RESULT
-)
-from openpype_ftrack.lib import get_ftrack_event_mongo_info
 from openpype.lib import (
     Logger,
     get_openpype_version,
     get_build_version
 )
+from ayon_ftrack.ftrack_server.ftrack_server import FtrackServer
+from ayon_ftrack.ftrack_server.lib import (
+    SocketSession,
+    StorerEventHub,
+    TOPIC_STATUS_SERVER,
+    TOPIC_STATUS_SERVER_RESULT
+)
+from ayon_ftrack.lib import get_ftrack_event_mongo_info
 
 log = Logger.get_logger("Event storer")
 subprocess_started = datetime.datetime.now()

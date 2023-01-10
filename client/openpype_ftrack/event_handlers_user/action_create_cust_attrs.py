@@ -2,7 +2,7 @@ import collections
 import json
 import arrow
 import ftrack_api
-from openpype_ftrack.lib import (
+from ayon_ftrack.lib import (
     BaseAction,
     statics_icon,
 
@@ -45,7 +45,7 @@ dictionary level, task's attributes are nested more.
 
 group (string)
     - name of group
-    - based on attribute `openpype_ftrack.lib.CUST_ATTR_GROUP`
+    - based on attribute `ayon_ftrack.lib.CUST_ATTR_GROUP`
         - "pype" by default
 
 *** Required ***************************************************************

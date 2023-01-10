@@ -3,7 +3,7 @@ import collections
 import time
 import logging
 
-from openpype_api import (
+from ayon_api import (
     get_project,
     create_project,
 )

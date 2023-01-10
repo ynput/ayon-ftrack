@@ -1,7 +1,7 @@
 import os
 
+from ayon_ftrack.lib import BaseAction
 from openpype.client import get_project
-from openpype_ftrack.lib import BaseAction
 from openpype.lib.applications import (
     ApplicationManager,
     ApplicationLaunchFailed,

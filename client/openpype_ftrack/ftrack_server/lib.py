@@ -23,7 +23,7 @@ try:
     from weakref import WeakMethod
 except ImportError:
     from ftrack_api._weakref import WeakMethod
-from openpype_ftrack.lib import get_ftrack_event_mongo_info
+from ayon_ftrack.lib import get_ftrack_event_mongo_info
 
 from openpype.client import OpenPypeMongoConnection
 from openpype.lib import Logger

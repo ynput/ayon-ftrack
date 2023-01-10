@@ -16,8 +16,8 @@ from openpype.lib import StringTemplate
 from openpype.pipeline import Anatomy
 from openpype.pipeline.template_data import get_template_data
 from openpype.pipeline.workfile import get_workfile_template_key
-from openpype_ftrack.lib import BaseAction, statics_icon
-from openpype_ftrack.lib.avalon_sync import create_chunks
+from ayon_ftrack.lib import BaseAction, statics_icon
+from ayon_ftrack.lib.avalon_sync import create_chunks
 
 NOT_SYNCHRONIZED_TITLE = "Not synchronized"
 
@@ -163,7 +163,7 @@ class FillWorkfileAttributeAction(BaseAction):
         if report:
             temp_obj = tempfile.NamedTemporaryFile(
                 mode="w",
-                prefix="openpype_ftrack_",
+                prefix="ayon_ftrack_",
                 suffix=".json",
                 delete=False
             )

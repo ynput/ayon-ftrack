@@ -3,9 +3,9 @@ import collections
 from abc import ABCMeta, abstractmethod, abstractproperty
 
 import six
-from openpype_api import get_server_api_connection
-from openpype_api.graphql import GraphQlQueryFailed
-from openpype_api.utils import create_entity_id, convert_entity_id
+from ayon_api import get_server_api_connection
+from ayon_api.graphql import GraphQlQueryFailed
+from ayon_api.utils import create_entity_id, convert_entity_id
 
 from nxtools import slugify
 

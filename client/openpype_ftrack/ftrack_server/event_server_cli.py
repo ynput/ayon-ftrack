@@ -20,12 +20,12 @@ from openpype.lib import (
     get_openpype_version,
     get_build_version,
 )
-from openpype_ftrack import (
+from ayon_ftrack import (
     FTRACK_MODULE_DIR,
     resolve_ftrack_url,
 )
-from openpype_ftrack.lib import credentials
-from openpype_ftrack.ftrack_server import socket_thread
+from ayon_ftrack.lib import credentials
+from ayon_ftrack.ftrack_server import socket_thread
 
 
 class MongoPermissionsError(Exception):

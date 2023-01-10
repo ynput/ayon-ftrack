@@ -21,7 +21,7 @@ from openpype.client import (
 from openpype.client.operations import CURRENT_ASSET_DOC_SCHEMA
 from openpype.pipeline import AvalonMongoDB, schema
 
-from openpype_ftrack.lib import (
+from ayon_ftrack.lib import (
     get_openpype_attr,
     query_custom_attributes,
     CUST_ATTR_ID_KEY,
@@ -32,7 +32,7 @@ from openpype_ftrack.lib import (
 
     BaseEvent
 )
-from openpype_ftrack.lib.avalon_sync import (
+from ayon_ftrack.lib.avalon_sync import (
     convert_to_fps,
     InvalidFpsValue
 )

@@ -276,7 +276,7 @@ class FtrackModule(
             return
 
         import ftrack_api
-        from openpype_ftrack.lib import (
+        from ayon_ftrack.lib import (
             get_openpype_attr,
             default_custom_attributes_definition,
             CUST_ATTR_TOOLS,

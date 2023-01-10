@@ -13,10 +13,10 @@ from openpype.client import (
     get_version_by_name,
     get_representations
 )
-from openpype_ftrack.lib import BaseAction, statics_icon
 from openpype.pipeline import AvalonMongoDB, Anatomy
 
-from openpype_ftrack.lib.avalon_sync import CUST_ATTR_ID_KEY
+from ayon_ftrack.lib import BaseAction, statics_icon
+from ayon_ftrack.lib.avalon_sync import CUST_ATTR_ID_KEY
 
 
 class StoreThumbnailsToAvalon(BaseAction):

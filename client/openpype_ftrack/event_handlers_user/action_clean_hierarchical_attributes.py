@@ -1,6 +1,6 @@
 import collections
 import ftrack_api
-from openpype_ftrack.lib import (
+from ayon_ftrack.lib import (
     BaseAction,
     statics_icon,
     get_openpype_attr

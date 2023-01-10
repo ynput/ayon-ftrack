@@ -5,7 +5,7 @@ import logging
 import traceback
 
 import ftrack_api
-from openpype_api import get_project_settings
+from ayon_api import get_project_settings
 
 from .ftrack_session import OPServerSession
 from .lib import modules_from_path

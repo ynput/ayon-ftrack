@@ -2,7 +2,7 @@ import sys
 import json
 import collections
 import ftrack_api
-from openpype_ftrack.lib import (
+from ayon_ftrack.lib import (
     ServerAction,
     query_custom_attributes
 )

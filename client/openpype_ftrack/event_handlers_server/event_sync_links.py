@@ -3,7 +3,7 @@ from bson.objectid import ObjectId
 
 from openpype.pipeline import AvalonMongoDB
 
-from openpype_ftrack.lib import (
+from ayon_ftrack.lib import (
     CUST_ATTR_ID_KEY,
     query_custom_attributes,
 

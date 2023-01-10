@@ -1,5 +1,5 @@
 import json
-from openpype_ftrack.lib import BaseAction, statics_icon
+from ayon_ftrack.lib import BaseAction, statics_icon
 
 
 class ThumbToChildren(BaseAction):

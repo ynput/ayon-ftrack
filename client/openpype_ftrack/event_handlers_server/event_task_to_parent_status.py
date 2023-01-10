@@ -1,5 +1,5 @@
 import collections
-from openpype_ftrack.lib import BaseEvent
+from ayon_ftrack.lib import BaseEvent
 
 
 class TaskStatusToParent(BaseEvent):

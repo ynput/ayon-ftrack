@@ -6,8 +6,8 @@ import datetime
 
 import ftrack_api
 
-from openpype_ftrack.ftrack_server.ftrack_server import FtrackServer
-from openpype_ftrack.ftrack_server.lib import (
+from ayon_ftrack.ftrack_server.ftrack_server import FtrackServer
+from ayon_ftrack.ftrack_server.lib import (
     SocketSession,
     ProcessEventHub,
     TOPIC_STATUS_SERVER

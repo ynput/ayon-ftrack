@@ -10,7 +10,7 @@ from openpype.lib import Logger
 from openpype.settings import get_project_settings
 
 import ftrack_api
-from openpype_ftrack import ftrack_server
+from ayon_ftrack import ftrack_server
 
 
 class MissingPermision(Exception):
@@ -656,7 +656,7 @@ class BaseHandler(object):
 
         # Create temp file where traceback will be stored
         temp_obj = tempfile.NamedTemporaryFile(
-            mode="w", prefix="openpype_ftrack_", suffix=".txt", delete=False
+            mode="w", prefix="ayon_ftrack_", suffix=".txt", delete=False
         )
         temp_obj.close()
         temp_filepath = temp_obj.name

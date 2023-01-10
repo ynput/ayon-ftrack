@@ -8,9 +8,9 @@ from Qt import QtCore, QtWidgets, QtGui
 import ftrack_api
 from openpype import resources
 from openpype.lib import Logger
-from openpype_ftrack import resolve_ftrack_url, FTRACK_MODULE_DIR
-from openpype_ftrack.ftrack_server import socket_thread
-from openpype_ftrack.lib import credentials
+from ayon_ftrack import resolve_ftrack_url, FTRACK_MODULE_DIR
+from ayon_ftrack.ftrack_server import socket_thread
+from ayon_ftrack.lib import credentials
 from . import login_dialog
 
 

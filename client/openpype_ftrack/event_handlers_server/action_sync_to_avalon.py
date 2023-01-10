@@ -4,8 +4,8 @@ import json
 
 import ftrack_api
 
-from openpype_ftrack.lib import ServerAction
-from openpype_ftrack.lib.avalon_sync import SyncEntitiesFactory
+from ayon_ftrack.lib import ServerAction
+from ayon_ftrack.lib.avalon_sync import SyncEntitiesFactory
 
 
 class SyncToAvalonServer(ServerAction):

@@ -4,11 +4,11 @@ import collections
 
 import ftrack_api
 
-from openpype_ftrack.lib import (
+from ayon_ftrack.lib import (
     ServerAction,
     statics_icon,
 )
-from openpype_ftrack.lib.avalon_sync import create_chunks
+from ayon_ftrack.lib.avalon_sync import create_chunks
 
 
 class TransferHierarchicalValues(ServerAction):

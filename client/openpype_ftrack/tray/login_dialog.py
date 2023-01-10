@@ -4,7 +4,7 @@ import requests
 from Qt import QtCore, QtGui, QtWidgets
 
 from openpype import style, resources
-from openpype_ftrack.lib import credentials
+from ayon_ftrack.lib import credentials
 
 from . import login_tools
 

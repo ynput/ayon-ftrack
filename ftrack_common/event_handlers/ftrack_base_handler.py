@@ -521,7 +521,7 @@ class BaseHandler(object):
 
         # Create temp file where traceback will be stored
         temp_obj = tempfile.NamedTemporaryFile(
-            mode="w", prefix="openpype_ftrack_", suffix=".txt", delete=False
+            mode="w", prefix="ayon_ftrack_", suffix=".txt", delete=False
         )
         temp_obj.close()
         temp_filepath = temp_obj.name

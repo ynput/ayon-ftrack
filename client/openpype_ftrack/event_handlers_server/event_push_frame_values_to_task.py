@@ -3,7 +3,7 @@ import datetime
 import copy
 
 import ftrack_api
-from openpype_ftrack.lib import (
+from ayon_ftrack.lib import (
     BaseEvent,
     query_custom_attributes,
 )

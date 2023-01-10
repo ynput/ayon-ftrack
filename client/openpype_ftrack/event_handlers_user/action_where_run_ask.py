@@ -2,7 +2,7 @@ import platform
 import socket
 import getpass
 
-from openpype_ftrack.lib import BaseAction
+from ayon_ftrack.lib import BaseAction
 
 
 class ActionWhereIRun(BaseAction):

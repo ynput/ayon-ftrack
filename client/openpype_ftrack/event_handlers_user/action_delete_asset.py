@@ -6,8 +6,8 @@ from bson.objectid import ObjectId
 
 from openpype.client import get_assets, get_subsets
 from openpype.pipeline import AvalonMongoDB
-from openpype_ftrack.lib import BaseAction, statics_icon
-from openpype_ftrack.lib.avalon_sync import create_chunks
+from ayon_ftrack.lib import BaseAction, statics_icon
+from ayon_ftrack.lib.avalon_sync import create_chunks
 
 
 class DeleteAssetSubset(BaseAction):

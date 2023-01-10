@@ -12,7 +12,7 @@ from openpype.pipeline import KnownPublishError
 CUST_ATTR_GROUP = "openpype"
 
 
-# Copy of `get_pype_attr` from openpype_ftrack.lib
+# Copy of `get_pype_attr` from ayon_ftrack.lib
 # TODO import from openpype's ftrack module when possible to not break Python 2
 def get_pype_attr(session, split_hierarchical=True):
     custom_attributes = []

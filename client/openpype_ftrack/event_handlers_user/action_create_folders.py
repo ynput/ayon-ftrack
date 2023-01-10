@@ -2,7 +2,7 @@ import os
 import collections
 import copy
 from openpype.pipeline import Anatomy
-from openpype_ftrack.lib import BaseAction, statics_icon
+from ayon_ftrack.lib import BaseAction, statics_icon
 
 
 class CreateFolders(BaseAction):

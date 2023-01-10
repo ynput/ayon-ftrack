@@ -7,7 +7,7 @@ import threading
 import ftrack_api
 from openpype.lib import Logger
 from openpype.modules import ModulesManager
-from openpype_ftrack.ftrack_server.ftrack_server import FtrackServer
+from ayon_ftrack.ftrack_server.ftrack_server import FtrackServer
 
 log = Logger.get_logger("Event Server Legacy")
 

@@ -1,5 +1,4 @@
-import ftrack_api
-from openpype_ftrack.lib import BaseEvent
+from ayon_ftrack.lib import BaseEvent
 
 
 class RadioButtons(BaseEvent):

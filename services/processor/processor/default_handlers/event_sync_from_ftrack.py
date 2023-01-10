@@ -7,7 +7,7 @@ import atexit
 import arrow
 import ftrack_api
 
-from openpype_api import (
+from ayon_api import (
     get_project,
     get_folders,
     get_tasks,

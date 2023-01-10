@@ -10,7 +10,7 @@ from openpype.settings.lib import (
     get_project_settings,
     get_default_project_settings
 )
-from openpype_ftrack.lib import ServerAction
+from ayon_ftrack.lib import ServerAction
 
 
 class CreateDailyReviewSessionServerAction(ServerAction):

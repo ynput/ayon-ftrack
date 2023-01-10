@@ -10,9 +10,9 @@ from openpype.client import (
     get_versions,
     get_representations
 )
-from openpype_ftrack.lib import BaseAction, statics_icon
-from openpype_ftrack.lib.avalon_sync import CUST_ATTR_ID_KEY
-from openpype_ftrack.lib.custom_attributes import (
+from ayon_ftrack.lib import BaseAction, statics_icon
+from ayon_ftrack.lib.avalon_sync import CUST_ATTR_ID_KEY
+from ayon_ftrack.lib.custom_attributes import (
     query_custom_attributes
 )
 from openpype.lib.dateutils import get_datetime_data
