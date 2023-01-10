@@ -1,7 +1,9 @@
-image := openpype/ay-ftrack-processor:1.0.0
+image := ynput/ayon-ftrack-processor:0.0.1
 
 build:
-	docker build -t $(image)  . 
+	cp -r ../../ftrack_common .
+	docker build -t $(image) .
+	rm -rf ftrack_common
 
 clean:
 	docker rmi $(image)
