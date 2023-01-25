@@ -1,6 +1,6 @@
 from pydantic import Field
 
-from openpype.settings import BaseSettingsModel
+from ayon_server.settings import BaseSettingsModel
 
 from .service_handlers import (
     FtrackServiceHandlers,

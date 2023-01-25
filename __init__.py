@@ -1,7 +1,7 @@
 from typing import Type
 
-from openpype.addons import BaseServerAddon
-from openpype.lib.postgres import Postgres
+from ayon_server.addons import BaseServerAddon
+from ayon_server.lib.postgres import Postgres
 
 from .ftrack_common import FTRACK_ID_ATTRIB, FTRACK_PATH_ATTRIB
 from .settings import FtrackSettings, DEFAULT_VALUES

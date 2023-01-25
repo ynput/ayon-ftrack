@@ -1,7 +1,7 @@
 import json
 from pydantic import Field, validator
 
-from openpype.settings import (
+from ayon_server.settings import (
     BaseSettingsModel,
     ensure_unique_names,
 )
