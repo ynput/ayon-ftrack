@@ -27,22 +27,12 @@ import argparse
 import logging
 import collections
 import zipfile
+from typing import Optional, Any
 
-COMMON_DIR_NAME = "ftrack_common"
-
-# Files or directories that won't be copied to server part of addon
-SERVER_ADDON_SUBPATHS = {
-    COMMON_DIR_NAME,
-    "private",
-    "public",
-    "services",
-    "settings",
-    "__init__.py",
-    "version.py",
-}
+COMMON_DIR_NAME: str = "ftrack_common"
 
 # Patterns of directories to be skipped for server part of addon
-IGNORE_DIR_PATTERNS = [
+IGNORE_DIR_PATTERNS: list[re.Pattern] = [
     re.compile(pattern)
     for pattern in {
         # Skip directories starting with '.'
@@ -53,7 +43,7 @@ IGNORE_DIR_PATTERNS = [
 ]
 
 # Patterns of files to be skipped for server part of addon
-IGNORE_FILE_PATTERNS = [
+IGNORE_FILE_PATTERNS: list[re.Pattern] = [
     re.compile(pattern)
     for pattern in {
         # Skip files starting with '.'
@@ -65,7 +55,7 @@ IGNORE_FILE_PATTERNS = [
 ]
 
 
-def safe_copy_file(src_path, dst_path):
+def safe_copy_file(src_path: str, dst_path: str):
     """Copy file and make sure destination directory exists.
 
     Ignore if destination already contains directories from source.
@@ -78,7 +68,7 @@ def safe_copy_file(src_path, dst_path):
     if src_path == dst_path:
         return
 
-    dst_dir = os.path.dirname(dst_path)
+    dst_dir: str = os.path.dirname(dst_path)
     try:
         os.makedirs(dst_dir)
     except Exception:
@@ -87,7 +77,7 @@ def safe_copy_file(src_path, dst_path):
     shutil.copy2(src_path, dst_path)
 
 
-def _value_match_regexes(value, regexes):
+def _value_match_regexes(value: str, regexes: list[re.Pattern]) -> bool:
     for regex in regexes:
         if regex.search(value):
             return True
@@ -95,18 +85,20 @@ def _value_match_regexes(value, regexes):
 
 
 def find_files_in_subdir(
-    src_path,
-    ignore_file_patterns=None,
-    ignore_dir_patterns=None
-):
+    src_path: str,
+    ignore_file_patterns: Optional[list[re.Pattern]] = None,
+    ignore_dir_patterns: Optional[list[re.Pattern]] = None
+) -> list[tuple[str, str]]:
     if ignore_file_patterns is None:
-        ignore_file_patterns = IGNORE_FILE_PATTERNS
+        ignore_file_patterns: list[re.Pattern] = IGNORE_FILE_PATTERNS
 
     if ignore_dir_patterns is None:
-        ignore_dir_patterns = IGNORE_DIR_PATTERNS
-    output = []
+        ignore_dir_patterns: list[re.Pattern] = IGNORE_DIR_PATTERNS
+    output: list[tuple[str, str]] = []
 
-    hierarchy_queue = collections.deque()
+    hierarchy_queue: collections.deque[tuple[str, list[str]]] = (
+        collections.deque()
+    )
     hierarchy_queue.append((src_path, []))
     while hierarchy_queue:
         item = hierarchy_queue.popleft()
@@ -128,7 +120,11 @@ def find_files_in_subdir(
     return output
 
 
-def copy_server_content(addon_output_dir, current_dir, log):
+def copy_server_content(
+    addon_output_dir: str,
+    current_dir: str,
+    log: logging.Logger
+):
     """Copies server side folders to 'addon_package_dir'
 
     Args:
@@ -139,34 +135,41 @@ def copy_server_content(addon_output_dir, current_dir, log):
 
     log.info("Copying server content")
 
-    filepaths_to_copy = []
-    for filename in SERVER_ADDON_SUBPATHS:
-        src_path = os.path.join(current_dir, filename)
-        dst_path = os.path.join(addon_output_dir, filename)
-        if os.path.isfile(src_path):
-            if not _value_match_regexes(filename, IGNORE_FILE_PATTERNS):
-                filepaths_to_copy.append((src_path, dst_path))
-            continue
-
-        for path, sub_path in find_files_in_subdir(src_path):
-            filepaths_to_copy.append(
-                (path, os.path.join(dst_path, sub_path))
-            )
+    server_dir: str = os.path.join(current_dir, "server")
+    services_dir: str = os.path.join(current_dir, "services")
+    common_dir: str = os.path.join(current_dir, COMMON_DIR_NAME)
 
     # Copy ftrack common to 'processor' service
-    src_ftrack_common = os.path.join(
-        current_dir,
-        COMMON_DIR_NAME
-    )
-    dst_processor_dir = os.path.join(
+    dst_processor_dir: str = os.path.join(
         addon_output_dir,
         "services",
         "processor",
         COMMON_DIR_NAME
     )
-    for path, sub_path in find_files_in_subdir(src_ftrack_common):
+
+    filepaths_to_copy: list[tuple[str, str]] = []
+    filepaths_to_copy.append(
+        (
+            os.path.join(current_dir, "version.py"),
+            os.path.join(addon_output_dir, "version.py")
+        )
+    )
+    for path, sub_path in find_files_in_subdir(server_dir):
         filepaths_to_copy.append(
-            (path, os.path.join(dst_processor_dir, sub_path))
+            (path, os.path.join(addon_output_dir, sub_path))
+        )
+
+    for path, sub_path in find_files_in_subdir(services_dir):
+        filepaths_to_copy.append(
+            (path, os.path.join(addon_output_dir, "services", sub_path))
+        )
+
+    for path, sub_path in find_files_in_subdir(common_dir):
+        filepaths_to_copy.append(
+            (path, os.path.join(addon_output_dir, COMMON_DIR_NAME, sub_path))
+        )
+        filepaths_to_copy.append(
+            (path, os.path.join(dst_processor_dir, COMMON_DIR_NAME, sub_path))
         )
 
     # Copy files
@@ -174,7 +177,12 @@ def copy_server_content(addon_output_dir, current_dir, log):
         safe_copy_file(src_path, dst_path)
 
 
-def zip_client_side(addon_package_dir, current_dir, log, zip_basename=None):
+def zip_client_side(
+    addon_package_dir: str,
+    current_dir: str,
+    log: logging.Logger,
+    zip_basename: Optional[str] = None
+):
     """Copy and zip `client` content into `addon_package_dir'.
 
     Args:
@@ -185,7 +193,7 @@ def zip_client_side(addon_package_dir, current_dir, log, zip_basename=None):
         log (logging.Logger): Logger object.
     """
 
-    client_dir = os.path.join(current_dir, "client")
+    client_dir: str = os.path.join(current_dir, "client")
     if not os.path.isdir(client_dir):
         log.info("Client directory was not found. Skipping")
         return
@@ -193,28 +201,32 @@ def zip_client_side(addon_package_dir, current_dir, log, zip_basename=None):
     if not zip_basename:
         zip_basename = "client"
     log.info("Preparing client code zip")
-    private_dir = os.path.join(addon_package_dir, "private")
+    private_dir: str = os.path.join(addon_package_dir, "private")
     if not os.path.exists(private_dir):
         os.makedirs(private_dir)
 
-    zip_filename = zip_basename + ".zip"
-    zip_filepath = os.path.join(os.path.join(private_dir, zip_filename))
+    version_filepath: str = os.path.join(current_dir, "version.py")
+
+    zip_filename: str = zip_basename + ".zip"
+    zip_filepath: str = os.path.join(os.path.join(private_dir, zip_filename))
     with zipfile.ZipFile(zip_filepath, "w", zipfile.ZIP_DEFLATED) as zipf:
         for path, sub_path in find_files_in_subdir(client_dir):
             zipf.write(path, sub_path)
 
+        zipf.write(version_filepath, os.path.join("ayon_ftrack", "version.py"))
 
-def main(output_dir=None):
-    addon_name = "ftrack"
-    log = logging.getLogger("create_package")
+
+def main(output_dir: Optional[str] = None):
+    addon_name: str = "ftrack"
+    log: logging.Logger = logging.getLogger("create_package")
     log.info("Start creating package")
 
-    current_dir = os.path.dirname(os.path.abspath(__file__))
+    current_dir: str = os.path.dirname(os.path.abspath(__file__))
     if not output_dir:
         output_dir = os.path.join(current_dir, "package")
 
-    version_filepath = os.path.join(current_dir, "version.py")
-    version_content = {}
+    version_filepath: str = os.path.join(current_dir, "version.py")
+    version_content: dict[str, Any] = {}
     with open(version_filepath, "r") as stream:
         exec(stream.read(), version_content)
     addon_version = version_content["__version__"]
@@ -238,7 +250,7 @@ def main(output_dir=None):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
+    parser: argparse.ArgumentParser = argparse.ArgumentParser()
     parser.add_argument(
         "--output_dir",
         help=(
@@ -247,5 +259,5 @@ if __name__ == "__main__":
         )
     )
 
-    args = parser.parse_args(sys.argv[1:])
+    args: argparse.Namespace = parser.parse_args(sys.argv[1:])
     main(args.output_dir)
