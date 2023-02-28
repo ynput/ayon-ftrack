@@ -8,7 +8,7 @@ authors = ["Martastain <martas@imm.cz>"]
 python = ">=3.9,<3.10"
 pydantic = "^1.10.2"
 nxtools = "^1.6"
-ayclient = { git = "https://github.com/martastain/ayclient.git", branch = "master" }
+ayon-python-api = "^0.1"
 ftrack-python-api = "2.3.3"
 
 [tool.poetry.dev-dependencies]

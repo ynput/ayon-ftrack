@@ -4,7 +4,7 @@ import signal
 from typing import Any, Callable, Union
 
 import ftrack_api
-import ayclient
+import ayon_api
 from nxtools import logging
 
 IGNORE_TOPICS = {
@@ -26,9 +26,10 @@ def callback(event):
 
     event_data = event._data
     description = create_event_description(event_data)
-    ayclient.dispatch_event(
+
+    ayon_api.dispatch_event(
         "ftrack.leech",
-        sender=ayclient.config.service_name,
+        sender=ayon_api.ServiceContext.service_name,
         hash=event_data["id"],
         description=description,
         payload=event_data,
@@ -48,7 +49,9 @@ def main(func: Union[Callable, None] = None):
     print("Starting listener")
     if func is None:
         func = callback
-    settings = ayclient.addon_settings()
+
+    ayon_api.init_service()
+    settings = ayon_api.get_service_addon_settings()
 
     print("Creating ftrack session")
     session = ftrack_api.Session(
