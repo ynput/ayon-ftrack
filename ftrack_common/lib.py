@@ -1,5 +1,6 @@
 import re
 import numbers
+import socket
 import six
 
 from .exceptions import InvalidFpsValue
@@ -144,3 +145,13 @@ def convert_to_fps(source_value):
     raise InvalidFpsValue(
         "Value can't be converted to number \"{}\"".format(source_value)
     )
+
+
+def get_host_ip():
+    host_name = socket.gethostname()
+    try:
+        return socket.gethostbyname(host_name)
+    except Exception:
+        pass
+
+    return None

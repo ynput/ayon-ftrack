@@ -1,3 +1,4 @@
+import os
 from operator import itemgetter
 from ayon_ftrack.lib import BaseAction, statics_icon
 

@@ -2,6 +2,7 @@ import platform
 import socket
 import getpass
 
+from ftrack_common import get_host_ip
 from ayon_ftrack.lib import BaseAction
 
 
@@ -53,8 +54,7 @@ class ActionWhereIRun(BaseAction):
         try:
             host_name = socket.gethostname()
             msgs["Hostname"] = host_name
-            host_ip = socket.gethostbyname(host_name)
-            msgs["IP"] = host_ip
+            msgs["IP"] = get_host_ip() or "N/A"
         except Exception:
             pass
 
