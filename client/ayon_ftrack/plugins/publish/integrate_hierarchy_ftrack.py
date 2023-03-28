@@ -1,8 +1,8 @@
 import sys
 import collections
-import six
 from copy import deepcopy
 
+import six
 import pyblish.api
 
 from openpype.client import get_asset_by_id

@@ -10,9 +10,9 @@ Provides:
     context, instances -> All data from previous publishing process.
 """
 
-import ftrack_api
 import os
 
+import ftrack_api
 import pyblish.api
 
 

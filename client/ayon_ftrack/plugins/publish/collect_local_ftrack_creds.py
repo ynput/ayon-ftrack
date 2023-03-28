@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Collect default Deadline server."""
-import pyblish.api
 import os
+import pyblish.api
 
 
 class CollectLocalFtrackCreds(pyblish.api.ContextPlugin):
