@@ -12,12 +12,12 @@ from abc import ABCMeta, abstractmethod
 import six
 import ftrack_api
 
+try:
+    from ayon_api.exceptions import HTTPRequestError
+except ImportError:
+    from requests.exceptions import HTTPError as HTTPRequestError
 
-def get_project_settings(project_name):
-    # TODO implement logic of getting settings
-    return {
-        "ftrack": {}
-    }
+from ayon_api import get_addons_project_settings, get_addons_studio_settings
 
 
 @six.add_metaclass(ABCMeta)
@@ -462,7 +462,7 @@ class BaseHandler(object):
 
         Args:
             event (ftrack_api.Event): Processed event by session.
-            project_entity (ftrack_api.Entity): Project entity.
+            project_name (str): Project name.
         """
 
         project_settings_by_id = event["data"].get("project_settings")
@@ -472,7 +472,10 @@ class BaseHandler(object):
 
         project_settings = project_settings_by_id.get(project_name)
         if not project_settings:
-            project_settings = get_project_settings(project_name)
+            try:
+                project_settings = get_addons_project_settings(project_name)
+            except HTTPRequestError:
+                project_settings = get_addons_studio_settings()
             event["data"]["project_settings"][project_name] = project_settings
         return project_settings
 
