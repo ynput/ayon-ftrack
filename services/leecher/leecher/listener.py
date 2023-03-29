@@ -30,7 +30,7 @@ def callback(event):
     ayon_api.dispatch_event(
         "ftrack.leech",
         sender=ayon_api.ServiceContext.service_name,
-        hash=event_data["id"],
+        event_hash=event_data["id"],
         description=description,
         payload=event_data,
     )
