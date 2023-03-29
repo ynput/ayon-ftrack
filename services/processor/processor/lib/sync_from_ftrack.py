@@ -19,6 +19,7 @@ from ftrack_common import (
     REMOVED_ID_VALUE,
     create_chunks,
     get_custom_attributes_by_entity_id,
+    get_ayon_attr_configs,
 )
 
 
@@ -31,34 +32,6 @@ def _get_ftrack_project(session, project_name):
             f"Project \"{project_name}\" was not found in ftrack"
         )
     return ft_project
-
-
-def _get_custom_attr_configs(session, query_keys=None):
-    custom_attributes = []
-    hier_custom_attributes = []
-    if not query_keys:
-        query_keys = [
-            "id",
-            "key",
-            "entity_type",
-            "object_type_id",
-            "is_hierarchical",
-            "default"
-        ]
-
-    cust_attrs_query = (
-        "select {}"
-        " from CustomAttributeConfiguration"
-        " where group.name in (\"openpype\")"
-    ).format(", ".join(query_keys))
-    all_avalon_attr = session.query(cust_attrs_query).all()
-    for cust_attr in all_avalon_attr:
-        if cust_attr["is_hierarchical"]:
-            hier_custom_attributes.append(cust_attr)
-        else:
-            custom_attributes.append(cust_attr)
-
-    return custom_attributes, hier_custom_attributes
 
 
 class IdsMapping(object):
@@ -126,7 +99,7 @@ class SyncFromFtrack:
         self.log.info(f"Synchronization of project \"{project_name}\" started")
 
         # Get ftrack custom attributes to sync
-        attr_confs, hier_attr_confs = _get_custom_attr_configs(ft_session)
+        attr_confs, hier_attr_confs = get_ayon_attr_configs(ft_session)
         # Check if there is custom attribute to store server id
         server_id_conf = None
         server_path_conf = None

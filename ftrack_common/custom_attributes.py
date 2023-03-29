@@ -5,7 +5,7 @@ from .lib import join_filter_values, create_chunks
 from .constants import CUST_ATTR_GROUP
 
 
-def get_custom_attr_configs(session, query_keys=None, split_hierarchical=True):
+def get_ayon_attr_configs(session, query_keys=None, split_hierarchical=True):
     """Query custom attribute configurations from ftrack server.
 
     Args:

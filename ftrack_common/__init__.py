@@ -28,7 +28,7 @@ __all__ = (
     "get_ftrack_public_url",
     "get_ftrack_icon_url",
 
-    "get_custom_attr_configs",
+    "get_ayon_attr_configs",
     "query_custom_attribute_values",
     "get_custom_attributes_by_entity_id",
 
@@ -69,7 +69,7 @@ from .lib import (
 )
 
 from .custom_attributes import (
-    get_custom_attr_configs,
+    get_ayon_attr_configs,
     query_custom_attribute_values,
     get_custom_attributes_by_entity_id,
 )

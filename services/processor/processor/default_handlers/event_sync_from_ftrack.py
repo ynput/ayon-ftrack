@@ -29,7 +29,7 @@ from ftrack_common import (
     CUST_ATTR_AUTO_SYNC,
     FPS_KEYS,
 
-    get_custom_attr_configs,
+    get_ayon_attr_configs,
     query_custom_attribute_values,
 
     convert_to_fps,
@@ -343,7 +343,7 @@ class SyncProcess:
     @property
     def ft_cust_attrs(self):
         if self._ft_cust_attrs is None:
-            self._ft_cust_attrs = get_custom_attr_configs(
+            self._ft_cust_attrs = get_ayon_attr_configs(
                 self.session, query_keys=self.cust_attr_query_keys
             )
         return self._ft_cust_attrs
