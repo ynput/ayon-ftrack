@@ -1,4 +1,4 @@
-from processor.lib import ServerAction
+from ftrack_common.event_handlers import ServerAction
 
 
 class MultipleNotesServer(ServerAction):

@@ -21,12 +21,15 @@ from openpype.client import (
 from openpype.client.operations import CURRENT_ASSET_DOC_SCHEMA
 from openpype.pipeline import AvalonMongoDB, schema
 
-from processor.lib import BaseEventHandler
-from openpype_modules.ftrack.lib import (
-    get_openpype_attr,
-    query_custom_attributes,
-    CUST_ATTR_ID_KEY,
+from ftrack_common import (
+    BaseEventHandler,
+    query_custom_attribute_values,
     CUST_ATTR_AUTO_SYNC,
+    CUST_ATTR_KEY_SERVER_ID,
+    get_ayon_attr_configs,
+)
+
+from openpype_modules.ftrack.lib import (
     FPS_KEYS,
 
     avalon_sync,
@@ -134,7 +137,7 @@ class SyncToAvalonEvent(BaseEventHandler):
     @property
     def avalon_cust_attrs(self):
         if self._avalon_cust_attrs is None:
-            self._avalon_cust_attrs = get_openpype_attr(
+            self._avalon_cust_attrs = get_ayon_attr_configs(
                 self.process_session, query_keys=self.cust_attr_query_keys
             )
         return self._avalon_cust_attrs
@@ -1005,7 +1008,7 @@ class SyncToAvalonEvent(BaseEventHandler):
 
                     new_entity["custom_attributes"][key] = val
 
-                new_entity["custom_attributes"][CUST_ATTR_ID_KEY] = (
+                new_entity["custom_attributes"][CUST_ATTR_KEY_SERVER_ID] = (
                     str(avalon_entity["_id"])
                 )
                 ent_path = self.get_ent_path(new_entity_id)
@@ -1271,7 +1274,7 @@ class SyncToAvalonEvent(BaseEventHandler):
                 items.append("{} - \"{}\"".format(ent_path, value))
             self.report_items["error"][fps_msg] = items
 
-        _mongo_id_str = cust_attrs.get(CUST_ATTR_ID_KEY)
+        _mongo_id_str = cust_attrs.get(CUST_ATTR_KEY_SERVER_ID)
         if _mongo_id_str:
             try:
                 _mongo_id = ObjectId(_mongo_id_str)
@@ -1332,8 +1335,12 @@ class SyncToAvalonEvent(BaseEventHandler):
             self.log.debug("Entity was synchronized <{}>".format(ent_path))
 
         mongo_id_str = str(mongo_id)
-        if mongo_id_str != ftrack_ent["custom_attributes"][CUST_ATTR_ID_KEY]:
-            ftrack_ent["custom_attributes"][CUST_ATTR_ID_KEY] = mongo_id_str
+        if mongo_id_str != (
+            ftrack_ent["custom_attributes"][CUST_ATTR_KEY_SERVER_ID]
+        ):
+            (
+                ftrack_ent["custom_attributes"][CUST_ATTR_KEY_SERVER_ID]
+            ) = mongo_id_str
             try:
                 self.process_session.commit()
             except Exception:
@@ -1397,7 +1404,7 @@ class SyncToAvalonEvent(BaseEventHandler):
             output[key] = val
 
         # Make sure mongo id is not set
-        output.pop(CUST_ATTR_ID_KEY, None)
+        output.pop(CUST_ATTR_KEY_SERVER_ID, None)
 
         return output
 
@@ -2253,11 +2260,10 @@ class SyncToAvalonEvent(BaseEventHandler):
         for key in hier_cust_attrs_keys:
             configuration_ids.add(hier_attr_id_by_key[key])
 
-        values = query_custom_attributes(
+        values = query_custom_attribute_values(
             self.process_session,
             configuration_ids,
-            cust_attrs_ftrack_ids,
-            True
+            cust_attrs_ftrack_ids
         )
 
         ftrack_project_id = self.cur_project["id"]
@@ -2688,7 +2694,7 @@ class SyncToAvalonEvent(BaseEventHandler):
         if "_hierarchical" not in temp_dict:
             hier_mongo_id_configuration_id = None
             for attr in hier_attrs:
-                if attr["key"] == CUST_ATTR_ID_KEY:
+                if attr["key"] == CUST_ATTR_KEY_SERVER_ID:
                     hier_mongo_id_configuration_id = attr["id"]
                     break
             temp_dict["_hierarchical"] = hier_mongo_id_configuration_id
@@ -2705,7 +2711,7 @@ class SyncToAvalonEvent(BaseEventHandler):
 
         for attr in cust_attrs:
             key = attr["key"]
-            if key != CUST_ATTR_ID_KEY:
+            if key != CUST_ATTR_KEY_SERVER_ID:
                 continue
 
             if attr["entity_type"] != ent_info["entityType"]:

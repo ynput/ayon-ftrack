@@ -1,7 +1,13 @@
 import re
 import numbers
 import socket
+
 import six
+from ayon_api import (
+    get_base_url,
+    get_service_addon_name,
+    get_service_addon_version
+)
 
 from .exceptions import InvalidFpsValue
 
@@ -148,6 +154,13 @@ def convert_to_fps(source_value):
 
 
 def get_host_ip():
+    """Get IP of machine.
+
+    Returns:
+        Union[str, None]: IP address of machine or None if could not be
+            detected.
+    """
+
     host_name = socket.gethostname()
     try:
         return socket.gethostbyname(host_name)
@@ -155,3 +168,40 @@ def get_host_ip():
         pass
 
     return None
+
+
+def get_ftrack_public_url(*args):
+    """Url to public path in ftrack addon.
+
+    Args:
+        args (tuple[str]): Subpaths in 'public' dir.
+
+    Returns:
+        str: Url to public file on server in ftrack addon.
+    """
+
+    server_url = get_base_url()
+    parts = [
+        server_url,
+        "addons",
+        get_service_addon_name(),
+        get_service_addon_version(),
+        "public"
+    ]
+    parts.extend(args)
+    return "/".join(parts)
+
+
+def get_ftrack_icon_url(icon_name):
+    """Helper to get icon url to server.
+
+    The existence of file is not validated.
+
+    Args:
+        icon_name (str): Name of icon filename.
+
+    Returns:
+        str: Url to icon on server.
+    """
+
+    return get_ftrack_public_url("icons", icon_name)

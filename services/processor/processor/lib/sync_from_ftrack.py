@@ -6,7 +6,9 @@ import logging
 from ayon_api import (
     get_project,
     create_project,
+    slugify_string,
 )
+from ayon_api.entity_hub import EntityHub
 import ftrack_api
 from ftrack_common import (
     CUST_ATTR_KEY_SERVER_ID,
@@ -17,9 +19,8 @@ from ftrack_common import (
     REMOVED_ID_VALUE,
     create_chunks,
     get_custom_attributes_by_entity_id,
+    get_ayon_attr_configs,
 )
-
-from .entity_hub import EntityHub, slugify_name
 
 
 def _get_ftrack_project(session, project_name):
@@ -31,34 +32,6 @@ def _get_ftrack_project(session, project_name):
             f"Project \"{project_name}\" was not found in ftrack"
         )
     return ft_project
-
-
-def _get_custom_attr_configs(session, query_keys=None):
-    custom_attributes = []
-    hier_custom_attributes = []
-    if not query_keys:
-        query_keys = [
-            "id",
-            "key",
-            "entity_type",
-            "object_type_id",
-            "is_hierarchical",
-            "default"
-        ]
-
-    cust_attrs_query = (
-        "select {}"
-        " from CustomAttributeConfiguration"
-        " where group.name in (\"openpype\")"
-    ).format(", ".join(query_keys))
-    all_avalon_attr = session.query(cust_attrs_query).all()
-    for cust_attr in all_avalon_attr:
-        if cust_attr["is_hierarchical"]:
-            hier_custom_attributes.append(cust_attr)
-        else:
-            custom_attributes.append(cust_attr)
-
-    return custom_attributes, hier_custom_attributes
 
 
 class IdsMapping(object):
@@ -126,7 +99,7 @@ class SyncFromFtrack:
         self.log.info(f"Synchronization of project \"{project_name}\" started")
 
         # Get ftrack custom attributes to sync
-        attr_confs, hier_attr_confs = _get_custom_attr_configs(ft_session)
+        attr_confs, hier_attr_confs = get_ayon_attr_configs(ft_session)
         # Check if there is custom attribute to store server id
         server_id_conf = None
         server_path_conf = None
@@ -383,7 +356,7 @@ class SyncFromFtrack:
                     #   entities
                     if ft_child["id"] in all_immutable_ftrack_ids:
                         continue
-                    name = slugify_name(ft_child["name"])
+                    name = slugify_string(ft_child["name"])
                     if name != entity.name:
                         continue
                     ft_is_folder = ft_child.entity_type != "Task"
@@ -405,7 +378,7 @@ class SyncFromFtrack:
 
             else:
                 valid = True
-                ft_name = slugify_name(ft_entity["name"])
+                ft_name = slugify_string(ft_entity["name"])
                 if ft_name != entity.name:
                     self._im_renamed_entity_ids.add(entity.id)
                     valid = False
@@ -440,7 +413,7 @@ class SyncFromFtrack:
         entity_id = custom_attributes.get(CUST_ATTR_KEY_SERVER_ID)
 
         label = ft_entity["name"]
-        name = slugify_name(label)
+        name = slugify_string(label)
         entity_type = ft_entity.entity_type
         if entity_type.lower() == "task":
             task_type_name = ft_type_names_by_id[ft_entity["type_id"]]
@@ -531,7 +504,7 @@ class SyncFromFtrack:
                 continue
 
             label = ft_entity["name"]
-            name = slugify_name(label)
+            name = slugify_string(label)
             matching_name_entity = None
             for child in parent_entity.children:
                 if child.name.lower() == name.lower():

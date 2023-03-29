@@ -4,11 +4,11 @@ import copy
 from openpype.client import get_project, create_project
 from openpype.settings import ProjectSettings, SaveWarningExc
 
-from processor.lib import (
+from ftrack_common import (
     ServerAction,
+    get_ftrack_icon_url,
     CUST_ATTR_AUTO_SYNC,
-    get_openpype_attr,
-    get_icon_url,
+    get_ayon_attr_configs,
 )
 
 
@@ -19,7 +19,7 @@ class PrepareProjectServer(ServerAction):
     label = "OpenPype Admin"
     variant = "- Prepare Project (Server)"
     description = "Set basic attributes on the project"
-    icon = get_icon_url("OpenPypeAdmin.svg")
+    icon = get_ftrack_icon_url("OpenPypeAdmin.svg")
 
     settings_key = "prepare_project"
 
@@ -172,7 +172,9 @@ class PrepareProjectServer(ServerAction):
         for key, entity in project_anatom_settings["attributes"].items():
             attribute_values_by_key[key] = entity.value
 
-        cust_attrs, hier_cust_attrs = get_openpype_attr(self.session, True)
+        cust_attrs, hier_cust_attrs = get_ayon_attr_configs(
+            self.session, split_hierarchical=True
+        )
 
         for attr in hier_cust_attrs:
             key = attr["key"]

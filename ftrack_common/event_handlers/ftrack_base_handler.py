@@ -12,12 +12,13 @@ from abc import ABCMeta, abstractmethod
 import six
 import ftrack_api
 
+# Exception is not available in ayon api at the time of creating this
+try:
+    from ayon_api.exceptions import HTTPRequestError
+except ImportError:
+    from requests.exceptions import HTTPError as HTTPRequestError
 
-def get_project_settings(project_name):
-    # TODO implement logic of getting settings
-    return {
-        "ftrack": {}
-    }
+from ayon_api import get_addons_project_settings, get_addons_studio_settings
 
 
 @six.add_metaclass(ABCMeta)
@@ -69,7 +70,9 @@ class BaseHandler(object):
         """
 
         if self._log is None:
+            # TODO better logging mechanism
             self._log = logging.getLogger(self.__class__.__name__)
+            self._log.setLevel(logging.DEBUG)
         return self._log
 
     @property
@@ -462,7 +465,7 @@ class BaseHandler(object):
 
         Args:
             event (ftrack_api.Event): Processed event by session.
-            project_entity (ftrack_api.Entity): Project entity.
+            project_name (str): Project name.
         """
 
         project_settings_by_id = event["data"].get("project_settings")
@@ -472,7 +475,14 @@ class BaseHandler(object):
 
         project_settings = project_settings_by_id.get(project_name)
         if not project_settings:
-            project_settings = get_project_settings(project_name)
+            # NOTE there is no safe way how to get project settings if project
+            #   does not exist on AYON server.
+            # TODO Should we somehow find out if ftrack is enabled for the
+            #   project?
+            try:
+                project_settings = get_addons_project_settings(project_name)
+            except HTTPRequestError:
+                project_settings = get_addons_studio_settings()
             event["data"]["project_settings"][project_name] = project_settings
         return project_settings
 

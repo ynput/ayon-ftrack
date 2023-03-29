@@ -7,8 +7,8 @@ import threading
 import time
 import queue
 import collections
-import appdirs
 
+import appdirs
 import requests
 import ftrack_api
 import ftrack_api.session
@@ -19,7 +19,12 @@ import ftrack_api.event
 
 from weakref import WeakMethod
 
-import ayclient
+from ayon_api import (
+    get_service_addon_name,
+    enroll_event_job,
+    get_event,
+    update_event,
+)
 
 TOPIC_STATUS_SERVER = "openpype.event.server.status"
 TOPIC_STATUS_SERVER_RESULT = "openpype.event.server.status.result"
@@ -28,53 +33,36 @@ TOPIC_STATUS_SERVER_RESULT = "openpype.event.server.status.result"
 class ProcessEventHub(ftrack_api.event.hub.EventHub):
     _server_con = None
 
-    def prepare_server_connection(self):
-        try:
-            assert ayclient.api.get("users/me")
-        except Exception:
-            logging.error('Server "{}" is not responding, exiting.')
-            sys.exit(0)
-
     def get_next_ftrack_event(self):
-        payload = {
-            "sourceTopic": "ftrack.leech",
-            "targetTopic": "ftrack.proc",
-            "sender": ayclient.config.service_name,
-            "description": "Event processing",
-            "sequential": True,
-        }
-        response = ayclient.api.post("enroll", json=payload)
-        if response.status_code == 204:
-            return None
-        elif response.status_code >= 400:
-            logging.error(response)
-            return None
-
-        return response.json()
+         return enroll_event_job(
+            source_topic="ftrack.leech",
+            target_topic="ftrack.proc",
+            sender=get_service_addon_name(),
+            description="Event processing",
+            sequential=True
+        )
 
     def finish_job(self, job):
         event_id = job["id"]
         source_id = job["dependsOn"]
-        source_event = ayclient.api.get(f"events/{source_id}").json()
+        source_event = get_event(event_id)
         print(f"Processing event... {source_id}")
 
         description = f"Processed {source_event['description']}"
 
-        req_data = {
-            "sender": ayclient.config.service_name,
-            "description": description,
-            "status": "finished",
-        }
-
-        res = ayclient.api.patch(f"events/{event_id}", json=req_data)
-        assert res
+        update_event(
+            event_id,
+            sender=get_service_addon_name(),
+            status="finished",
+            description=description,
+        )
 
     def load_event_from_jobs(self):
         job = self.get_next_ftrack_event()
         if not job:
             return False
 
-        src_job = ayclient.api.get(f"events/{job['dependsOn']}").json()
+        src_job = get_event(job["dependsOn"])
         ftrack_event = ftrack_api.event.base.Event(**src_job["payload"])
         self._event_queue.put((ftrack_event, job))
         return True
@@ -86,7 +74,6 @@ class ProcessEventHub(ftrack_api.event.hub.EventHub):
         """
 
         started = time.time()
-        self.prepare_server_connection()
         while True:
             job = None
             try:

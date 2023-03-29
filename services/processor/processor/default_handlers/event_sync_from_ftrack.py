@@ -11,11 +11,12 @@ from ayon_api import (
     get_project,
     get_folders,
     get_tasks,
+    slugify_string,
 )
 
-from processor.lib.entity_hub import EntityHub, slugify_name
+from ayon_api.entity_hub import EntityHub
 from ftrack_common import (
-    InvalidFpsValue,
+    BaseEventHandler,
 
     FTRACK_ID_ATTRIB,
     FTRACK_PATH_ATTRIB,
@@ -28,7 +29,7 @@ from ftrack_common import (
     CUST_ATTR_AUTO_SYNC,
     FPS_KEYS,
 
-    get_custom_attr_configs,
+    get_ayon_attr_configs,
     query_custom_attribute_values,
 
     convert_to_fps,
@@ -36,7 +37,6 @@ from ftrack_common import (
     create_chunks,
     join_filter_values,
 )
-from ftrack_common.event_handlers import BaseEventHandler
 
 UNKNOWN_VALUE = object()
 
@@ -343,7 +343,7 @@ class SyncProcess:
     @property
     def ft_cust_attrs(self):
         if self._ft_cust_attrs is None:
-            self._ft_cust_attrs = get_custom_attr_configs(
+            self._ft_cust_attrs = get_ayon_attr_configs(
                 self.session, query_keys=self.cust_attr_query_keys
             )
         return self._ft_cust_attrs
@@ -614,7 +614,7 @@ class SyncProcess:
             return None
 
         label = ft_entity["name"]
-        name = slugify_name(label)
+        name = slugify_string(label)
         # Try to find matching entity by name in same parent
         matching_entity = None
         for child in parent.children:
@@ -754,7 +754,7 @@ class SyncProcess:
         )).all()
         for child in ft_other_children:
             label = child["name"]
-            name = slugify_name(label)
+            name = slugify_string(label)
             if name == entity.name:
                 new_ft_match = child
                 break
@@ -815,7 +815,7 @@ class SyncProcess:
                 #   did not change for server (after slugify)
                 if "parent_id" not in changes and "name" in changes:
                     new_name = changes["name"]["new"]
-                    if slugify_name(new_name) == entity.name:
+                    if slugify_string(new_name) == entity.name:
                         allow_change = True
 
             if allow_change:
@@ -887,7 +887,7 @@ class SyncProcess:
             changes = info["changes"]
             if "name" in changes:
                 label = changes["name"]["new"]
-                name = slugify_name(label)
+                name = slugify_string(label)
             else:
                 name = entity.name
 
@@ -1057,7 +1057,7 @@ class SyncProcess:
             changes = info["changes"]
             if "name" in changes:
                 label = changes["name"]["new"]
-                name = slugify_name(label)
+                name = slugify_string(label)
             else:
                 name = entity.name
 
@@ -1565,15 +1565,16 @@ class AutoSyncFromFtrack(BaseEventHandler):
                     "entityType": "show"
                 }]
                 # TODO uncomment when out of testing stage
-                # self.trigger_action(
-                #     action_identifier="sync.from.ftrack.server",
-                #     event=sync_process.event,
-                #     selection=selection
-                # )
+                self.trigger_action(
+                    action_identifier="sync.from.ftrack.server",
+                    event=sync_process.event,
+                    selection=selection
+                )
 
         if not sync_process.is_event_valid:
             self.log.debug(
-                "Project has disabled autosync {sync_process.project_name}. Skipping."
+                f"Project has disabled autosync {sync_process.project_name}."
+                " Skipping."
             )
             return True
 
