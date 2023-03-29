@@ -69,7 +69,9 @@ class BaseHandler(object):
         """
 
         if self._log is None:
+            # TODO better logging mechanism
             self._log = logging.getLogger(self.__class__.__name__)
+            self._log.setLevel(logging.DEBUG)
         return self._log
 
     @property
