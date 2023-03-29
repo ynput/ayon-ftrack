@@ -5,7 +5,7 @@ import logging
 import traceback
 
 import ftrack_api
-from ayon_api import get_project_settings
+from ayon_api import get_addons_studio_settings, init_service
 
 from .ftrack_session import OPServerSession
 from .lib import modules_from_path
@@ -167,11 +167,12 @@ def get_handler_paths() -> list[str]:
 
 
 def main():
-    os.environ["OPENPYPE_SERVER_URL"] = os.environ["AY_SERVER_URL"]
-    os.environ["OPENPYPE_TOKEN"] = os.environ["AY_API_KEY"]
+    logging.basicConfig()
+
+    init_service()
 
     handler_paths = get_handler_paths()
-    settings = get_project_settings()
+    settings = get_addons_studio_settings()
     ftrack_settings = settings["ftrack"]
     service_settings = ftrack_settings["service_settings"]
     session = OPServerSession(

@@ -14,9 +14,6 @@ from .python_module_tools import (
     import_filepath,
 )
 
-from .custom_attributes import (
-    query_custom_attributes,
-)
 from .ftrack_event_handler import BaseEventHandler
 from .ftrack_action_handler import LocalAction, ServerAction
 
@@ -32,8 +29,6 @@ __all__ = (
 
     "modules_from_path",
     "import_filepath",
-
-    "query_custom_attributes",
 
     "BaseEventHandler",
 

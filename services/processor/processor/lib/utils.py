@@ -1,14 +1,17 @@
-import ayclient
+from ayon_api import (
+    get_base_url,
+    get_service_addon_name,
+    get_service_addon_version
+)
 
 
 def get_addon_resource_url(*args):
-    # server_url = ayclient.config.server_url
-    server_url = "https://dev.openpype.cloud"
+    server_url = get_base_url()
     parts = [
         server_url,
         "addons",
-        ayclient.config.addon_name,
-        ayclient.config.addon_version,
+        get_service_addon_name(),
+        get_service_addon_version(),
         "public"
     ]
     parts.extend(args)
