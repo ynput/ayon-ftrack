@@ -10,7 +10,7 @@ from openpype.settings.lib import (
     get_project_settings,
     get_default_project_settings
 )
-from ftrack_common import BaseEventHandler, get_ftrack_icon_url
+from ftrack_common import ServerAction, get_ftrack_icon_url
 
 
 class CreateDailyReviewSessionServerAction(ServerAction):

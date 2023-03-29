@@ -6,11 +6,9 @@ from openpype.settings import ProjectSettings, SaveWarningExc
 
 from ftrack_common import (
     ServerAction,
-    get_ftrack_icon_url
-)
-from processor.lib import (
+    get_ftrack_icon_url,
     CUST_ATTR_AUTO_SYNC,
-    get_openpype_attr,
+    get_ayon_attr_configs,
 )
 
 
@@ -174,7 +172,9 @@ class PrepareProjectServer(ServerAction):
         for key, entity in project_anatom_settings["attributes"].items():
             attribute_values_by_key[key] = entity.value
 
-        cust_attrs, hier_cust_attrs = get_openpype_attr(self.session, True)
+        cust_attrs, hier_cust_attrs = get_ayon_attr_configs(
+            self.session, split_hierarchical=True
+        )
 
         for attr in hier_cust_attrs:
             key = attr["key"]

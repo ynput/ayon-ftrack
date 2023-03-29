@@ -1,9 +1,12 @@
 from pymongo import UpdateOne
 from bson.objectid import ObjectId
 
-from ftrack_common import BaseEventHandler, query_custom_attribute_values
+from ftrack_common import (
+    BaseEventHandler,
+    query_custom_attribute_values,
+    CUST_ATTR_KEY_SERVER_ID,
+)
 from openpype.pipeline import AvalonMongoDB
-from openpype_modules.ftrack.lib import CUST_ATTR_ID_KEY
 
 
 class SyncLinksToAvalon(BaseEventHandler):
@@ -61,7 +64,7 @@ class SyncLinksToAvalon(BaseEventHandler):
 
         attr_def = session.query((
             "select id from CustomAttributeConfiguration where key is \"{}\""
-        ).format(CUST_ATTR_ID_KEY)).first()
+        ).format(CUST_ATTR_KEY_SERVER_ID)).first()
         if attr_def is None:
             return
 
