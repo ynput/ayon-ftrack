@@ -12,6 +12,7 @@ from abc import ABCMeta, abstractmethod
 import six
 import ftrack_api
 
+# Exception is not available in ayon api at the time of creating this
 try:
     from ayon_api.exceptions import HTTPRequestError
 except ImportError:
@@ -474,6 +475,10 @@ class BaseHandler(object):
 
         project_settings = project_settings_by_id.get(project_name)
         if not project_settings:
+            # NOTE there is no safe way how to get project settings if project
+            #   does not exist on AYON server.
+            # TODO Should we somehow find out if ftrack is enabled for the
+            #   project?
             try:
                 project_settings = get_addons_project_settings(project_name)
             except HTTPRequestError:
