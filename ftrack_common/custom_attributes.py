@@ -1,7 +1,7 @@
 import itertools
 import collections
 
-from .lib import join_filter_values
+from .lib import join_filter_values, create_chunks
 from .constants import CUST_ATTR_GROUP
 
 
@@ -88,11 +88,8 @@ def query_custom_attribute_values(session, attr_ids, entity_ids):
     # Query values in chunks
     chunk_size = 5000 // len(attr_ids)
     # Make sure entity_ids is `list` for chunk selection
-    entity_ids = list(entity_ids)
-    for idx in range(0, len(entity_ids), chunk_size):
-        entity_ids_joined = join_filter_values(
-            entity_ids[idx:idx + chunk_size]
-        )
+    for chunk in create_chunks(entity_ids, chunk_size):
+        entity_ids_joined = join_filter_values(chunk)
         output.extend(
             session.query(
                 (
