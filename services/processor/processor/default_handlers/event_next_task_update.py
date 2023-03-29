@@ -1,6 +1,6 @@
 import collections
 
-from processor.lib import BaseEventHandler
+from ftrack_common import BaseEventHandler
 
 
 class NextTaskUpdate(BaseEventHandler):

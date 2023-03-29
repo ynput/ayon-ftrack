@@ -1,5 +1,7 @@
-from ftrack_common.event_handlers import ServerAction
-from processor.lib import get_icon_url
+from ftrack_common import (
+    ServerAction,
+    get_ftrack_icon_url,
+)
 from processor.lib.sync_from_ftrack import SyncFromFtrack
 
 
@@ -10,7 +12,7 @@ class SyncFromFtrackAction(ServerAction):
     label = "OpenPype Admin"
     variant = "- Sync from ftrack"
     description = "Synchronize project hierarchy based on ftrack"
-    icon = get_icon_url("OpenPypeAdmin.svg")
+    icon = get_ftrack_icon_url("OpenPypeAdmin.svg")
 
     role_list = ["Pypeclub", "Administrator", "Project Manager"]
 

@@ -1,9 +1,8 @@
 from pymongo import UpdateOne
 from bson.objectid import ObjectId
 
+from ftrack_common import BaseEventHandler, query_custom_attribute_values
 from openpype.pipeline import AvalonMongoDB
-
-from processor.lib import BaseEventHandler, query_custom_attributes
 from openpype_modules.ftrack.lib import CUST_ATTR_ID_KEY
 
 
@@ -123,8 +122,8 @@ class SyncLinksToAvalon(BaseEventHandler):
             self.dbcon.database[project_name].bulk_write(bulk_writes)
 
     def _get_mongo_ids_by_ftrack_ids(self, session, attr_id, ftrack_ids):
-        output = query_custom_attributes(
-            session, [attr_id], ftrack_ids, True
+        output = query_custom_attribute_values(
+            session, [attr_id], ftrack_ids
         )
         mongo_id_by_ftrack_id = {}
         for item in output:

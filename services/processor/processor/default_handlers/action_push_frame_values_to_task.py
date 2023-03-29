@@ -3,10 +3,10 @@ import json
 import collections
 import ftrack_api
 
-from processor.lib import (
+from ftrack_common import (
     ServerAction,
-    query_custom_attributes,
-    get_icon_url,
+    query_custom_attribute_values,
+    get_ftrack_icon_url,
 )
 
 
@@ -46,7 +46,7 @@ class PushHierValuesToNonHier(ServerAction):
     identifier = "admin.push_hier_values_to_non_hier"
     label = "OpenPype Admin"
     variant = "- Push Hierarchical values To Non-Hierarchical"
-    icon = get_icon_url("OpenPypeAdmin.svg")
+    icon = get_ftrack_icon_url("OpenPypeAdmin.svg")
 
     entities_query_by_project = (
         "select id, parent_id, object_type_id from TypedContext"
@@ -358,7 +358,7 @@ class PushHierValuesToNonHier(ServerAction):
             for key in hier_attrs_key_by_id.values():
                 values_per_entity_id[entity_id][key] = None
 
-        values = query_custom_attributes(
+        values = query_custom_attribute_values(
             session, hier_attr_ids, all_ids_with_parents, True
         )
         for item in values:

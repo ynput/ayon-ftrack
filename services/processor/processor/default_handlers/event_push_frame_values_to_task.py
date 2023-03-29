@@ -4,7 +4,7 @@ import copy
 
 import ftrack_api
 
-from processor.lib import BaseEventHandler, query_custom_attributes
+from ftrack_common import BaseEventHandler, query_custom_attribute_values
 
 
 class PushFrameValuesToTaskEvent(BaseEventHandler):
@@ -299,8 +299,8 @@ class PushFrameValuesToTaskEvent(BaseEventHandler):
         # - result does not contain values for all entities only result of
         #   query callback to ftrack server
         hierarchy_ids_with_tasks = whole_hierarchy_ids | task_ids
-        result = query_custom_attributes(
-            session, list(hier_attr_ids), hierarchy_ids_with_tasks, True
+        result = query_custom_attribute_values(
+            session, list(hier_attr_ids), hierarchy_ids_with_tasks
         )
         task_real_values = {
             task_id: {}
@@ -315,8 +315,8 @@ class PushFrameValuesToTaskEvent(BaseEventHandler):
             task_real_values[entity_id][attr_id] = item["value"]
 
         result.extend(
-            query_custom_attributes(
-                session, task_conf_ids, whole_hierarchy_ids, False
+            query_custom_attribute_values(
+                session, task_conf_ids, whole_hierarchy_ids
             )
         )
 
@@ -775,8 +775,8 @@ class PushFrameValuesToTaskEvent(BaseEventHandler):
             for attr_conf in hier_attrs
         }
 
-        values = query_custom_attributes(
-            session, list(hier_attrs_key_by_id.keys()), all_entity_ids, True
+        values = query_custom_attribute_values(
+            session, list(hier_attrs_key_by_id.keys()), all_entity_ids
         )
         values_per_entity_id = {}
         for entity_id in all_entity_ids:
@@ -840,8 +840,8 @@ class PushFrameValuesToTaskEvent(BaseEventHandler):
                     ftrack_api.symbol.NOT_SET
                 )
 
-        values = query_custom_attributes(
-            session, attr_ids, entity_ids, True
+        values = query_custom_attribute_values(
+            session, attr_ids, entity_ids
         )
 
         for item in values:

@@ -21,10 +21,9 @@ from openpype.client import (
 from openpype.client.operations import CURRENT_ASSET_DOC_SCHEMA
 from openpype.pipeline import AvalonMongoDB, schema
 
-from processor.lib import BaseEventHandler
+from ftrack_common import BaseEventHandler, query_custom_attribute_values
 from openpype_modules.ftrack.lib import (
     get_openpype_attr,
-    query_custom_attributes,
     CUST_ATTR_ID_KEY,
     CUST_ATTR_AUTO_SYNC,
     FPS_KEYS,
@@ -2253,11 +2252,10 @@ class SyncToAvalonEvent(BaseEventHandler):
         for key in hier_cust_attrs_keys:
             configuration_ids.add(hier_attr_id_by_key[key])
 
-        values = query_custom_attributes(
+        values = query_custom_attribute_values(
             self.process_session,
             configuration_ids,
-            cust_attrs_ftrack_ids,
-            True
+            cust_attrs_ftrack_ids
         )
 
         ftrack_project_id = self.cur_project["id"]
