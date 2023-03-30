@@ -277,6 +277,6 @@ class CustomEventHubSession(ftrack_api.session.Session):
         )
 
 
-class OPServerSession(CustomEventHubSession):
+class AYONServerSession(CustomEventHubSession):
     def _create_event_hub(self):
         return ProcessEventHub(self._server_url, self._api_user, self._api_key)

@@ -2,7 +2,7 @@ from ftrack_common import (
     ServerAction,
     get_ftrack_icon_url,
 )
-from processor.lib.sync_from_ftrack import SyncFromFtrack
+from processor.lib import SyncFromFtrack
 
 
 class SyncFromFtrackAction(ServerAction):

@@ -1,10 +1,8 @@
-from .python_module_tools import (
-    modules_from_path,
-    import_filepath,
+from .sync_from_ftrack import (
+    SyncFromFtrack,
 )
 
 
 __all__ = (
-    "modules_from_path",
-    "import_filepath",
+    "SyncFromFtrack",
 )
