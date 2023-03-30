@@ -1,9 +1,5 @@
 {
     "show": {
-        "avalon_auto_sync": {
-          "label": "Avalon auto-sync",
-          "type": "boolean"
-        },
         "library_project": {
           "label": "Library Project",
           "type": "boolean"

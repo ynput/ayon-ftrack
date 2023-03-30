@@ -2,21 +2,25 @@ import collections
 import json
 import arrow
 import ftrack_api
-from openpype_modules.ftrack.lib import (
-    BaseAction,
-    statics_icon,
 
-    CUST_ATTR_ID_KEY,
+from ftrack_common import (
+    BaseAction,
+
     CUST_ATTR_GROUP,
-    CUST_ATTR_TOOLS,
-    CUST_ATTR_APPLICATIONS,
-    CUST_ATTR_INTENT,
+    CUST_ATTR_KEY_SERVER_ID,
+    CUST_ATTR_KEY_SERVER_PATH,
+    CUST_ATTR_AUTO_SYNC,
+    CUST_ATTR_KEY_SYNC_FAIL,
     FPS_KEYS,
+    CUST_ATTR_INTENT,
+    CUST_ATTR_APPLICATIONS,
+    CUST_ATTR_TOOLS,
 
     default_custom_attributes_definition,
     app_definitions_from_app_manager,
     tool_definitions_from_app_manager
 )
+from ayon_ftrack.lib import statics_icon
 
 from openpype.settings import get_system_settings
 from openpype.lib import ApplicationManager
@@ -243,7 +247,7 @@ class CustomAttributes(BaseAction):
         return output
 
     def avalon_mongo_id_attributes(self, session, event):
-        self.create_hierarchical_mongo_attr(session, event)
+        self.create_ayon_attributes(session, event)
 
         hierarchical_attr, object_type_attrs = (
             self.mongo_id_custom_attributes(session)
@@ -258,7 +262,7 @@ class CustomAttributes(BaseAction):
             "select id, entity_type, object_type_id, is_hierarchical, default"
             " from CustomAttributeConfiguration"
             " where key = \"{}\""
-        ).format(CUST_ATTR_ID_KEY)
+        ).format(CUST_ATTR_KEY_SERVER_ID)
 
         mongo_id_avalon_attr = session.query(cust_attrs_query).all()
         heirarchical_attr = None
@@ -272,19 +276,46 @@ class CustomAttributes(BaseAction):
 
         return heirarchical_attr, object_type_attrs
 
-    def create_hierarchical_mongo_attr(self, session, event):
+    def create_ayon_attributes(self, session, event):
         # Set security roles for attribute
-        data = {
-            "key": CUST_ATTR_ID_KEY,
-            "label": "Avalon/Mongo ID",
-            "type": "text",
-            "default": "",
-            "group": CUST_ATTR_GROUP,
-            "is_hierarchical": True,
-            "config": {"markdown": False}
-        }
 
-        self.process_attr_data(data, event)
+        for item in [
+            {
+                "key": CUST_ATTR_KEY_SERVER_ID,
+                "label": "AYON ID",
+                "type": "text",
+                "default": "",
+                "group": CUST_ATTR_GROUP,
+                "is_hierarchical": True,
+                "config": {"markdown": False}
+            },
+            {
+                "key": CUST_ATTR_KEY_SERVER_PATH,
+                "label": "AYON path",
+                "type": "text",
+                "default": "",
+                "group": CUST_ATTR_GROUP,
+                "is_hierarchical": True,
+                "config": {"markdown": False}
+            },
+            {
+                "key": CUST_ATTR_KEY_SYNC_FAIL,
+                "label": "AYON sync failed",
+                "type": "boolean",
+                "default": "",
+                "group": CUST_ATTR_GROUP,
+                "is_hierarchical": True,
+                "config": {"markdown": False}
+            },
+            {
+                "key": CUST_ATTR_AUTO_SYNC,
+                "label": "AYON auto-sync",
+                "group": CUST_ATTR_GROUP,
+                "type": "boolean",
+                "entity_type": "show"
+            }
+        ]:
+            self.process_attr_data(item, event)
 
     def convert_mongo_id_to_hierarchical(
         self, hierarchical_attr, object_type_attrs, session, event
