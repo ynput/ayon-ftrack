@@ -17,7 +17,12 @@ __all__ = (
     "CUST_ATTR_KEY_SYNC_FAIL",
     "CUST_ATTR_GROUP",
     "CUST_ATTR_AUTO_SYNC",
+
     "FPS_KEYS",
+    "CUST_ATTR_INTENT",
+
+    "CUST_ATTR_APPLICATIONS",
+    "CUST_ATTR_TOOLS",
 
     "InvalidFpsValue",
 
@@ -31,6 +36,9 @@ __all__ = (
     "get_ayon_attr_configs",
     "query_custom_attribute_values",
     "get_custom_attributes_by_entity_id",
+    "default_custom_attributes_definition",
+    "app_definitions_from_app_manager",
+    "tool_definitions_from_app_manager",
 
     "BaseHandler",
     "BaseEventHandler",
@@ -58,6 +66,10 @@ from .constants import (
     CUST_ATTR_AUTO_SYNC,
 
     FPS_KEYS,
+    CUST_ATTR_INTENT,
+
+    CUST_ATTR_APPLICATIONS,
+    CUST_ATTR_TOOLS,
 )
 
 from .exceptions import (
@@ -77,6 +89,9 @@ from .custom_attributes import (
     get_ayon_attr_configs,
     query_custom_attribute_values,
     get_custom_attributes_by_entity_id,
+    default_custom_attributes_definition,
+    app_definitions_from_app_manager,
+    tool_definitions_from_app_manager,
 )
 
 from .event_handlers import (

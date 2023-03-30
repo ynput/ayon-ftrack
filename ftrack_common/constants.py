@@ -15,11 +15,13 @@ CUST_ATTR_GROUP = "ayon"
 CUST_ATTR_AUTO_SYNC = "auto_sync_enabled"
 CUST_ATTR_AUTO_SYNC = "avalon_auto_sync" # TODO remove this line
 
-
 FPS_KEYS = {
     "fps",
     "fps_string"
 }
+
+# Intent custom attribute name
+CUST_ATTR_INTENT = "intent"
 
 # TODO these are applications addon specific
 # - maybe should be handled by applications?
