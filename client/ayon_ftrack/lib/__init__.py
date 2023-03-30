@@ -19,9 +19,7 @@ from .custom_attributes import (
 )
 
 from . import credentials
-from .ftrack_base_handler import BaseHandler
-from .ftrack_event_handler import BaseEvent
-from .ftrack_action_handler import BaseAction, ServerAction, statics_icon
+from .utils import statics_icon
 
 
 __all__ = (
@@ -44,11 +42,5 @@ __all__ = (
 
     "credentials",
 
-    "BaseHandler",
-
-    "BaseEvent",
-
-    "BaseAction",
-    "ServerAction",
     "statics_icon"
 )
