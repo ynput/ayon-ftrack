@@ -5,35 +5,22 @@ from datetime import datetime
 from bson.objectid import ObjectId
 
 from openpype.client import get_assets, get_subsets
-from openpype.pipeline import AvalonMongoDB
-from ayon_ftrack.lib import BaseAction, statics_icon
-from ayon_ftrack.lib.avalon_sync import create_chunks
+from ftrack_common import create_chunks, BaseAction
+from openpype_modules.ftrack.lib import statics_icon
 
 
 class DeleteAssetSubset(BaseAction):
-    '''Edit meta data action.'''
-
-    # Action identifier.
-    identifier = "delete.asset.subset"
-    # Action label.
-    label = "Delete Asset/Subsets"
-    # Action description.
-    description = "Removes from Avalon with all childs and asset from Ftrack"
+    identifier = "delete.folder.subset"
+    label = "Delete Folder/Subsets"
+    description = "Removes from AYON and from ftrack with all children"
     icon = statics_icon("ftrack", "action_icons", "DeleteAsset.svg")
 
     settings_key = "delete_asset_subset"
-    # Db connection
-    dbcon = None
 
     splitter = {"type": "label", "value": "---"}
     action_data_by_id = {}
-    asset_prefix = "asset:"
+    folder_prefix = "folder:"
     subset_prefix = "subset:"
-
-    def __init__(self, *args, **kwargs):
-        self.dbcon = AvalonMongoDB()
-
-        super(DeleteAssetSubset, self).__init__(*args, **kwargs)
 
     def discover(self, session, entities, event):
         """ Validation """
@@ -121,7 +108,6 @@ class DeleteAssetSubset(BaseAction):
 
         project = self.get_project_from_entity(entities[0], session)
         project_name = project["full_name"]
-        self.dbcon.Session["AVALON_PROJECT"] = project_name
 
         asset_docs = list(get_assets(
             project_name,
@@ -246,7 +232,7 @@ class DeleteAssetSubset(BaseAction):
                 items.append({
                     "label": asset["name"],
                     "name": "{}{}".format(
-                        self.asset_prefix, str(asset["_id"])
+                        self.folder_prefix, str(asset["_id"])
                     ),
                     "type": 'boolean',
                     "value": False
@@ -340,8 +326,8 @@ class DeleteAssetSubset(BaseAction):
             for key, value in values.items():
                 if not value:
                     continue
-                if key.startswith(self.asset_prefix):
-                    _key = key.replace(self.asset_prefix, "")
+                if key.startswith(self.folder_prefix):
+                    _key = key.replace(self.folder_prefix, "")
                     to_delete["assets"].append(_key)
 
                 elif key.startswith(self.subset_prefix):
@@ -437,7 +423,6 @@ class DeleteAssetSubset(BaseAction):
 
         project_name = spec_data["project_name"]
         to_delete = spec_data["to_delete"]
-        self.dbcon.Session["AVALON_PROJECT"] = project_name
 
         assets_to_delete = to_delete.get("assets") or []
         subsets_to_delete = to_delete.get("subsets") or []

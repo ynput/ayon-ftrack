@@ -3,17 +3,18 @@ import copy
 import json
 import collections
 
+from ftrack_common import (
+    BaseAction,
+    query_custom_attribute_values,
+    CUST_ATTR_KEY_SERVER_ID,
+)
+from ayon_ftrack.lib import statics_icon
 from openpype.client import (
     get_project,
     get_assets,
     get_subsets,
     get_versions,
     get_representations
-)
-from ayon_ftrack.lib import BaseAction, statics_icon
-from ayon_ftrack.lib.avalon_sync import CUST_ATTR_ID_KEY
-from ayon_ftrack.lib.custom_attributes import (
-    query_custom_attributes
 )
 from openpype.lib.dateutils import get_datetime_data
 from openpype.pipeline import Anatomy
@@ -411,12 +412,12 @@ class Delivery(BaseAction):
 
         attr_def = session.query((
             "select id from CustomAttributeConfiguration where key is \"{}\""
-        ).format(CUST_ATTR_ID_KEY)).first()
+        ).format(CUST_ATTR_KEY_SERVER_ID)).first()
         if attr_def is None:
             return asset_docs_by_ftrack_id
 
-        avalon_mongo_id_values = query_custom_attributes(
-            session, [attr_def["id"]], parent_ids, True
+        avalon_mongo_id_values = query_custom_attribute_values(
+            session, [attr_def["id"]], parent_ids
         )
         missing_ids = set(parent_ids)
         for item in avalon_mongo_id_values:

@@ -2,7 +2,7 @@ import collections
 import json
 import arrow
 import ftrack_api
-from ayon_ftrack.lib import (
+from openpype_modules.ftrack.lib import (
     BaseAction,
     statics_icon,
 
@@ -45,7 +45,7 @@ dictionary level, task's attributes are nested more.
 
 group (string)
     - name of group
-    - based on attribute `ayon_ftrack.lib.CUST_ATTR_GROUP`
+    - based on attribute `openpype_modules.ftrack.lib.CUST_ATTR_GROUP`
         - "pype" by default
 
 *** Required ***************************************************************
@@ -134,15 +134,10 @@ class CustAttrException(Exception):
 
 
 class CustomAttributes(BaseAction):
-    '''Edit meta data action.'''
-
-    #: Action identifier.
-    identifier = 'create.update.attributes'
-    #: Action label.
+    identifier = "create.update.attributes"
     label = "OpenPype Admin"
-    variant = '- Create/Update Custom Attributes'
-    #: Action description.
-    description = 'Creates required custom attributes in ftrack'
+    variant = "- Create/Update Custom Attributes"
+    description = "Creates required custom attributes in ftrack"
     icon = statics_icon("ftrack", "action_icons", "OpenPypeAdmin.svg")
     settings_key = "create_update_attributes"
 
@@ -161,26 +156,23 @@ class CustomAttributes(BaseAction):
     )
 
     def discover(self, session, entities, event):
-        '''
-        Validation
-        - action is only for Administrators
-        '''
         return self.valid_roles(session, entities, event)
 
     def launch(self, session, entities, event):
         # JOB SETTINGS
-        userId = event['source']['user']['id']
-        user = session.query('User where id is ' + userId).one()
+        user_id = event["source"]["user"]["id"]
+        user = session.query(f"User where id is {user_id}").one()
 
-        job = session.create('Job', {
-            'user': user,
-            'status': 'running',
-            'data': json.dumps({
-                'description': 'Custom Attribute creation.'
+        job = session.create("Job", {
+            "user": user,
+            "status": 'running',
+            "data": json.dumps({
+                "description": "Custom Attribute creation."
             })
         })
         session.commit()
 
+        # TODO how to get custom attributes from different addons?
         self.app_manager = ApplicationManager()
 
         try:
@@ -191,7 +183,7 @@ class CustomAttributes(BaseAction):
             self.intent_attribute(event)
             self.custom_attributes_from_file(event)
 
-            job['status'] = 'done'
+            job["status"] = "done"
             session.commit()
 
         except Exception:

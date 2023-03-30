@@ -16,7 +16,7 @@ from openpype.pipeline import (
     AvalonMongoDB,
     Anatomy,
 )
-from ayon_ftrack.lib import BaseAction, statics_icon
+from openpype_modules.ftrack.lib import BaseAction, statics_icon
 
 
 class RVAction(BaseAction):
