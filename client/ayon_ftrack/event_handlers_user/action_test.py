@@ -1,4 +1,5 @@
-from ayon_ftrack.lib import BaseAction, statics_icon
+from ftrack_common import BaseAction
+from ayon_ftrack.lib import statics_icon
 
 
 class TestAction(BaseAction):
@@ -6,11 +7,10 @@ class TestAction(BaseAction):
 
     ignore_me = True
 
-    identifier = 'test.action'
-    label = 'Test action'
-    description = 'Test action'
+    identifier = "test.action"
+    label = "Test action"
+    description = "Test action"
     priority = 10000
-    role_list = ['Pypeclub']
     icon = statics_icon("ftrack", "action_icons", "TestAction.svg")
 
     def discover(self, session, entities, event):

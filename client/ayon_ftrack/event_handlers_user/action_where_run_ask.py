@@ -2,8 +2,7 @@ import platform
 import socket
 import getpass
 
-from ftrack_common import get_host_ip
-from ayon_ftrack.lib import BaseAction
+from ftrack_common import get_host_ip, BaseAction
 
 
 class ActionWhereIRun(BaseAction):
@@ -93,6 +92,4 @@ class ActionWhereIRun(BaseAction):
 
 
 def register(session):
-    '''Register plugin. Called when used as an plugin.'''
-
     ActionWhereIRun(session).register()

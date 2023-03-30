@@ -1,10 +1,8 @@
 import collections
 import ftrack_api
-from ayon_ftrack.lib import (
-    BaseAction,
-    statics_icon,
-    get_openpype_attr
-)
+
+from ftrack_common import BaseAction, get_ayon_attr_configs
+from ayon_ftrack.lib import statics_icon
 
 
 class CleanHierarchicalAttrsAction(BaseAction):
@@ -55,7 +53,7 @@ class CleanHierarchicalAttrsAction(BaseAction):
         )
         entity_ids_joined = ", ".join(all_entities_ids)
 
-        attrs, hier_attrs = get_openpype_attr(session)
+        attrs, hier_attrs = get_ayon_attr_configs(session)
 
         for attr in hier_attrs:
             configuration_key = attr["key"]

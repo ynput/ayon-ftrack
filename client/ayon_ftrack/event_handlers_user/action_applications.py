@@ -1,7 +1,8 @@
 import os
 
-from ayon_ftrack.lib import BaseAction
-from openpype.client import get_project
+from ayon_api import get_project
+
+from ftrack_common import BaseAction
 from openpype.lib.applications import (
     ApplicationManager,
     ApplicationLaunchFailed,
@@ -103,34 +104,24 @@ class AppplicationsAction(BaseAction):
         if entity["parent"].entity_type.lower() == "project":
             return False
 
-        avalon_project_apps = event["data"].get("avalon_project_apps", None)
-        avalon_project_doc = event["data"].get("avalon_project_doc", None)
-        if avalon_project_apps is None:
-            if avalon_project_doc is None:
-                ft_project = self.get_project_from_entity(entity)
-                project_name = ft_project["full_name"]
-                avalon_project_doc = get_project(project_name) or False
-                event["data"]["avalon_project_doc"] = avalon_project_doc
+        # TODO we only need project name
+        ft_project = self.get_project_from_entity(entity)
+        project_name = ft_project["full_name"]
+        ayon_project_entity = get_project(project_name)
+        if not ayon_project_entity:
+            return False
 
-            if not avalon_project_doc:
-                return False
-
-            project_apps_config = avalon_project_doc["config"].get("apps", [])
-            avalon_project_apps = [
-                app["name"] for app in project_apps_config
-            ] or False
-            event["data"]["avalon_project_apps"] = avalon_project_apps
-
-        if not avalon_project_apps:
+        ayon_project_apps = ayon_project_entity["attrib"].get("applications")
+        if not ayon_project_apps:
             return False
 
         settings = self.get_project_settings_from_event(
-            event, avalon_project_doc["name"])
+            event, ayon_project_entity["name"])
 
-        only_available = settings["applications"]["only_available"]
+        only_available = settings["applications"].get("only_available", False)
 
         items = []
-        for app_name in avalon_project_apps:
+        for app_name in ayon_project_apps:
             app = self.application_manager.applications.get(app_name)
             if not app or not app.enabled:
                 continue

@@ -1,5 +1,6 @@
 import json
-from ayon_ftrack.lib import BaseAction, statics_icon
+from ftrack_common import BaseAction
+from ayon_ftrack.lib import statics_icon
 
 
 class JobKiller(BaseAction):
@@ -59,7 +60,7 @@ class JobKiller(BaseAction):
                 desctiption = "*No description*"
             user_id = job["user_id"]
             username = usernames_by_id.get(user_id) or "Unknown user"
-            created = job["created_at"].strftime('%d.%m.%Y %H:%M:%S')
+            created = job["created_at"].strftime("%d.%m.%Y %H:%M:%S")
             label = "{} - {} - {}".format(
                 username, desctiption, created
             )
@@ -129,6 +130,4 @@ class JobKiller(BaseAction):
 
 
 def register(session):
-    '''Register plugin. Called when used as an plugin.'''
-
     JobKiller(session).register()

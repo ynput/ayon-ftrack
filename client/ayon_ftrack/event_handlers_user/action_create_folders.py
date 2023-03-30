@@ -1,8 +1,10 @@
 import os
 import collections
 import copy
+
 from openpype.pipeline import Anatomy
-from ayon_ftrack.lib import BaseAction, statics_icon
+from ftrack_common import BaseAction
+from ayon_ftrack.lib import statics_icon
 
 
 class CreateFolders(BaseAction):
@@ -71,8 +73,6 @@ class CreateFolders(BaseAction):
         }
 
     def launch(self, session, entities, event):
-        '''Callback method for custom action.'''
-
         if "values" not in event["data"]:
             return
 
