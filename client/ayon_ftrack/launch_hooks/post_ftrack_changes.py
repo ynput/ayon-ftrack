@@ -106,8 +106,7 @@ class PostFtrackHook(PostLaunchHook):
         status_update = (
             project_settings
             ["ftrack"]
-            ["service_event_handlers"]
-            ["status_update"]
+            ["post_launch_hook"]
         )
         if not status_update["enabled"]:
             self.log.debug(
@@ -133,15 +132,17 @@ class PostFtrackHook(PostLaunchHook):
         )
         while True:
             next_status_name = None
-            for key, value in status_mapping.items():
-                if key in already_tested:
+            for item in status_mapping:
+                new_status = item["name"]
+                from_statuses = item["value"]
+                if new_status in already_tested:
                     continue
-                if actual_status in value or "__any__" in value:
-                    if key != "__ignore__":
-                        next_status_name = key
-                        already_tested.add(key)
+                if actual_status in from_statuses or "__any__" in from_statuses:
+                    if new_status != "__ignore__":
+                        next_status_name = new_status
+                        already_tested.add(new_status)
                     break
-                already_tested.add(key)
+                already_tested.add(new_status)
 
             if next_status_name is None:
                 break
