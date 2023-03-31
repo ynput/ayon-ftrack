@@ -147,13 +147,18 @@ def copy_server_content(
         COMMON_DIR_NAME
     )
 
-    filepaths_to_copy: list[tuple[str, str]] = []
-    filepaths_to_copy.append(
+    filepaths_to_copy: list[tuple[str, str]] = [
         (
             os.path.join(current_dir, "version.py"),
             os.path.join(addon_output_dir, "version.py")
-        )
-    )
+        ),
+        # Copy constants needed for attributes creation
+        (
+            os.path.join(common_dir, "constants.py"),
+            os.path.join(addon_output_dir, "constants.py")
+        ),
+    ]
+
     for path, sub_path in find_files_in_subdir(server_dir):
         filepaths_to_copy.append(
             (path, os.path.join(addon_output_dir, sub_path))
