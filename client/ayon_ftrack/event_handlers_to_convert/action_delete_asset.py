@@ -4,8 +4,8 @@ from datetime import datetime
 
 from bson.objectid import ObjectId
 
+from ayon_ftrack.common import create_chunks, BaseAction
 from openpype.client import get_assets, get_subsets
-from ftrack_common import create_chunks, BaseAction
 from openpype_modules.ftrack.lib import statics_icon
 
 

@@ -4,7 +4,7 @@ from openpype.pipeline.project_folders import (
     get_project_basic_paths,
     create_project_folders,
 )
-from ftrack_common import BaseAction
+from ayon_ftrack.common import BaseAction
 from ayon_ftrack.lib import statics_icon
 
 

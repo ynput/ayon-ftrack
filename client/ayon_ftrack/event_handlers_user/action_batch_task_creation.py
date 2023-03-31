@@ -2,7 +2,7 @@
 Taken from https://github.com/tokejepsen/ftrack-hooks/tree/master/batch_tasks
 """
 
-from ftrack_common import BaseAction
+from ayon_ftrack.common import BaseAction
 from ayon_ftrack.lib import statics_icon
 
 

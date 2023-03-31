@@ -4,7 +4,7 @@ import socket
 
 from openpype.lib import Logger
 from openpype.modules import ModulesManager
-from ftrack_common import FtrackServer
+from ayon_ftrack.common import FtrackServer
 
 from ayon_ftrack.tray.user_server import (
     SocketSession,

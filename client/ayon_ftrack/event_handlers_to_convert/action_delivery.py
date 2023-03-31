@@ -3,7 +3,7 @@ import copy
 import json
 import collections
 
-from ftrack_common import (
+from ayon_ftrack.common import (
     BaseAction,
     query_custom_attribute_values,
     CUST_ATTR_KEY_SERVER_ID,

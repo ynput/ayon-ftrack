@@ -8,7 +8,7 @@ import pyblish.api
 from openpype.client import get_asset_by_id
 from openpype.lib import filter_profiles
 from openpype.pipeline import KnownPublishError
-from ftrack_common import get_ayon_attr_configs
+from ayon_ftrack.common import get_ayon_attr_configs
 
 
 class IntegrateHierarchyToFtrack(pyblish.api.ContextPlugin):

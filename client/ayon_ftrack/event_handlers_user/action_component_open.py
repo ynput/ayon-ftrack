@@ -2,7 +2,7 @@ import os
 import subprocess
 import platform
 
-from ftrack_common import BaseAction
+from ayon_ftrack.common import BaseAction
 from ayon_ftrack.lib import statics_icon
 from openpype.lib import run_detached_process
 

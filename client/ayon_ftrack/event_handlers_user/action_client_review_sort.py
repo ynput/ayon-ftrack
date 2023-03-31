@@ -1,4 +1,4 @@
-from ftrack_common import BaseAction
+from ayon_ftrack.common import BaseAction
 from ayon_ftrack.lib import statics_icon
 try:
     from functools import cmp_to_key

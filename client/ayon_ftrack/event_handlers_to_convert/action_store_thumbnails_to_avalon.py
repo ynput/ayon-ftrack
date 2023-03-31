@@ -5,7 +5,7 @@ import requests
 
 from bson.objectid import ObjectId
 
-from ftrack_common import BaseAction, CUST_ATTR_KEY_SERVER_ID
+from ayon_ftrack.common import BaseAction, CUST_ATTR_KEY_SERVER_ID
 from openpype.client import (
     get_project,
     get_asset_by_id,

@@ -4,7 +4,7 @@ import copy
 from openpype.client import get_project, create_project
 from openpype.settings import ProjectSettings, SaveWarningExc
 
-from ftrack_common import (
+from ayon_ftrack.common import (
     BaseAction,
     get_ayon_attr_configs,
     CUST_ATTR_AUTO_SYNC

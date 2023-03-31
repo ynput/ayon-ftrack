@@ -2,7 +2,7 @@ import platform
 import socket
 import getpass
 
-from ftrack_common import get_host_ip, BaseAction
+from ayon_ftrack.common import get_host_ip, BaseAction
 
 
 class ActionWhereIRun(BaseAction):

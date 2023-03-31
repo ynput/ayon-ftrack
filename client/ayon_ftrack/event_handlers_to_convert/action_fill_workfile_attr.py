@@ -16,7 +16,7 @@ from openpype.lib import StringTemplate
 from openpype.pipeline import Anatomy
 from openpype.pipeline.template_data import get_template_data
 from openpype.pipeline.workfile import get_workfile_template_key
-from ftrack_common import BaseAction, create_chunks
+from ayon_ftrack.common import BaseAction, create_chunks
 from ayon_ftrack.lib import statics_icon
 
 NOT_SYNCHRONIZED_TITLE = "Not synchronized"

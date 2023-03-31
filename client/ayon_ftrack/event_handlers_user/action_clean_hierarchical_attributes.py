@@ -1,7 +1,7 @@
 import collections
 import ftrack_api
 
-from ftrack_common import BaseAction, get_ayon_attr_configs
+from ayon_ftrack.common import BaseAction, get_ayon_attr_configs
 from ayon_ftrack.lib import statics_icon
 
 

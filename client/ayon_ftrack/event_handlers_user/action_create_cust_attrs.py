@@ -108,7 +108,7 @@ Example:
 import json
 import arrow
 
-from ftrack_common import (
+from ayon_ftrack.common import (
     BaseAction,
 
     CUST_ATTR_GROUP,
@@ -509,8 +509,8 @@ class CustomAttributes(BaseAction):
             )
 
         output = {
-            "key": attr["key"]
-            "label": attr["label"]
+            "key": attr["key"],
+            "label": attr["label"],
             "type": self.types_per_name[type_name_l]
         }
 
