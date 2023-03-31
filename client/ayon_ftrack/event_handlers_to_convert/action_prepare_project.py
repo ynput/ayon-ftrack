@@ -4,12 +4,12 @@ import copy
 from openpype.client import get_project, create_project
 from openpype.settings import ProjectSettings, SaveWarningExc
 
-from openpype_modules.ftrack.lib import (
+from ftrack_common import (
     BaseAction,
-    statics_icon,
-    get_openpype_attr,
+    get_ayon_attr_configs,
     CUST_ATTR_AUTO_SYNC
 )
+from ayon_ftrack.lib import statics_icon
 
 
 class PrepareProjectLocal(BaseAction):
@@ -192,7 +192,9 @@ class PrepareProjectLocal(BaseAction):
         for key, entity in project_anatom_settings["attributes"].items():
             attribute_values_by_key[key] = entity.value
 
-        cust_attrs, hier_cust_attrs = get_openpype_attr(self.session, True)
+        cust_attrs, hier_cust_attrs = get_ayon_attr_configs(
+            self.session, split_hierarchical=True
+        )
 
         for attr in hier_cust_attrs:
             key = attr["key"]

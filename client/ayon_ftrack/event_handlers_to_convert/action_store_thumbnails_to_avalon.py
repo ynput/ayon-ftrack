@@ -5,6 +5,7 @@ import requests
 
 from bson.objectid import ObjectId
 
+from ftrack_common import BaseAction, CUST_ATTR_KEY_SERVER_ID
 from openpype.client import (
     get_project,
     get_asset_by_id,
@@ -13,10 +14,8 @@ from openpype.client import (
     get_version_by_name,
     get_representations
 )
-from openpype_modules.ftrack.lib import BaseAction, statics_icon
+from ayon_ftrack.lib import statics_icon
 from openpype.pipeline import AvalonMongoDB, Anatomy
-
-from openpype_modules.ftrack.lib.avalon_sync import CUST_ATTR_ID_KEY
 
 
 class StoreThumbnailsToAvalon(BaseAction):
@@ -403,7 +402,8 @@ class StoreThumbnailsToAvalon(BaseAction):
             return output
 
         asset_ent = None
-        asset_mongo_id = parent["custom_attributes"].get(CUST_ATTR_ID_KEY)
+        asset_mongo_id = parent["custom_attributes"].get(
+            CUST_ATTR_KEY_SERVER_ID)
         if asset_mongo_id:
             try:
                 asset_ent = get_asset_by_id(project_name, asset_mongo_id)
