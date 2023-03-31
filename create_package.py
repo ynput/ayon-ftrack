@@ -171,10 +171,7 @@ def copy_server_content(
 
     for path, sub_path in find_files_in_subdir(common_dir):
         filepaths_to_copy.append(
-            (path, os.path.join(addon_output_dir, COMMON_DIR_NAME, sub_path))
-        )
-        filepaths_to_copy.append(
-            (path, os.path.join(dst_processor_dir, COMMON_DIR_NAME, sub_path))
+            (path, os.path.join(dst_processor_dir, sub_path))
         )
 
     # Copy files
