@@ -3,7 +3,7 @@ import time
 import subprocess
 from operator import itemgetter
 from openpype.lib import ApplicationManager
-from ftrack_common import BaseAction
+from ayon_ftrack.common import BaseAction
 from ayon_ftrack.lib import statics_icon
 
 
