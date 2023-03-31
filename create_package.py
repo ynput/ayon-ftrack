@@ -207,7 +207,9 @@ def zip_client_side(
     if not os.path.exists(private_dir):
         os.makedirs(private_dir)
 
+    common_dir: str = os.path.join(current_dir, COMMON_DIR_NAME)
     version_filepath: str = os.path.join(current_dir, "version.py")
+    addon_subdir_name: str = "ayon_ftrack"
 
     zip_filename: str = zip_basename + ".zip"
     zip_filepath: str = os.path.join(os.path.join(private_dir, zip_filename))
@@ -215,7 +217,12 @@ def zip_client_side(
         for path, sub_path in find_files_in_subdir(client_dir):
             zipf.write(path, sub_path)
 
-        zipf.write(version_filepath, os.path.join("ayon_ftrack", "version.py"))
+        for path, sub_path in find_files_in_subdir(common_dir):
+            zipf.write(path, "/".join((addon_subdir_name, "common", sub_path)))
+
+        zipf.write(
+            version_filepath, os.path.join(addon_subdir_name, "version.py")
+        )
 
 
 def main(output_dir: Optional[str] = None):
