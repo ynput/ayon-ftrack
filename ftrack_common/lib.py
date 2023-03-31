@@ -6,7 +6,7 @@ import six
 from ayon_api import (
     get_base_url,
     get_service_addon_name,
-    get_service_addon_version
+    get_service_addon_version,
 )
 
 from .exceptions import InvalidFpsValue
@@ -170,11 +170,14 @@ def get_host_ip():
     return None
 
 
-def get_ftrack_public_url(*args):
+def get_ftrack_public_url(*args, addon_version, addon_name=None):
     """Url to public path in ftrack addon.
 
     Args:
         args (tuple[str]): Subpaths in 'public' dir.
+        addon_version (str): Version of addon.
+        addon_name (Optional[str]): Name of addon. This is for development
+            purposes. Default value 'ftrack'.
 
     Returns:
         str: Url to public file on server in ftrack addon.
@@ -184,24 +187,56 @@ def get_ftrack_public_url(*args):
     parts = [
         server_url,
         "addons",
-        get_service_addon_name(),
-        get_service_addon_version(),
+        addon_name or "ftrack",
+        addon_version,
         "public"
     ]
     parts.extend(args)
     return "/".join(parts)
 
 
-def get_ftrack_icon_url(icon_name):
+def get_ftrack_icon_url(icon_name, addon_version, addon_name=None):
     """Helper to get icon url to server.
 
     The existence of file is not validated.
 
     Args:
         icon_name (str): Name of icon filename.
+        addon_version (str): Version of addon.
+        addon_name (Optional[str]): Name of addon. For development purposes.
+            Default value 'ftrack'.
 
     Returns:
         str: Url to icon on server.
     """
 
-    return get_ftrack_public_url("icons", icon_name)
+    return get_ftrack_public_url(
+        "icons", icon_name,
+        addon_version=addon_version,
+        addon_name=addon_name
+    )
+
+
+def get_service_ftrack_icon_url(
+    icon_name, addon_version=None, addon_name=None
+):
+    """Icon url to server for service process.
+
+    Information about addon version are taken from registered service
+    in 'ayon_api'.
+
+    Args:
+        icon_name (str): Name of icon filename.
+        addon_version (Optional[str]): Version of addon. Version from
+            registered service is used if not passed. For development purposes.
+        addon_name (Optional[str]): Name of addon. For development purposes.
+
+    Returns:
+        str: Url to icon on server.
+    """
+
+    return get_ftrack_icon_url(
+        icon_name,
+        addon_version=addon_version or get_service_addon_name(),
+        addon_name=addon_name or get_service_addon_version()
+    )

@@ -6,7 +6,7 @@ from openpype.settings import ProjectSettings, SaveWarningExc
 
 from ftrack_common import (
     ServerAction,
-    get_ftrack_icon_url,
+    get_service_ftrack_icon_url,
     CUST_ATTR_AUTO_SYNC,
     get_ayon_attr_configs,
 )
@@ -19,7 +19,7 @@ class PrepareProjectServer(ServerAction):
     label = "OpenPype Admin"
     variant = "- Prepare Project (Server)"
     description = "Set basic attributes on the project"
-    icon = get_ftrack_icon_url("OpenPypeAdmin.svg")
+    icon = get_service_ftrack_icon_url("OpenPypeAdmin.svg")
 
     settings_key = "prepare_project"
 

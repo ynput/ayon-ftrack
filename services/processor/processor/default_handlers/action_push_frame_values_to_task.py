@@ -6,7 +6,7 @@ import ftrack_api
 from ftrack_common import (
     ServerAction,
     query_custom_attribute_values,
-    get_ftrack_icon_url,
+    get_service_ftrack_icon_url,
 )
 
 
@@ -46,7 +46,7 @@ class PushHierValuesToNonHier(ServerAction):
     identifier = "admin.push_hier_values_to_non_hier"
     label = "OpenPype Admin"
     variant = "- Push Hierarchical values To Non-Hierarchical"
-    icon = get_ftrack_icon_url("OpenPypeAdmin.svg")
+    icon = get_service_ftrack_icon_url("OpenPypeAdmin.svg")
 
     entities_query_by_project = (
         "select id, parent_id, object_type_id from TypedContext"

@@ -32,6 +32,7 @@ __all__ = (
     "get_host_ip",
     "get_ftrack_public_url",
     "get_ftrack_icon_url",
+    "get_service_ftrack_icon_url",
 
     "get_ayon_attr_configs",
     "query_custom_attribute_values",
@@ -83,6 +84,7 @@ from .lib import (
     get_host_ip,
     get_ftrack_public_url,
     get_ftrack_icon_url,
+    get_service_ftrack_icon_url,
 )
 
 from .custom_attributes import (

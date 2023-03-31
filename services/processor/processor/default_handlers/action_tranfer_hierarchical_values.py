@@ -7,7 +7,7 @@ import ftrack_api
 from ftrack_common import (
     ServerAction,
     create_chunks,
-    get_ftrack_icon_url,
+    get_service_ftrack_icon_url,
 )
 
 
@@ -27,7 +27,7 @@ class TransferHierarchicalValues(ServerAction):
         "Move values from a hierarchical attribute to"
         " second hierarchical attribute."
     )
-    icon = get_ftrack_icon_url("OpenPypeAdmin.svg")
+    icon = get_service_ftrack_icon_url("OpenPypeAdmin.svg")
 
     all_project_entities_query = (
         "select id, name, parent_id, link"
