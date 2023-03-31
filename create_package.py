@@ -238,9 +238,9 @@ def main(output_dir: Optional[str] = None):
     version_content: dict[str, Any] = {}
     with open(version_filepath, "r") as stream:
         exec(stream.read(), version_content)
-    addon_version = version_content["__version__"]
+    addon_version: str = version_content["__version__"]
 
-    new_created_version_dir = os.path.join(
+    new_created_version_dir: str = os.path.join(
         output_dir, addon_name, addon_version
     )
     if os.path.isdir(new_created_version_dir):
@@ -249,7 +249,7 @@ def main(output_dir: Optional[str] = None):
 
     log.info(f"Preparing package for {addon_name}-{addon_version}")
 
-    addon_output_dir = os.path.join(output_dir, addon_name, addon_version)
+    addon_output_dir: str = os.path.join(output_dir, addon_name, addon_version)
     if not os.path.exists(addon_output_dir):
         os.makedirs(addon_output_dir)
 
