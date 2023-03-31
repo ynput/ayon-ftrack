@@ -1,12 +1,12 @@
 from ayon_ftrack.common import BaseAction
-from ayon_ftrack.lib import statics_icon
+from ayon_ftrack.lib import get_ftrack_icon_url
 
 
 class MultipleNotes(BaseAction):
     identifier = "multiple.notes"
     label = "Multiple Notes"
     description = "Add same note to multiple entities"
-    icon = statics_icon("ftrack", "action_icons", "MultipleNotes.svg")
+    icon = get_ftrack_icon_url("MultipleNotes.svg")
 
     def discover(self, session, entities, event):
         # Check for multiple selection.

@@ -8,7 +8,7 @@ from ayon_ftrack.common import (
     query_custom_attribute_values,
     CUST_ATTR_KEY_SERVER_ID,
 )
-from ayon_ftrack.lib import statics_icon
+from ayon_ftrack.lib import get_ftrack_icon_url
 from openpype.client import (
     get_project,
     get_assets,
@@ -32,7 +32,7 @@ class Delivery(BaseAction):
     label = "Delivery"
     description = "Deliver data to client"
     role_list = ["Pypeclub", "Administrator", "Project manager"]
-    icon = statics_icon("ftrack", "action_icons", "Delivery.svg")
+    icon = get_ftrack_icon_url("Delivery.svg")
     settings_key = "delivery_action"
 
     def discover(self, session, entities, event):

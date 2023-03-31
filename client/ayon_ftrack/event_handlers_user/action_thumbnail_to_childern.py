@@ -1,13 +1,13 @@
 import json
 from ayon_ftrack.common import BaseAction
-from ayon_ftrack.lib import statics_icon
+from ayon_ftrack.lib import get_ftrack_icon_url
 
 
 class ThumbToChildren(BaseAction):
     identifier = "thumb.to.children"
     label = "Thumbnail"
     variant = " to Children"
-    icon = statics_icon("ftrack", "action_icons", "Thumbnail.svg")
+    icon = get_ftrack_icon_url("Thumbnail.svg")
 
     def discover(self, session, entities, event):
         """Show only on project."""

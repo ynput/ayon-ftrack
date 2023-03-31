@@ -1,6 +1,6 @@
 import json
 from ayon_ftrack.common import BaseAction
-from ayon_ftrack.lib import statics_icon
+from ayon_ftrack.lib import get_ftrack_icon_url
 
 
 class JobKiller(BaseAction):
@@ -10,7 +10,7 @@ class JobKiller(BaseAction):
     label = "OpenPype Admin"
     variant = "- Job Killer"
     description = "Killing selected running jobs"
-    icon = statics_icon("ftrack", "action_icons", "OpenPypeAdmin.svg")
+    icon = get_ftrack_icon_url("OpenPypeAdmin.svg")
     settings_key = "job_killer"
 
     def discover(self, session, entities, event):

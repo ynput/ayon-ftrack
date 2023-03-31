@@ -1,5 +1,5 @@
 from ayon_ftrack.common import BaseAction
-from ayon_ftrack.lib import statics_icon
+from ayon_ftrack.lib import get_ftrack_icon_url
 try:
     from functools import cmp_to_key
 except Exception:
@@ -45,7 +45,7 @@ task_name_sort_kwargs = {task_name_kwarg_key: task_name_sorter}
 class ClientReviewSort(BaseAction):
     identifier = "client.review.sort"
     label = "Sort Review"
-    icon = statics_icon("ftrack", "action_icons", "SortReview.svg")
+    icon = get_ftrack_icon_url("SortReview.svg")
 
     def discover(self, session, entities, event):
         if not entities:

@@ -123,9 +123,9 @@ from ayon_ftrack.common import (
 
     default_custom_attributes_definition,
     app_definitions_from_app_manager,
-    tool_definitions_from_app_manager
+    tool_definitions_from_app_manager,
 )
-from ayon_ftrack.lib import statics_icon
+from ayon_ftrack.lib import get_ftrack_icon_url
 
 from openpype.settings import get_system_settings
 from openpype.lib import ApplicationManager
@@ -140,7 +140,7 @@ class CustomAttributes(BaseAction):
     label = "OpenPype Admin"
     variant = "- Create/Update Custom Attributes"
     description = "Creates required custom attributes in ftrack"
-    icon = statics_icon("ftrack", "action_icons", "OpenPypeAdmin.svg")
+    icon = get_ftrack_icon_url("OpenPypeAdmin.svg")
     settings_key = "create_update_attributes"
 
     required_keys = ("key", "label", "type")

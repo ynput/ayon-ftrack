@@ -5,7 +5,11 @@ import requests
 
 from bson.objectid import ObjectId
 
-from ayon_ftrack.common import BaseAction, CUST_ATTR_KEY_SERVER_ID
+from ayon_ftrack.common import (
+    BaseAction,
+    CUST_ATTR_KEY_SERVER_ID,
+)
+from ayon_ftrack.lib import get_ftrack_icon_url
 from openpype.client import (
     get_project,
     get_asset_by_id,
@@ -14,7 +18,6 @@ from openpype.client import (
     get_version_by_name,
     get_representations
 )
-from ayon_ftrack.lib import statics_icon
 from openpype.pipeline import AvalonMongoDB, Anatomy
 
 
@@ -28,7 +31,7 @@ class StoreThumbnailsToAvalon(BaseAction):
     # Action description
     description = 'Test action'
     # roles that are allowed to register this action
-    icon = statics_icon("ftrack", "action_icons", "OpenPypeAdmin.svg")
+    icon = get_ftrack_icon_url("OpenPypeAdmin.svg")
     settings_key = "store_thubmnail_to_avalon"
 
     thumbnail_key = "AVALON_THUMBNAIL_ROOT"

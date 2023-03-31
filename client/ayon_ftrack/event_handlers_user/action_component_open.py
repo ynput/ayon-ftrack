@@ -3,14 +3,14 @@ import subprocess
 import platform
 
 from ayon_ftrack.common import BaseAction
-from ayon_ftrack.lib import statics_icon
+from ayon_ftrack.lib import get_ftrack_icon_url
 from openpype.lib import run_detached_process
 
 
 class ComponentOpen(BaseAction):
     identifier = "component.open"
     label = "Open File"
-    icon = statics_icon("ftrack", "action_icons", "ComponentOpen.svg")
+    icon = get_ftrack_icon_url("ComponentOpen.svg")
 
     def discover(self, session, entities, event):
         if len(entities) != 1:

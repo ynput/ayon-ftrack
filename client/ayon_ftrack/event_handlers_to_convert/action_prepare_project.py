@@ -7,9 +7,9 @@ from openpype.settings import ProjectSettings, SaveWarningExc
 from ayon_ftrack.common import (
     BaseAction,
     get_ayon_attr_configs,
-    CUST_ATTR_AUTO_SYNC
+    CUST_ATTR_AUTO_SYNC,
 )
-from ayon_ftrack.lib import statics_icon
+from ayon_ftrack.lib import get_ftrack_icon_url
 
 
 class PrepareProjectLocal(BaseAction):
@@ -18,7 +18,7 @@ class PrepareProjectLocal(BaseAction):
     identifier = "prepare.project.local"
     label = "Prepare Project"
     description = "Set basic attributes on the project"
-    icon = statics_icon("ftrack", "action_icons", "PrepareProject.svg")
+    icon = get_ftrack_icon_url("PrepareProject.svg")
 
     role_list = ["Pypeclub", "Administrator", "Project Manager"]
 

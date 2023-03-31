@@ -3,8 +3,7 @@ Taken from https://github.com/tokejepsen/ftrack-hooks/tree/master/batch_tasks
 """
 
 from ayon_ftrack.common import BaseAction
-from ayon_ftrack.lib import statics_icon
-
+from ayon_ftrack.lib import get_ftrack_icon_url
 
 class BatchTasksAction(BaseAction):
     '''Batch Tasks action
@@ -18,7 +17,7 @@ class BatchTasksAction(BaseAction):
     variant = None
     identifier = "batch-tasks"
     description = None
-    icon = statics_icon("ftrack", "action_icons", "BatchTasks.svg")
+    icon = get_ftrack_icon_url("BatchTasks.svg")
 
     def discover(self, session, entities, event):
         '''Return true if we can handle the selected entities.

@@ -5,7 +5,7 @@ from openpype.pipeline.project_folders import (
     create_project_folders,
 )
 from ayon_ftrack.common import BaseAction
-from ayon_ftrack.lib import statics_icon
+from ayon_ftrack.lib import get_ftrack_icon_url
 
 
 class CreateProjectFolders(BaseAction):
@@ -55,7 +55,7 @@ class CreateProjectFolders(BaseAction):
     label = "Create Project Structure"
     description = "Creates folder structure"
     role_list = ["Pypeclub", "Administrator", "Project Manager"]
-    icon = statics_icon("ftrack", "action_icons", "CreateProjectFolders.svg")
+    icon = get_ftrack_icon_url("CreateProjectFolders.svg")
 
     pattern_array = re.compile(r"\[.*\]")
     pattern_ftrack = re.compile(r".*\[[.]*ftrack[.]*")

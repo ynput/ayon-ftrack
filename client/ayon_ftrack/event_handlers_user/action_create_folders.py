@@ -4,13 +4,13 @@ import copy
 
 from openpype.pipeline import Anatomy
 from ayon_ftrack.common import BaseAction
-from ayon_ftrack.lib import statics_icon
+from ayon_ftrack.lib import get_ftrack_icon_url
 
 
 class CreateFolders(BaseAction):
     identifier = "create.folders"
     label = "Create Folders"
-    icon = statics_icon("ftrack", "action_icons", "CreateFolders.svg")
+    icon = get_ftrack_icon_url("CreateFolders.svg")
 
     def discover(self, session, entities, event):
         for entity_item in event["data"]["selection"]:

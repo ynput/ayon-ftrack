@@ -1,17 +1,17 @@
 from ayon_ftrack.common import BaseAction
-from ayon_ftrack.lib import statics_icon
+from ayon_ftrack.lib import get_ftrack_icon_url
 
 
 class TestAction(BaseAction):
     """Action for testing purpose or as base for new actions."""
 
-    ignore_me = True
+    enabled = False
 
     identifier = "test.action"
     label = "Test action"
     description = "Test action"
     priority = 10000
-    icon = statics_icon("ftrack", "action_icons", "TestAction.svg")
+    icon = get_ftrack_icon_url("TestAction.svg")
 
     def discover(self, session, entities, event):
         return True

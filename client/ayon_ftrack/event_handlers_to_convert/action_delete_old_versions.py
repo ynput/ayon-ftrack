@@ -17,7 +17,8 @@ from openpype.lib import (
     format_file_size,
 )
 from openpype.pipeline import AvalonMongoDB, Anatomy
-from openpype_modules.ftrack.lib import BaseAction, statics_icon
+from ayon_ftrack.common import BaseAction
+from ayon_ftrack.lib import get_ftrack_icon_url
 
 
 class DeleteOldVersions(BaseAction):
@@ -29,7 +30,7 @@ class DeleteOldVersions(BaseAction):
         "Delete files from older publishes so project can be"
         " archived with only lates versions."
     )
-    icon = statics_icon("ftrack", "action_icons", "OpenPypeAdmin.svg")
+    icon = get_ftrack_icon_url("OpenPypeAdmin.svg")
 
     settings_key = "delete_old_versions"
 

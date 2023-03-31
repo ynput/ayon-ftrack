@@ -17,7 +17,7 @@ from openpype.pipeline import Anatomy
 from openpype.pipeline.template_data import get_template_data
 from openpype.pipeline.workfile import get_workfile_template_key
 from ayon_ftrack.common import BaseAction, create_chunks
-from ayon_ftrack.lib import statics_icon
+from ayon_ftrack.lib import get_ftrack_icon_url
 
 NOT_SYNCHRONIZED_TITLE = "Not synchronized"
 
@@ -34,7 +34,7 @@ class FillWorkfileAttributeAction(BaseAction):
     label = "OpenPype Admin"
     variant = "- Fill workfile attribute"
     description = "Precalculate and fill workfile name into a custom attribute"
-    icon = statics_icon("ftrack", "action_icons", "OpenPypeAdmin.svg")
+    icon = get_ftrack_icon_url("OpenPypeAdmin.svg")
 
     settings_key = "fill_workfile_attribute"
 
