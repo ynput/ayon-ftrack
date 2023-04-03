@@ -3,9 +3,12 @@ from typing import Type
 from ayon_server.addons import BaseServerAddon
 from ayon_server.lib.postgres import Postgres
 
-from .ftrack_common import FTRACK_ID_ATTRIB, FTRACK_PATH_ATTRIB
 from .settings import FtrackSettings, DEFAULT_VALUES
 from .version import __version__
+from .constants import (
+    FTRACK_ID_ATTRIB,
+    FTRACK_PATH_ATTRIB,
+)
 
 
 class FtrackAddon(BaseServerAddon):

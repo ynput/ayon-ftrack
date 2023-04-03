@@ -2,18 +2,17 @@ import platform
 import socket
 import getpass
 
-from ftrack_common import get_host_ip
-from ayon_ftrack.lib import BaseAction
+from ayon_ftrack.common import get_host_ip, BaseAction
 
 
 class ActionWhereIRun(BaseAction):
-    """Show where same user has running OpenPype instances."""
+    """Show where same user has running AYON instances."""
 
     identifier = "ask.where.i.run"
     show_identifier = "show.where.i.run"
-    label = "OpenPype Admin"
+    label = "AYON Admin"
     variant = "- Where I run"
-    description = "Show PC info where user have running OpenPype"
+    description = "Show PC info where user have running AYON"
 
     def _discover(self, _event):
         return {
@@ -93,6 +92,4 @@ class ActionWhereIRun(BaseAction):
 
 
 def register(session):
-    '''Register plugin. Called when used as an plugin.'''
-
     ActionWhereIRun(session).register()

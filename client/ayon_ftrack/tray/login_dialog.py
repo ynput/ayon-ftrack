@@ -19,7 +19,7 @@ class CredentialsDialog(QtWidgets.QDialog):
     def __init__(self, module, parent=None):
         super(CredentialsDialog, self).__init__(parent)
 
-        self.setWindowTitle("OpenPype - Ftrack Login")
+        self.setWindowTitle("AYON - Ftrack Login")
 
         self._module = module
 

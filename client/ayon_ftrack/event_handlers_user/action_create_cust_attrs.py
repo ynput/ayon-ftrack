@@ -1,35 +1,12 @@
-import collections
-import json
-import arrow
-import ftrack_api
-from ayon_ftrack.lib import (
-    BaseAction,
-    statics_icon,
-
-    CUST_ATTR_ID_KEY,
-    CUST_ATTR_GROUP,
-    CUST_ATTR_TOOLS,
-    CUST_ATTR_APPLICATIONS,
-    CUST_ATTR_INTENT,
-    FPS_KEYS,
-
-    default_custom_attributes_definition,
-    app_definitions_from_app_manager,
-    tool_definitions_from_app_manager
-)
-
-from openpype.settings import get_system_settings
-from openpype.lib import ApplicationManager
-
 """
 This action creates/updates custom attributes.
 ## First part take care about special attributes
-    - `avalon_mongo_id` for storing Avalon MongoID
+    - AYON attributes defined in code because they use constants
     - `applications` based on applications usages
     - `tools` based on tools usages
 
 ## Second part is based on json file in ftrack module.
-File location: `~/OpenPype/pype/modules/ftrack/ftrack_custom_attributes.json`
+File location: `~/ftrack_common/custom_attributes.json`
 
 Data in json file is nested dictionary. Keys in first dictionary level
 represents Ftrack entity type (task, show, assetversion, user, list, asset)
@@ -45,7 +22,7 @@ dictionary level, task's attributes are nested more.
 
 group (string)
     - name of group
-    - based on attribute `ayon_ftrack.lib.CUST_ATTR_GROUP`
+    - based on attribute `ftrack_common.constants.CUST_ATTR_GROUP`
         - "pype" by default
 
 *** Required ***************************************************************
@@ -103,8 +80,8 @@ default
 Example:
 ```
 "show": {
-    "avalon_auto_sync": {
-      "label": "Avalon auto-sync",
+    "ayon_auto_sync": {
+      "label": "AYON auto-sync",
       "type": "boolean",
       "write_security_roles": ["API", "Administrator"],
       "read_security_roles": ["API", "Administrator"]
@@ -128,22 +105,42 @@ Example:
 ```
 """
 
+import json
+import arrow
+
+from ayon_ftrack.common import (
+    BaseAction,
+
+    CUST_ATTR_GROUP,
+    CUST_ATTR_KEY_SERVER_ID,
+    CUST_ATTR_KEY_SERVER_PATH,
+    CUST_ATTR_AUTO_SYNC,
+    CUST_ATTR_KEY_SYNC_FAIL,
+    FPS_KEYS,
+    CUST_ATTR_INTENT,
+    CUST_ATTR_APPLICATIONS,
+    CUST_ATTR_TOOLS,
+
+    default_custom_attributes_definition,
+    app_definitions_from_app_manager,
+    tool_definitions_from_app_manager,
+)
+from ayon_ftrack.lib import get_ftrack_icon_url
+
+from openpype.settings import get_system_settings
+from openpype.lib import ApplicationManager
+
 
 class CustAttrException(Exception):
     pass
 
 
 class CustomAttributes(BaseAction):
-    '''Edit meta data action.'''
-
-    #: Action identifier.
-    identifier = 'create.update.attributes'
-    #: Action label.
-    label = "OpenPype Admin"
-    variant = '- Create/Update Custom Attributes'
-    #: Action description.
-    description = 'Creates required custom attributes in ftrack'
-    icon = statics_icon("ftrack", "action_icons", "OpenPypeAdmin.svg")
+    identifier = "create.update.attributes"
+    label = "AYON Admin"
+    variant = "- Create/Update Custom Attributes"
+    description = "Creates required custom attributes in ftrack"
+    icon = get_ftrack_icon_url("AYONAdmin.svg")
     settings_key = "create_update_attributes"
 
     required_keys = ("key", "label", "type")
@@ -156,42 +153,46 @@ class CustomAttributes(BaseAction):
     hierarchical_key = "is_hierarchical"
 
     type_posibilities = (
-        "text", "boolean", "date", "enumerator",
-        "dynamic enumerator", "number"
+        "text",
+        "boolean",
+        "date",
+        "enumerator",
+        "dynamic enumerator",
+        "number"
     )
 
     def discover(self, session, entities, event):
-        '''
-        Validation
-        - action is only for Administrators
-        '''
         return self.valid_roles(session, entities, event)
 
     def launch(self, session, entities, event):
         # JOB SETTINGS
-        userId = event['source']['user']['id']
-        user = session.query('User where id is ' + userId).one()
+        user_id = event["source"]["user"]["id"]
+        user = session.query(f"User where id is {user_id}").one()
 
-        job = session.create('Job', {
-            'user': user,
-            'status': 'running',
-            'data': json.dumps({
-                'description': 'Custom Attribute creation.'
-            })
-        })
+        job = session.create(
+            "Job",
+            {
+                "user": user,
+                "status": "running",
+                "data": json.dumps({
+                    "description": "Custom Attribute creation."
+                })
+            }
+        )
         session.commit()
 
+        # TODO how to get custom attributes from different addons?
         self.app_manager = ApplicationManager()
 
         try:
             self.prepare_global_data(session)
-            self.avalon_mongo_id_attributes(session, event)
+            self.create_ayon_attributes(event)
             self.applications_attribute(event)
             self.tools_attribute(event)
             self.intent_attribute(event)
             self.custom_attributes_from_file(event)
 
-            job['status'] = 'done'
+            job["status"] = "done"
             session.commit()
 
         except Exception:
@@ -250,130 +251,46 @@ class CustomAttributes(BaseAction):
 
         return output
 
-    def avalon_mongo_id_attributes(self, session, event):
-        self.create_hierarchical_mongo_attr(session, event)
-
-        hierarchical_attr, object_type_attrs = (
-            self.mongo_id_custom_attributes(session)
-        )
-        if object_type_attrs:
-            self.convert_mongo_id_to_hierarchical(
-                hierarchical_attr, object_type_attrs, session, event
-            )
-
-    def mongo_id_custom_attributes(self, session):
-        cust_attrs_query = (
-            "select id, entity_type, object_type_id, is_hierarchical, default"
-            " from CustomAttributeConfiguration"
-            " where key = \"{}\""
-        ).format(CUST_ATTR_ID_KEY)
-
-        mongo_id_avalon_attr = session.query(cust_attrs_query).all()
-        heirarchical_attr = None
-        object_type_attrs = []
-        for cust_attr in mongo_id_avalon_attr:
-            if cust_attr["is_hierarchical"]:
-                heirarchical_attr = cust_attr
-
-            else:
-                object_type_attrs.append(cust_attr)
-
-        return heirarchical_attr, object_type_attrs
-
-    def create_hierarchical_mongo_attr(self, session, event):
+    def create_ayon_attributes(self, event):
         # Set security roles for attribute
-        data = {
-            "key": CUST_ATTR_ID_KEY,
-            "label": "Avalon/Mongo ID",
-            "type": "text",
-            "default": "",
-            "group": CUST_ATTR_GROUP,
-            "is_hierarchical": True,
-            "config": {"markdown": False}
-        }
 
-        self.process_attr_data(data, event)
-
-    def convert_mongo_id_to_hierarchical(
-        self, hierarchical_attr, object_type_attrs, session, event
-    ):
-        user_msg = "Converting old custom attributes. This may take some time."
-        self.show_message(event, user_msg, True)
-        self.log.info(user_msg)
-
-        object_types_per_id = {
-            object_type["id"]: object_type
-            for object_type in session.query("ObjectType").all()
-        }
-
-        cust_attr_query = (
-            "select value, entity_id from CustomAttributeValue"
-            " where configuration_id is {}"
-        )
-        for attr_def in object_type_attrs:
-            attr_ent_type = attr_def["entity_type"]
-            if attr_ent_type == "show":
-                entity_type_label = "Project"
-            elif attr_ent_type == "task":
-                entity_type_label = (
-                    object_types_per_id[attr_def["object_type_id"]]["name"]
-                )
-            else:
-                self.log.warning(
-                    "Unsupported entity type: \"{}\". Skipping.".format(
-                        attr_ent_type
-                    )
-                )
-                continue
-
-            self.log.debug((
-                "Converting Avalon MongoID attr for Entity type \"{}\"."
-            ).format(entity_type_label))
-            values = session.query(
-                cust_attr_query.format(attr_def["id"])
-            ).all()
-            for value in values:
-                table_values = collections.OrderedDict([
-                    ("configuration_id", hierarchical_attr["id"]),
-                    ("entity_id", value["entity_id"])
-                ])
-
-                session.recorded_operations.push(
-                    ftrack_api.operation.UpdateEntityOperation(
-                        "ContextCustomAttributeValue",
-                        table_values,
-                        "value",
-                        ftrack_api.symbol.NOT_SET,
-                        value["value"]
-                    )
-                )
-
-            try:
-                session.commit()
-
-            except Exception:
-                session.rollback()
-                self.log.warning(
-                    (
-                        "Couldn't transfer Avalon Mongo ID"
-                        " attribute for entity type \"{}\"."
-                    ).format(entity_type_label),
-                    exc_info=True
-                )
-
-            try:
-                session.delete(attr_def)
-                session.commit()
-
-            except Exception:
-                session.rollback()
-                self.log.warning(
-                    (
-                        "Couldn't delete Avalon Mongo ID"
-                        " attribute for entity type \"{}\"."
-                    ).format(entity_type_label),
-                    exc_info=True
-                )
+        for item in [
+            {
+                "key": CUST_ATTR_KEY_SERVER_ID,
+                "label": "AYON ID",
+                "type": "text",
+                "default": "",
+                "group": CUST_ATTR_GROUP,
+                "is_hierarchical": True,
+                "config": {"markdown": False}
+            },
+            {
+                "key": CUST_ATTR_KEY_SERVER_PATH,
+                "label": "AYON path",
+                "type": "text",
+                "default": "",
+                "group": CUST_ATTR_GROUP,
+                "is_hierarchical": True,
+                "config": {"markdown": False}
+            },
+            {
+                "key": CUST_ATTR_KEY_SYNC_FAIL,
+                "label": "AYON sync failed",
+                "type": "boolean",
+                "default": "",
+                "group": CUST_ATTR_GROUP,
+                "is_hierarchical": True,
+                "config": {"markdown": False}
+            },
+            {
+                "key": CUST_ATTR_AUTO_SYNC,
+                "label": "AYON auto-sync",
+                "group": CUST_ATTR_GROUP,
+                "type": "boolean",
+                "entity_type": "show"
+            }
+        ]:
+            self.process_attr_data(item, event)
 
     def applications_attribute(self, event):
         apps_data = app_definitions_from_app_manager(self.app_manager)
@@ -511,11 +428,11 @@ class CustomAttributes(BaseAction):
             cust_attr_name = cust_attr_data.get("label", cust_attr_data["key"])
 
             if cust_attr_name:
-                msg = 'Custom attribute error "{}" - {}'.format(
+                msg = "Custom attribute error \"{}\" - {}".format(
                     cust_attr_name, str(cae)
                 )
             else:
-                msg = 'Custom attribute error - {}'.format(str(cae))
+                msg = "Custom attribute error - {}".format(str(cae))
             self.log.warning(msg, exc_info=True)
             self.show_message(event, msg)
 
@@ -578,116 +495,109 @@ class CustomAttributes(BaseAction):
             ).format(data["key"], data["type"]["name"]))
 
     def get_required(self, attr):
-        output = {}
         for key in self.required_keys:
             if key not in attr:
                 raise CustAttrException(
                     "BUG: Key \"{}\" is required".format(key)
                 )
 
-        if attr['type'].lower() not in self.type_posibilities:
+        type_name = attr["type"]
+        type_name_l = type_name.lower()
+        if type_name_l not in self.type_posibilities:
             raise CustAttrException(
-                'Type {} is not valid'.format(attr['type'])
+                "Type {} is not valid".format(type_name)
             )
 
-        output['key'] = attr['key']
-        output['label'] = attr['label']
-
-        type_name = attr['type'].lower()
-        output['type'] = self.types_per_name[type_name]
+        output = {
+            "key": attr["key"],
+            "label": attr["label"],
+            "type": self.types_per_name[type_name_l]
+        }
 
         config = None
-        if type_name == 'number':
+        if type_name == "number":
             config = self.get_number_config(attr)
-        elif type_name == 'text':
+        elif type_name == "text":
             config = self.get_text_config(attr)
-        elif type_name == 'enumerator':
+        elif type_name == "enumerator":
             config = self.get_enumerator_config(attr)
 
         if config is not None:
-            output['config'] = config
+            output["config"] = config
 
         return output
 
     def get_number_config(self, attr):
-        if 'config' in attr and 'isdecimal' in attr['config']:
-            isdecimal = attr['config']['isdecimal']
-        else:
-            isdecimal = False
+        is_decimal = attr.get("config", {}).get("isdecimal")
+        if is_decimal is None:
+            is_decimal = False
 
-        config = json.dumps({'isdecimal': isdecimal})
-
-        return config
+        return json.dumps({"isdecimal": is_decimal})
 
     def get_text_config(self, attr):
-        if 'config' in attr and 'markdown' in attr['config']:
-            markdown = attr['config']['markdown']
-        else:
+        markdown = attr.get("config", {}).get("markdown")
+        if markdown is None:
             markdown = False
-        config = json.dumps({'markdown': markdown})
-
-        return config
+        return json.dumps({"markdown": markdown})
 
     def get_enumerator_config(self, attr):
-        if 'config' not in attr:
-            raise CustAttrException('Missing config with data')
-        if 'data' not in attr['config']:
-            raise CustAttrException('Missing data in config')
+        if "config" not in attr:
+            raise CustAttrException("Missing config with data")
+        if "data" not in attr["config"]:
+            raise CustAttrException("Missing data in config")
 
         data = []
-        for item in attr['config']['data']:
+        for item in attr["config"]["data"]:
             item_data = {}
             for key in item:
                 # TODO key check by regex
-                item_data['menu'] = item[key]
-                item_data['value'] = key
+                item_data["menu"] = item[key]
+                item_data["value"] = key
                 data.append(item_data)
 
-        multiSelect = False
-        for k in attr['config']:
-            if k.lower() == 'multiselect':
-                if isinstance(attr['config'][k], bool):
-                    multiSelect = attr['config'][k]
-                else:
-                    raise CustAttrException('Multiselect must be boolean')
+        multi_selection = False
+        for key, value in attr["config"].items():
+            if key.lower() == "multiselect":
+                if not isinstance(value, bool):
+                    raise CustAttrException("Multiselect must be boolean")
+                multi_selection = value
                 break
 
-        config = json.dumps({
-            'multiSelect': multiSelect,
-            'data': json.dumps(data)
+        return json.dumps({
+            "multiSelect": multi_selection,
+            "data": json.dumps(data)
         })
 
         return config
 
     def get_group(self, attr):
         if isinstance(attr, dict):
-            group_name = attr['group'].lower()
+            group_name = attr["group"].lower()
         else:
             group_name = attr
         if group_name in self.groups:
             return self.groups[group_name]
 
-        query = 'CustomAttributeGroup where name is "{}"'.format(group_name)
+        query = "CustomAttributeGroup where name is \"{}\"".format(group_name)
         groups = self.session.query(query).all()
 
-        if len(groups) == 1:
-            group = groups[0]
-            self.groups[group_name] = group
-
-            return group
-
-        elif len(groups) < 1:
-            group = self.session.create('CustomAttributeGroup', {
-                'name': group_name,
-            })
-            self.session.commit()
-
-            return group
-
-        else:
+        if len(groups) > 1:
             raise CustAttrException(
-                'Found more than one group "{}"'.format(group_name)
+                "Found more than one group \"{}\"".format(group_name)
             )
+
+        if len(groups) == 1:
+            group = next(iter(groups))
+            self.groups[group_name] = group
+            return group
+
+        group = self.session.create(
+            "CustomAttributeGroup",
+            {"name": group_name}
+        )
+        self.session.commit()
+
+        return group
 
     def get_security_roles(self, security_roles):
         security_roles_lowered = tuple(name.lower() for name in security_roles)
@@ -715,45 +625,50 @@ class CustomAttributes(BaseAction):
         return output
 
     def get_default(self, attr):
-        type = attr['type']
-        default = attr['default']
+        attr_type = attr["type"]
+        default = attr["default"]
         if default is None:
             return default
-        err_msg = 'Default value is not'
-        if type == 'number':
-            if isinstance(default, (str)) and default.isnumeric():
+        err_msg = "Default value is not"
+        if attr_type == "number":
+            if isinstance(default, str) and default.isnumeric():
                 default = float(default)
 
             if not isinstance(default, (float, int)):
-                raise CustAttrException('{} integer'.format(err_msg))
-        elif type == 'text':
+                raise CustAttrException("{} integer".format(err_msg))
+        elif attr_type == "text":
             if not isinstance(default, str):
-                raise CustAttrException('{} string'.format(err_msg))
-        elif type == 'boolean':
+                raise CustAttrException("{} string".format(err_msg))
+        elif attr_type == "boolean":
             if not isinstance(default, bool):
-                raise CustAttrException('{} boolean'.format(err_msg))
-        elif type == 'enumerator':
+                raise CustAttrException("{} boolean".format(err_msg))
+        elif attr_type == "enumerator":
             if not isinstance(default, list):
                 raise CustAttrException(
-                    '{} array with strings'.format(err_msg)
+                    "{} array with strings".format(err_msg)
                 )
             # TODO check if multiSelect is available
             # and if default is one of data menu
             if not isinstance(default[0], str):
-                raise CustAttrException('{} array of strings'.format(err_msg))
-        elif type == 'date':
-            date_items = default.split(' ')
+                raise CustAttrException("{} array of strings".format(err_msg))
+        elif attr_type == "date":
+            date_items = default.split(" ")
+            failed = True
             try:
                 if len(date_items) == 1:
-                    default = arrow.get(default, 'YY.M.D')
+                    default = arrow.get(default, "YY.M.D")
+                    failed = False
                 elif len(date_items) == 2:
-                    default = arrow.get(default, 'YY.M.D H:m:s')
-                else:
-                    raise Exception
+                    default = arrow.get(default, "YY.M.D H:m:s")
+                    failed = False
+
             except Exception:
-                raise CustAttrException('Date is not in proper format')
-        elif type == 'dynamic enumerator':
-            raise CustAttrException('Dynamic enumerator can\'t have default')
+                pass
+
+            if failed:
+                raise CustAttrException("Date is not in proper format")
+        elif attr_type == "dynamic enumerator":
+            raise CustAttrException("Dynamic enumerator can't have default")
 
         return default
 
@@ -782,30 +697,29 @@ class CustomAttributes(BaseAction):
                 "entity_type": attr.get("entity_type") or "show"
             }
 
-        if 'entity_type' not in attr:
-            raise CustAttrException('Missing entity_type')
+        entity_type = attr.get("entity_type")
+        if not entity_type:
+            raise CustAttrException("Missing entity_type")
 
-        if attr['entity_type'].lower() != 'task':
-            return {'entity_type': attr['entity_type']}
+        if entity_type.lower() != "task":
+            return {"entity_type": entity_type}
 
-        if 'object_type' not in attr:
-            raise CustAttrException('Missing object_type')
+        object_type_name = attr.get("object_type")
+        if not object_type_name:
+            raise CustAttrException("Missing object_type")
 
-        object_type_name = attr['object_type']
         object_type_name_low = object_type_name.lower()
         object_type = self.object_types_per_name.get(object_type_name_low)
         if not object_type:
             raise CustAttrException((
-                'Object type with name "{}" don\'t exist'
+                "Object type with name \"{}\" don't exist"
             ).format(object_type_name))
 
         return {
-            'entity_type': attr['entity_type'],
-            'object_type_id': object_type["id"]
+            "entity_type": entity_type,
+            "object_type_id": object_type["id"]
         }
 
 
 def register(session):
-    '''Register plugin. Called when used as an plugin.'''
-
     CustomAttributes(session).register()

@@ -9,9 +9,9 @@ from qtpy import QtCore, QtWidgets, QtGui
 from openpype import resources
 from openpype.lib import Logger
 from ayon_ftrack import resolve_ftrack_url, FTRACK_MODULE_DIR
-from ayon_ftrack.ftrack_server import socket_thread
 from ayon_ftrack.lib import credentials
 from . import login_dialog
+from .user_server import SocketThread
 
 
 class FtrackTrayWrapper:
@@ -177,7 +177,7 @@ class FtrackTrayWrapper:
             # Run backup thread which does not requeire mongo to work
             if self.thread_socket_server is None:
                 if failed_count < max_fail_count:
-                    self.thread_socket_server = socket_thread.SocketThread(
+                    self.thread_socket_server = SocketThread(
                         thread_name, thread_port, subprocess_path
                     )
                     self.thread_socket_server.start()

@@ -8,34 +8,7 @@ import pyblish.api
 from openpype.client import get_asset_by_id
 from openpype.lib import filter_profiles
 from openpype.pipeline import KnownPublishError
-
-CUST_ATTR_GROUP = "openpype"
-
-
-# Copy of `get_pype_attr` from ayon_ftrack.lib
-# TODO import from openpype's ftrack module when possible to not break Python 2
-def get_pype_attr(session, split_hierarchical=True):
-    custom_attributes = []
-    hier_custom_attributes = []
-    cust_attrs_query = (
-        "select id, entity_type, object_type_id, is_hierarchical, default"
-        " from CustomAttributeConfiguration"
-        # Kept `pype` for Backwards Compatiblity
-        " where group.name in (\"pype\", \"{}\")"
-    ).format(CUST_ATTR_GROUP)
-    all_avalon_attr = session.query(cust_attrs_query).all()
-    for cust_attr in all_avalon_attr:
-        if split_hierarchical and cust_attr["is_hierarchical"]:
-            hier_custom_attributes.append(cust_attr)
-            continue
-
-        custom_attributes.append(cust_attr)
-
-    if split_hierarchical:
-        # return tuple
-        return custom_attributes, hier_custom_attributes
-
-    return custom_attributes
+from ayon_ftrack.common import get_ayon_attr_configs
 
 
 class IntegrateHierarchyToFtrack(pyblish.api.ContextPlugin):
@@ -229,7 +202,7 @@ class IntegrateHierarchyToFtrack(pyblish.api.ContextPlugin):
 
     def import_to_ftrack(self, project_name, hierarchy_context):
         # Prequery hiearchical custom attributes
-        hier_attrs = get_pype_attr(self.session)[1]
+        hier_attrs = get_ayon_attr_configs(self.session)[1]
         hier_attr_by_key = {
             attr["key"]: attr
             for attr in hier_attrs

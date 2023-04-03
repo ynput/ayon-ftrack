@@ -3,12 +3,13 @@ import signal
 import socket
 
 from openpype.lib import Logger
-from ayon_ftrack.ftrack_server.ftrack_server import FtrackServer
-from ayon_ftrack.ftrack_server.lib import (
+from openpype.modules import ModulesManager
+from ayon_ftrack.common import FtrackServer
+
+from ayon_ftrack.tray.user_server import (
     SocketSession,
     SocketBaseEventHub
 )
-from openpype.modules import ModulesManager
 
 log = Logger.get_logger("FtrackUserServer")
 

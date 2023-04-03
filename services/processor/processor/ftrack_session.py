@@ -26,9 +26,6 @@ from ayon_api import (
     update_event,
 )
 
-TOPIC_STATUS_SERVER = "openpype.event.server.status"
-TOPIC_STATUS_SERVER_RESULT = "openpype.event.server.status.result"
-
 
 class ProcessEventHub(ftrack_api.event.hub.EventHub):
     _server_con = None
@@ -277,6 +274,6 @@ class CustomEventHubSession(ftrack_api.session.Session):
         )
 
 
-class OPServerSession(CustomEventHubSession):
+class AYONServerSession(CustomEventHubSession):
     def _create_event_hub(self):
         return ProcessEventHub(self._server_url, self._api_user, self._api_key)
