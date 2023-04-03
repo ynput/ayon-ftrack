@@ -10,10 +10,10 @@ from ayon_ftrack.lib import get_ftrack_icon_url
 
 class CleanHierarchicalAttrsAction(BaseAction):
     identifier = "clean.hierarchical.attr"
-    label = "OpenPype Admin"
+    label = "AYON Admin"
     variant = "- Clean hierarchical custom attributes"
     description = "Unset empty hierarchical attribute values."
-    icon = get_ftrack_icon_url("OpenPypeAdmin.svg")
+    icon = get_ftrack_icon_url("AYONAdmin.svg")
 
     all_project_entities_query = (
         "select id, name, parent_id, link"

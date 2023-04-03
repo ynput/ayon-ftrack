@@ -30,9 +30,9 @@ class CreateDailyReviewSessionServerAction(ServerAction):
 
     identifier = "create.daily.review.session"
     #: Action label.
-    label = "OpenPype Admin"
+    label = "AYON Admin"
     variant = "- Create Daily Review Session (Server)"
-    icon = get_service_ftrack_icon_url("OpenPypeAdmin.svg")
+    icon = get_service_ftrack_icon_url("AYONAdmin.svg")
     #: Action description.
     description = "Manually create daily review session"
     role_list = {"Pypeclub", "Administrator", "Project Manager"}

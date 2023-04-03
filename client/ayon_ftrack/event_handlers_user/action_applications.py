@@ -17,7 +17,7 @@ class AppplicationsAction(BaseAction):
     type = "Application"
     label = "Application action"
 
-    identifier = "openpype_app"
+    identifier = "ayon_app"
     _launch_identifier_with_id = None
 
     icon_url = os.environ.get("OPENPYPE_STATICS_SERVER")
@@ -166,7 +166,7 @@ class AppplicationsAction(BaseAction):
         return {
             "success": False,
             "message": (
-                "There are running more OpenPype processes"
+                "There are running more AYON processes"
                 " where Application can be launched."
             )
         }

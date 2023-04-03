@@ -84,12 +84,12 @@ class CreateProjectFolders(BaseAction):
                     "message": "Project structure is not set."
                 }
 
-            # Invoking OpenPype API to create the project folders
+            # Invoking AYON API to create the project folders
             create_project_folders(project_name, basic_paths)
             self.create_ftrack_entities(basic_paths, project_entity)
 
             self.trigger_event(
-                "openpype.project.structure.created",
+                "ayon.project.structure.created",
                 {"project_name": project_name}
             )
 

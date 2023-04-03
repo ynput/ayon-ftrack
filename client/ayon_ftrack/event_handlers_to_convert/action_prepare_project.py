@@ -401,7 +401,7 @@ class PrepareProjectLocal(BaseAction):
             ))
             create_project(project_name, project_code)
             self.trigger_event(
-                "openpype.project.created",
+                "ayon.project.created",
                 {"project_name": project_name}
             )
 
@@ -441,7 +441,7 @@ class PrepareProjectLocal(BaseAction):
 
         event_data = copy.deepcopy(in_data)
         event_data["project_name"] = project_name
-        self.trigger_event("openpype.project.prepared", event_data)
+        self.trigger_event("ayon.project.prepared", event_data)
         return True
 
 

@@ -9,10 +9,10 @@ class SyncFromFtrackAction(ServerAction):
     """Prepare project attributes in Anatomy."""
 
     identifier = "sync.from.ftrack.server"
-    label = "OpenPype Admin"
+    label = "AYON Admin"
     variant = "- Sync from ftrack"
     description = "Synchronize project hierarchy based on ftrack"
-    icon = get_service_ftrack_icon_url("OpenPypeAdmin.svg")
+    icon = get_service_ftrack_icon_url("AYONAdmin.svg")
 
     role_list = ["Pypeclub", "Administrator", "Project Manager"]
 

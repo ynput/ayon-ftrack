@@ -5,7 +5,7 @@ Requires Python3.9. (Or at least 3.8+).
 This script should be called from cloned addon repo.
 
 It will produce 'package' subdirectory which could be pasted into server
-addon directory directly (eg. into `openpype4-backend/addons`).
+addon directory directly (eg. into `ayon-docker/addons`).
 
 Format of package folder:
 ADDON_REPO/package/{addon name}/{addon version}

@@ -6,7 +6,7 @@ This action creates/updates custom attributes.
     - `tools` based on tools usages
 
 ## Second part is based on json file in ftrack module.
-File location: `~/OpenPype/pype/modules/ftrack/ftrack_custom_attributes.json`
+File location: `~/ftrack_common/custom_attributes.json`
 
 Data in json file is nested dictionary. Keys in first dictionary level
 represents Ftrack entity type (task, show, assetversion, user, list, asset)
@@ -22,7 +22,7 @@ dictionary level, task's attributes are nested more.
 
 group (string)
     - name of group
-    - based on attribute `openpype_modules.ftrack.lib.CUST_ATTR_GROUP`
+    - based on attribute `ftrack_common.constants.CUST_ATTR_GROUP`
         - "pype" by default
 
 *** Required ***************************************************************
@@ -137,10 +137,10 @@ class CustAttrException(Exception):
 
 class CustomAttributes(BaseAction):
     identifier = "create.update.attributes"
-    label = "OpenPype Admin"
+    label = "AYON Admin"
     variant = "- Create/Update Custom Attributes"
     description = "Creates required custom attributes in ftrack"
-    icon = get_ftrack_icon_url("OpenPypeAdmin.svg")
+    icon = get_ftrack_icon_url("AYONAdmin.svg")
     settings_key = "create_update_attributes"
 
     required_keys = ("key", "label", "type")

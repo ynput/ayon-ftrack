@@ -123,7 +123,7 @@ class FtrackModule(
             os.path.join(python_2_vendor, "arrow"),
             # `builtins` from `python-future`
             # - `python-future` is strict Python 2 module that cause crashes
-            #   of Python 3 scripts executed through OpenPype
+            #   of Python 3 scripts executed through AYON
             #   (burnin script etc.)
             os.path.join(python_2_vendor, "builtins"),
             # `backports.functools_lru_cache`
@@ -182,7 +182,7 @@ class FtrackModule(
         api_key = session_kwargs.get("api_key")
         api_user = session_kwargs.get("api_user")
         # First look into environments
-        # - both OpenPype tray and ftrack event server should have set them
+        # - both AYON tray and ftrack event server should have set them
         # - ftrack event server may crash when credentials are tried to load
         #   from keyring
         if not api_key or not api_user:

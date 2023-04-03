@@ -21,13 +21,13 @@ class TransferHierarchicalValues(ServerAction):
     """
 
     identifier = "transfer.hierarchical.values"
-    label = "OpenPype Admin"
+    label = "AYON Admin"
     variant = "- Transfer values between 2 custom attributes"
     description = (
         "Move values from a hierarchical attribute to"
         " second hierarchical attribute."
     )
-    icon = get_service_ftrack_icon_url("OpenPypeAdmin.svg")
+    icon = get_service_ftrack_icon_url("AYONAdmin.svg")
 
     all_project_entities_query = (
         "select id, name, parent_id, link"

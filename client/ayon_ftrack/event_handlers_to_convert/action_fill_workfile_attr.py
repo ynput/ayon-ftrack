@@ -31,10 +31,10 @@ class FillWorkfileAttributeAction(BaseAction):
     """
 
     identifier = "fill.workfile.attr"
-    label = "OpenPype Admin"
+    label = "AYON Admin"
     variant = "- Fill workfile attribute"
     description = "Precalculate and fill workfile name into a custom attribute"
-    icon = get_ftrack_icon_url("OpenPypeAdmin.svg")
+    icon = get_ftrack_icon_url("AYONAdmin.svg")
 
     settings_key = "fill_workfile_attribute"
 

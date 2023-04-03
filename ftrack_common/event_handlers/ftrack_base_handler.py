@@ -458,7 +458,7 @@ class BaseHandler(object):
         ).one()
 
     def get_project_settings_from_event(self, event, project_name):
-        """Load or fill OpenPype's project settings from event data.
+        """Load or fill AYON's project settings from event data.
 
         Project data are stored by ftrack id because in most cases it is
         easier to access project id than project name.

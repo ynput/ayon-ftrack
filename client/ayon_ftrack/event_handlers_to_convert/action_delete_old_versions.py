@@ -24,13 +24,13 @@ from ayon_ftrack.lib import get_ftrack_icon_url
 class DeleteOldVersions(BaseAction):
 
     identifier = "delete.old.versions"
-    label = "OpenPype Admin"
+    label = "AYON Admin"
     variant = "- Delete old versions"
     description = (
         "Delete files from older publishes so project can be"
         " archived with only lates versions."
     )
-    icon = get_ftrack_icon_url("OpenPypeAdmin.svg")
+    icon = get_ftrack_icon_url("AYONAdmin.svg")
 
     settings_key = "delete_old_versions"
 

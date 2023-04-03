@@ -7,10 +7,10 @@ class JobKiller(BaseAction):
     """Kill jobs that are marked as running."""
 
     identifier = "job.killer"
-    label = "OpenPype Admin"
+    label = "AYON Admin"
     variant = "- Job Killer"
     description = "Killing selected running jobs"
-    icon = get_ftrack_icon_url("OpenPypeAdmin.svg")
+    icon = get_ftrack_icon_url("AYONAdmin.svg")
     settings_key = "job_killer"
 
     def discover(self, session, entities, event):

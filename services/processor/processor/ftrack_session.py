@@ -26,9 +26,6 @@ from ayon_api import (
     update_event,
 )
 
-TOPIC_STATUS_SERVER = "openpype.event.server.status"
-TOPIC_STATUS_SERVER_RESULT = "openpype.event.server.status.result"
-
 
 class ProcessEventHub(ftrack_api.event.hub.EventHub):
     _server_con = None
