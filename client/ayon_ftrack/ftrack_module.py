@@ -31,15 +31,6 @@ class FtrackModule(
         current_dir = os.path.dirname(os.path.abspath(__file__))
         low_platform = platform.system().lower()
 
-        # Server event handler paths
-        server_event_handlers_paths = [
-            os.path.join(current_dir, "event_handlers_server")
-        ]
-        settings_server_paths = ftrack_settings["ftrack_events_path"]
-        if isinstance(settings_server_paths, dict):
-            settings_server_paths = settings_server_paths[low_platform]
-        server_event_handlers_paths.extend(settings_server_paths)
-
         # User event handler paths
         user_event_handlers_paths = [
             os.path.join(current_dir, "event_handlers_user")
@@ -50,7 +41,6 @@ class FtrackModule(
         user_event_handlers_paths.extend(settings_action_paths)
 
         # Prepare attribute
-        self.server_event_handlers_paths = server_event_handlers_paths
         self.user_event_handlers_paths = user_event_handlers_paths
         self.tray_module = None
 
@@ -168,9 +158,7 @@ class FtrackModule(
                 if not isinstance(value, (list, tuple, set)):
                     value = [value]
 
-                if key == "server":
-                    self.server_event_handlers_paths.extend(value)
-                elif key == "user":
+                if key == "user":
                     self.user_event_handlers_paths.extend(value)
 
     def create_ftrack_session(self, **session_kwargs):
