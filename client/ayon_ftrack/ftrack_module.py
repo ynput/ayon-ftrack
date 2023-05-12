@@ -1,5 +1,4 @@
 import os
-import platform
 
 import click
 
@@ -20,25 +19,20 @@ class FtrackModule(
     IPluginPaths,
 ):
     name = "ftrack"
+    enabled = True
 
     def initialize(self, settings):
         ftrack_settings = settings[self.name]
 
-        self.enabled = ftrack_settings["enabled"]
         self._settings_ftrack_url = ftrack_settings["ftrack_server"]
         self._ftrack_url = _URL_NOT_SET
 
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        low_platform = platform.system().lower()
 
         # User event handler paths
         user_event_handlers_paths = [
             os.path.join(current_dir, "event_handlers_user")
         ]
-        settings_action_paths = ftrack_settings["ftrack_actions_path"]
-        if isinstance(settings_action_paths, dict):
-            settings_action_paths = settings_action_paths[low_platform]
-        user_event_handlers_paths.extend(settings_action_paths)
 
         # Prepare attribute
         self.user_event_handlers_paths = user_event_handlers_paths
