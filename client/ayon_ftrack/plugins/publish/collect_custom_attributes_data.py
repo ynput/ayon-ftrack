@@ -22,6 +22,8 @@ class CollectFtrackCustomAttributeData(pyblish.api.ContextPlugin):
     custom attribute values lookup must be extended.
     """
 
+    settings_category = "ftrack"
+
     order = pyblish.api.CollectorOrder + 0.4992
     label = "Collect Ftrack Custom Attribute Data"
 

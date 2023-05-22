@@ -24,6 +24,7 @@ class IntegrateFtrackNote(pyblish.api.InstancePlugin):
     label = "Integrate Ftrack note"
     families = ["ftrack"]
     optional = True
+    settings_category = "ftrack"
 
     # Can be set in presets:
     # - Allows only `intent` and `comment` keys

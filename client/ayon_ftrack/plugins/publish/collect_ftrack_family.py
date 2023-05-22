@@ -26,6 +26,8 @@ class CollectFtrackFamily(pyblish.api.InstancePlugin):
     label = "Collect Ftrack Family"
     order = pyblish.api.CollectorOrder + 0.4990
 
+    settings_category = "ftrack"
+
     profiles = None
 
     def process(self, instance):
