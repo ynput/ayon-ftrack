@@ -30,6 +30,9 @@ class CollectUsernameForWebpublish(pyblish.api.ContextPlugin):
         `representation.context.username`
 
     """
+
+    settings_category = "ftrack"
+
     order = pyblish.api.CollectorOrder + 0.0015
     label = "Collect ftrack username"
     hosts = ["webpublisher", "photoshop"]

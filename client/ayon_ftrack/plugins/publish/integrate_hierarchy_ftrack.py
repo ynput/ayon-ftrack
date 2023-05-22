@@ -46,6 +46,7 @@ class IntegrateHierarchyToFtrack(pyblish.api.ContextPlugin):
         "traypublisher"
     ]
     optional = False
+    settings_category = "ftrack"
     create_task_status_profiles = []
 
     def process(self, context):

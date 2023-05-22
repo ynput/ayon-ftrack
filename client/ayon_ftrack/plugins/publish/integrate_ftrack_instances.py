@@ -22,6 +22,7 @@ class IntegrateFtrackInstance(pyblish.api.InstancePlugin):
     order = pyblish.api.IntegratorOrder + 0.48
     label = "Integrate Ftrack Component"
     families = ["ftrack"]
+    settings_category = "ftrack"
 
     metadata_keys_to_label = {
         "openpype_version": "OpenPype version",

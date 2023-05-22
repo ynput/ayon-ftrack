@@ -11,7 +11,7 @@ class IntegrateFtrackFarmStatus(pyblish.api.ContextPlugin):
 
     order = pyblish.api.IntegratorOrder + 0.48
     label = "Integrate Ftrack Farm Status"
-
+    settings_category = "ftrack"
     farm_status_profiles = []
 
     def process(self, context):

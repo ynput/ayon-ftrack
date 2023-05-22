@@ -37,6 +37,7 @@ class ValidateFtrackAttributes(pyblish.api.InstancePlugin):
     order = ValidateContentsOrder
     families = ["ftrack"]
     optional = True
+    settings_category = "ftrack"
     # Ignore standalone host, because it does not have an Ftrack entity
     # associated.
     hosts = [

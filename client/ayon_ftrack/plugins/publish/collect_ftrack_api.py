@@ -8,6 +8,8 @@ class CollectFtrackApi(pyblish.api.ContextPlugin):
     order = pyblish.api.CollectorOrder + 0.4991
     label = "Collect Ftrack Api"
 
+    settings_category = "ftrack"
+
     def process(self, context):
         ftrack_log = logging.getLogger('ftrack_api')
         ftrack_log.setLevel(logging.WARNING)
