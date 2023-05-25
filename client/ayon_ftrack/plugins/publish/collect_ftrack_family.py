@@ -41,8 +41,8 @@ class CollectFtrackFamily(pyblish.api.InstancePlugin):
 
         filtering_criteria = {
             "hosts": host_name,
-            "families": family,
             "tasks": task_name
+            "product_types": family,
         }
         profile = filter_profiles(
             self.profiles,

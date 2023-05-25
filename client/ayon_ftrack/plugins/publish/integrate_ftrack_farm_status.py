@@ -69,8 +69,8 @@ class IntegrateFtrackFarmStatus(pyblish.api.ContextPlugin):
                     "hosts": host_name,
                     "task_types": task_type,
                     "task_names": task_name,
-                    "families": family,
-                    "subsets": subset_name,
+                    "product_types": family,
+                    "product_names": subset_name,
                 },
                 logger=self.log
             )

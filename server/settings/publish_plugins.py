@@ -12,7 +12,7 @@ class CollectFamilyProfile(BaseSettingsModel):
         default_factory=list,
         title="Host names",
     )
-    families: list[str] = Field(
+    product_types: list[str] = Field(
         default_factory=list,
         title="Families",
     )
@@ -131,7 +131,7 @@ class AssetVersionStatusProfile(BaseSettingsModel):
         default_factory=list,
         title="Host names",
     )
-    families: list[str] = Field(
+    product_types: list[str] = Field(
         default_factory=list,
         title="Families",
     )
@@ -165,13 +165,13 @@ def integrate_ftrack_metadata_enum():
 
 class IntegrateFtrackInstanceModel(BaseSettingsModel):
     _isGroup = True
-    family_mapping: list[IntegrateFtrackFamilyMapping] = Field(
+    product_type_mapping: list[IntegrateFtrackFamilyMapping] = Field(
         title="Family Mapping",
         default_factory=list,
     )
-    keep_first_subset_name_for_review: bool = Field(
+    keep_first_product_name_for_review: bool = Field(
         True,
-        title="Make subset name as first asset name",
+        title="Make product name as first asset name",
     )
     asset_versions_status_profiles: list[AssetVersionStatusProfile] = Field(
         title="AssetVersion status on publish",
@@ -183,7 +183,7 @@ class IntegrateFtrackInstanceModel(BaseSettingsModel):
         enum_resolver=integrate_ftrack_metadata_enum
     )
 
-    @validator("family_mapping")
+    @validator("product_type_mapping")
     def validate_unique_outputs(cls, value):
         ensure_unique_names(value)
         return value
@@ -194,10 +194,6 @@ class IntegrateFarmStartusProfile(BaseSettingsModel):
         default_factory=list,
         title="Host names",
     )
-    families: list[str] = Field(
-        default_factory=list,
-        title="Families",
-    )
     task_types: list[str] = Field(
         default_factory=list,
         title="Task types",
@@ -206,8 +202,12 @@ class IntegrateFarmStartusProfile(BaseSettingsModel):
         default_factory=list,
         title="Task names",
     )
-    subsets: list[str] = Field(
-        title="Subset names",
+    product_types: list[str] = Field(
+        default_factory=list,
+        title="Product types",
+    )
+    product_names: list[str] = Field(
+        title="Product names",
         default_factory=list,
     )
     status_name: str = Field(
@@ -287,7 +287,7 @@ DEFAULT_PUBLISH_SETTINGS = {
                 "hosts": [
                     "standalonepublisher"
                 ],
-                "families": [],
+                "product_types": [],
                 "task_types": [],
                 "task_names": [],
                 "add_ftrack_family": True,
@@ -297,7 +297,7 @@ DEFAULT_PUBLISH_SETTINGS = {
                 "hosts": [
                     "standalonepublisher"
                 ],
-                "families": [
+                "product_types": [
                     "matchmove",
                     "shot"
                 ],
@@ -310,7 +310,7 @@ DEFAULT_PUBLISH_SETTINGS = {
                 "hosts": [
                     "standalonepublisher"
                 ],
-                "families": [
+                "product_types": [
                     "plate"
                 ],
                 "task_types": [],
@@ -330,7 +330,7 @@ DEFAULT_PUBLISH_SETTINGS = {
                 "hosts": [
                     "traypublisher"
                 ],
-                "families": [],
+                "product_types": [],
                 "task_types": [],
                 "task_names": [],
                 "add_ftrack_family": True,
@@ -340,7 +340,7 @@ DEFAULT_PUBLISH_SETTINGS = {
                 "hosts": [
                     "traypublisher"
                 ],
-                "families": [
+                "product_types": [
                     "matchmove",
                     "shot"
                 ],
@@ -353,7 +353,7 @@ DEFAULT_PUBLISH_SETTINGS = {
                 "hosts": [
                     "traypublisher"
                 ],
-                "families": [
+                "product_types": [
                     "plate",
                     "review",
                     "audio"
@@ -375,7 +375,7 @@ DEFAULT_PUBLISH_SETTINGS = {
                 "hosts": [
                     "maya"
                 ],
-                "families": [
+                "product_types": [
                     "model",
                     "setdress",
                     "animation",
@@ -392,7 +392,7 @@ DEFAULT_PUBLISH_SETTINGS = {
                 "hosts": [
                     "tvpaint"
                 ],
-                "families": [
+                "product_types": [
                     "renderPass"
                 ],
                 "task_types": [],
@@ -404,7 +404,7 @@ DEFAULT_PUBLISH_SETTINGS = {
                 "hosts": [
                     "tvpaint"
                 ],
-                "families": [],
+                "product_types": [],
                 "task_types": [],
                 "task_names": [],
                 "add_ftrack_family": True,
@@ -414,7 +414,7 @@ DEFAULT_PUBLISH_SETTINGS = {
                 "hosts": [
                     "nuke"
                 ],
-                "families": [
+                "product_types": [
                     "write",
                     "render",
                     "prerender"
@@ -435,7 +435,7 @@ DEFAULT_PUBLISH_SETTINGS = {
                 "hosts": [
                     "aftereffects"
                 ],
-                "families": [
+                "product_types": [
                     "render",
                     "workfile"
                 ],
@@ -448,7 +448,7 @@ DEFAULT_PUBLISH_SETTINGS = {
                 "hosts": [
                     "flame"
                 ],
-                "families": [
+                "product_types": [
                     "plate",
                     "take"
                 ],
@@ -461,7 +461,7 @@ DEFAULT_PUBLISH_SETTINGS = {
                 "hosts": [
                     "houdini"
                 ],
-                "families": [
+                "product_types": [
                     "usd"
                 ],
                 "task_types": [],
@@ -473,7 +473,7 @@ DEFAULT_PUBLISH_SETTINGS = {
                 "hosts": [
                     "photoshop"
                 ],
-                "families": [
+                "product_types": [
                     "review"
                 ],
                 "task_types": [],
@@ -509,7 +509,7 @@ DEFAULT_PUBLISH_SETTINGS = {
         "enabled": True
     },
     "IntegrateFtrackInstance": {
-        "family_mapping": [
+        "product_type_mapping": [
             {
                 "name": "camera",
                 "asset_type": "cam"
@@ -608,7 +608,7 @@ DEFAULT_PUBLISH_SETTINGS = {
                 "asset_type": "usd"
             }
         ],
-        "keep_first_subset_name_for_review": True,
+        "keep_first_product_name_for_review": True,
         "asset_versions_status_profiles": [],
         "additional_metadata_keys": []
     },
