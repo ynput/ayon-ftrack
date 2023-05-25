@@ -8,7 +8,7 @@ from ayon_server.settings import (
 
 
 class CollectFamilyProfile(BaseSettingsModel):
-    hosts: list[str] = Field(
+    host_names: list[str] = Field(
         default_factory=list,
         title="Host names",
     )
@@ -127,7 +127,7 @@ class IntegrateFtrackComponentOverwriteModel(BaseSettingsModel):
 
 
 class AssetVersionStatusProfile(BaseSettingsModel):
-    hosts: list[str] = Field(
+    host_names: list[str] = Field(
         default_factory=list,
         title="Host names",
     )
@@ -190,7 +190,7 @@ class IntegrateFtrackInstanceModel(BaseSettingsModel):
 
 
 class IntegrateFarmStartusProfile(BaseSettingsModel):
-    hosts: list[str] = Field(
+    host_names: list[str] = Field(
         default_factory=list,
         title="Host names",
     )
@@ -284,7 +284,7 @@ DEFAULT_PUBLISH_SETTINGS = {
         "enabled": True,
         "profiles": [
             {
-                "hosts": [
+                "host_names": [
                     "standalonepublisher"
                 ],
                 "product_types": [],
@@ -294,7 +294,7 @@ DEFAULT_PUBLISH_SETTINGS = {
                 "advanced_filtering": []
             },
             {
-                "hosts": [
+                "host_names": [
                     "standalonepublisher"
                 ],
                 "product_types": [
@@ -307,7 +307,7 @@ DEFAULT_PUBLISH_SETTINGS = {
                 "advanced_filtering": []
             },
             {
-                "hosts": [
+                "host_names": [
                     "standalonepublisher"
                 ],
                 "product_types": [
@@ -327,7 +327,7 @@ DEFAULT_PUBLISH_SETTINGS = {
                 ]
             },
             {
-                "hosts": [
+                "host_names": [
                     "traypublisher"
                 ],
                 "product_types": [],
@@ -337,7 +337,7 @@ DEFAULT_PUBLISH_SETTINGS = {
                 "advanced_filtering": []
             },
             {
-                "hosts": [
+                "host_names": [
                     "traypublisher"
                 ],
                 "product_types": [
@@ -350,7 +350,7 @@ DEFAULT_PUBLISH_SETTINGS = {
                 "advanced_filtering": []
             },
             {
-                "hosts": [
+                "host_names": [
                     "traypublisher"
                 ],
                 "product_types": [
@@ -372,7 +372,7 @@ DEFAULT_PUBLISH_SETTINGS = {
                 ]
             },
             {
-                "hosts": [
+                "host_names": [
                     "maya"
                 ],
                 "product_types": [
@@ -389,7 +389,7 @@ DEFAULT_PUBLISH_SETTINGS = {
                 "advanced_filtering": []
             },
             {
-                "hosts": [
+                "host_names": [
                     "tvpaint"
                 ],
                 "product_types": [
@@ -401,7 +401,7 @@ DEFAULT_PUBLISH_SETTINGS = {
                 "advanced_filtering": []
             },
             {
-                "hosts": [
+                "host_names": [
                     "tvpaint"
                 ],
                 "product_types": [],
@@ -411,7 +411,7 @@ DEFAULT_PUBLISH_SETTINGS = {
                 "advanced_filtering": []
             },
             {
-                "hosts": [
+                "host_names": [
                     "nuke"
                 ],
                 "product_types": [
@@ -432,7 +432,7 @@ DEFAULT_PUBLISH_SETTINGS = {
                 ]
             },
             {
-                "hosts": [
+                "host_names": [
                     "aftereffects"
                 ],
                 "product_types": [
@@ -445,7 +445,7 @@ DEFAULT_PUBLISH_SETTINGS = {
                 "advanced_filtering": []
             },
             {
-                "hosts": [
+                "host_names": [
                     "flame"
                 ],
                 "product_types": [
@@ -458,7 +458,7 @@ DEFAULT_PUBLISH_SETTINGS = {
                 "advanced_filtering": []
             },
             {
-                "hosts": [
+                "host_names": [
                     "houdini"
                 ],
                 "product_types": [
@@ -470,7 +470,7 @@ DEFAULT_PUBLISH_SETTINGS = {
                 "advanced_filtering": []
             },
             {
-                "hosts": [
+                "host_names": [
                     "photoshop"
                 ],
                 "product_types": [

@@ -40,7 +40,7 @@ class CollectFtrackFamily(pyblish.api.InstancePlugin):
         task_name = instance.data.get("task")
 
         filtering_criteria = {
-            "hosts": host_name,
+            "host_names": host_name,
             "product_types": family,
             "task_names": task_name
         }
