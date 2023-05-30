@@ -103,17 +103,6 @@ class FtrackModule(
         python_paths = [
             # `python-ftrack-api`
             os.path.join(python_2_vendor, "ftrack-python-api", "source"),
-            # `arrow`
-            os.path.join(python_2_vendor, "arrow"),
-            # `builtins` from `python-future`
-            # - `python-future` is strict Python 2 module that cause crashes
-            #   of Python 3 scripts executed through AYON
-            #   (burnin script etc.)
-            os.path.join(python_2_vendor, "builtins"),
-            # `backports.functools_lru_cache`
-            os.path.join(
-                python_2_vendor, "backports.functools_lru_cache"
-            )
         ]
 
         # Load PYTHONPATH from current launch context
