@@ -444,13 +444,13 @@ class BaseAction(BaseHandler):
         return user_entity
 
     @classmethod
-    def get_user_roles_from_event(cls, session, event, lower=True):
+    def get_user_roles_from_event(cls, session, event, lower=False):
         """Get user roles based on data in event.
 
         Args:
             session (ftrack_api.Session): Prepared ftrack session.
             event (ftrack_api.event.Event): Event which is processed.
-            lower (Optional[bool]): Lower the role names. Default 'True'.
+            lower (Optional[bool]): Lower the role names. Default 'False'.
         """
 
         not_set = object()
@@ -513,8 +513,7 @@ class BaseAction(BaseHandler):
             if not settings.get(self.settings_enabled_key, True):
                 return False
 
-        user_role_list = self.get_user_roles_from_event(
-            session, event, lower=False)
+        user_role_list = self.get_user_roles_from_event(session, event)
         if not self.roles_check(settings.get("role_list"), user_role_list):
             return False
         return True
