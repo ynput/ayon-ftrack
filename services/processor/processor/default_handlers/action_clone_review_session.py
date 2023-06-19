@@ -1,6 +1,6 @@
 import json
 
-from processor.lib import ServerAction
+from ftrack_common.event_handlers import ServerAction
 
 
 def clone_review_session(session, entity):

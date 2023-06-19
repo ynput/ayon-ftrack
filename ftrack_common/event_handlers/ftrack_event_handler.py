@@ -1,4 +1,3 @@
-import functools
 from .ftrack_base_handler import BaseHandler
 
 

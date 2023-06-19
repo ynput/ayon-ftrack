@@ -1,6 +1,6 @@
-from pydantic import Field
+from pydantic import Field, validator
 
-from ayon_server.settings import BaseSettingsModel
+from ayon_server.settings import BaseSettingsModel, ensure_unique_names
 
 from .service_handlers import (
     FtrackServiceHandlers,
@@ -34,6 +34,32 @@ class FtrackServiceSettings(BaseSettingsModel):
     )
 
 
+class PostLaunchHookMapping(BaseSettingsModel):
+    name: str = Field("", title="New status")
+    value: list[str] = Field(default_factory=list, title="From statuses")
+
+
+class PostLaunchHookSettings(BaseSettingsModel):
+    """Change task status on application launch.
+
+    Changeo of status is based on mapping. Each item in mapping define new
+    status which is used based on current status/es. Special value for current
+    statuses is '__any__', in that case the new status is always used. And if
+    new status name is '__ignore__', the change of status is skipped if current
+    status is in current statuses list.
+    """
+
+    enabled: bool = True
+    mapping: list[PostLaunchHookMapping] = Field(default_factory=list)
+
+    @validator("mapping")
+    def ensure_unique_names(cls, value):
+        """Ensure name fields within the lists have unique names."""
+
+        ensure_unique_names(value)
+        return value
+
+
 class FtrackSettings(BaseSettingsModel):
     """Ftrack addon settings."""
 
@@ -46,12 +72,14 @@ class FtrackSettings(BaseSettingsModel):
         default_factory=FtrackServiceHandlers,
         title="Server Actions/Events",
     )
-
     service_settings: FtrackServiceSettings = Field(
         default_factory=FtrackServiceSettings,
         title="Service settings",
     )
-
+    post_launch_hook: PostLaunchHookSettings = Field(
+        default_factory=PostLaunchHookSettings,
+        title="Status change on application launch"
+    )
     user_handlers: FtrackDesktopAppHandlers = Field(
         default_factory=FtrackDesktopAppHandlers,
         title="User Actions/Events",
@@ -70,5 +98,26 @@ DEFAULT_VALUES = {
         "api_key": ""
     },
     "user_handlers": DEFAULT_DESKTOP_HANDLERS_SETTINGS,
+    "post_launch_hook": {
+        "enabled": True,
+        "mapping": [
+            {
+                "name": "In Progress",
+                "value": ["__any__"]
+            },
+            {
+                "name": "Ready",
+                "value": ["Not Ready"]
+            },
+            {
+                "name": "__ignore__",
+                "value": [
+                    "in progress",
+                    "omitted",
+                    "on hold"
+                ]
+            }
+        ]
+    },
     "publish": DEFAULT_PUBLISH_SETTINGS
 }

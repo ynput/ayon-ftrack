@@ -9,6 +9,7 @@ class IntegrateFtrackComponentOverwrite(pyblish.api.InstancePlugin):
     order = pyblish.api.IntegratorOrder + 0.49
     label = 'Overwrite ftrack created versions'
     families = ["clip"]
+    settings_category = "ftrack"
     optional = True
     active = False
 

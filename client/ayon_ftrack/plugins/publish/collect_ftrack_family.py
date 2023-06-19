@@ -26,6 +26,8 @@ class CollectFtrackFamily(pyblish.api.InstancePlugin):
     label = "Collect Ftrack Family"
     order = pyblish.api.CollectorOrder + 0.4990
 
+    settings_category = "ftrack"
+
     profiles = None
 
     def process(self, instance):
@@ -38,9 +40,9 @@ class CollectFtrackFamily(pyblish.api.InstancePlugin):
         task_name = instance.data.get("task")
 
         filtering_criteria = {
-            "hosts": host_name,
-            "families": family,
-            "tasks": task_name
+            "host_names": host_name,
+            "product_types": family,
+            "task_names": task_name
         }
         profile = filter_profiles(
             self.profiles,

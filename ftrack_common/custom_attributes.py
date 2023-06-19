@@ -1,11 +1,13 @@
+import os
+import json
 import itertools
 import collections
 
-from .lib import join_filter_values
+from .lib import join_filter_values, create_chunks
 from .constants import CUST_ATTR_GROUP
 
 
-def get_custom_attr_configs(session, query_keys=None, split_hierarchical=True):
+def get_ayon_attr_configs(session, query_keys=None, split_hierarchical=True):
     """Query custom attribute configurations from ftrack server.
 
     Args:
@@ -88,11 +90,8 @@ def query_custom_attribute_values(session, attr_ids, entity_ids):
     # Query values in chunks
     chunk_size = 5000 // len(attr_ids)
     # Make sure entity_ids is `list` for chunk selection
-    entity_ids = list(entity_ids)
-    for idx in range(0, len(entity_ids), chunk_size):
-        entity_ids_joined = join_filter_values(
-            entity_ids[idx:idx + chunk_size]
-        )
+    for chunk in create_chunks(entity_ids, chunk_size):
+        entity_ids_joined = join_filter_values(chunk)
         output.extend(
             session.query(
                 (
@@ -167,3 +166,61 @@ def get_custom_attributes_by_entity_id(
             entity_values[attr_id] = value
 
     return output
+
+
+def default_custom_attributes_definition():
+    """Default custom attribute definitions created in ftracl.
+
+    Todos:
+        Convert to list of dictionaries to be able determine order. Check if
+            ftrack api support to define order first!
+
+    Returns:
+        dict[str, Any]: Custom attribute configurations per entity type that
+            can be used to create/update custom attributes.
+    """
+
+    json_file_path = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "custom_attributes.json"
+    )
+    with open(json_file_path, "r") as json_stream:
+        data = json.load(json_stream)
+    return data
+
+
+# TODO applications and tools should be moved to 'applications' addon
+def app_definitions_from_app_manager(app_manager):
+    _app_definitions = []
+    for app_name, app in app_manager.applications.items():
+        if app.enabled:
+            _app_definitions.append(
+                (app_name, app.full_label)
+            )
+
+    # Sort items by label
+    app_definitions = []
+    for key, label in sorted(_app_definitions, key=lambda item: item[1]):
+        app_definitions.append({key: label})
+
+    if not app_definitions:
+        app_definitions.append({"empty": "< Empty >"})
+    return app_definitions
+
+
+def tool_definitions_from_app_manager(app_manager):
+    _tools_data = []
+    for tool_name, tool in app_manager.tools.items():
+        _tools_data.append(
+            (tool_name, tool.label)
+        )
+
+    # Sort items by label
+    tools_data = []
+    for key, label in sorted(_tools_data, key=lambda item: item[1]):
+        tools_data.append({key: label})
+
+    # Make sure there is at least one item
+    if not tools_data:
+        tools_data.append({"empty": "< Empty >"})
+    return tools_data

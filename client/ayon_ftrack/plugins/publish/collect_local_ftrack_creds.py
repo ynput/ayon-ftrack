@@ -11,6 +11,8 @@ class CollectLocalFtrackCreds(pyblish.api.ContextPlugin):
     label = "Collect local ftrack credentials"
     targets = ["rr_control"]
 
+    settings_category = "ftrack"
+
     def process(self, context):
         if os.getenv("FTRACK_API_USER") and os.getenv("FTRACK_API_KEY") and \
                 os.getenv("FTRACK_SERVER"):

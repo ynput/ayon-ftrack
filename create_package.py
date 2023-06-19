@@ -5,7 +5,7 @@ Requires Python3.9. (Or at least 3.8+).
 This script should be called from cloned addon repo.
 
 It will produce 'package' subdirectory which could be pasted into server
-addon directory directly (eg. into `openpype4-backend/addons`).
+addon directory directly (eg. into `ayon-docker/addons`).
 
 Format of package folder:
 ADDON_REPO/package/{addon name}/{addon version}
@@ -147,13 +147,18 @@ def copy_server_content(
         COMMON_DIR_NAME
     )
 
-    filepaths_to_copy: list[tuple[str, str]] = []
-    filepaths_to_copy.append(
+    filepaths_to_copy: list[tuple[str, str]] = [
         (
             os.path.join(current_dir, "version.py"),
             os.path.join(addon_output_dir, "version.py")
-        )
-    )
+        ),
+        # Copy constants needed for attributes creation
+        (
+            os.path.join(common_dir, "constants.py"),
+            os.path.join(addon_output_dir, "constants.py")
+        ),
+    ]
+
     for path, sub_path in find_files_in_subdir(server_dir):
         filepaths_to_copy.append(
             (path, os.path.join(addon_output_dir, sub_path))
@@ -166,10 +171,7 @@ def copy_server_content(
 
     for path, sub_path in find_files_in_subdir(common_dir):
         filepaths_to_copy.append(
-            (path, os.path.join(addon_output_dir, COMMON_DIR_NAME, sub_path))
-        )
-        filepaths_to_copy.append(
-            (path, os.path.join(dst_processor_dir, COMMON_DIR_NAME, sub_path))
+            (path, os.path.join(dst_processor_dir, sub_path))
         )
 
     # Copy files
@@ -205,7 +207,9 @@ def zip_client_side(
     if not os.path.exists(private_dir):
         os.makedirs(private_dir)
 
+    common_dir: str = os.path.join(current_dir, COMMON_DIR_NAME)
     version_filepath: str = os.path.join(current_dir, "version.py")
+    addon_subdir_name: str = "ayon_ftrack"
 
     zip_filename: str = zip_basename + ".zip"
     zip_filepath: str = os.path.join(os.path.join(private_dir, zip_filename))
@@ -213,7 +217,12 @@ def zip_client_side(
         for path, sub_path in find_files_in_subdir(client_dir):
             zipf.write(path, sub_path)
 
-        zipf.write(version_filepath, os.path.join("ayon_ftrack", "version.py"))
+        for path, sub_path in find_files_in_subdir(common_dir):
+            zipf.write(path, "/".join((addon_subdir_name, "common", sub_path)))
+
+        zipf.write(
+            version_filepath, os.path.join(addon_subdir_name, "version.py")
+        )
 
 
 def main(output_dir: Optional[str] = None):
@@ -229,9 +238,9 @@ def main(output_dir: Optional[str] = None):
     version_content: dict[str, Any] = {}
     with open(version_filepath, "r") as stream:
         exec(stream.read(), version_content)
-    addon_version = version_content["__version__"]
+    addon_version: str = version_content["__version__"]
 
-    new_created_version_dir = os.path.join(
+    new_created_version_dir: str = os.path.join(
         output_dir, addon_name, addon_version
     )
     if os.path.isdir(new_created_version_dir):
@@ -240,7 +249,7 @@ def main(output_dir: Optional[str] = None):
 
     log.info(f"Preparing package for {addon_name}-{addon_version}")
 
-    addon_output_dir = os.path.join(output_dir, addon_name, addon_version)
+    addon_output_dir: str = os.path.join(output_dir, addon_name, addon_version)
     if not os.path.exists(addon_output_dir):
         os.makedirs(addon_output_dir)
 

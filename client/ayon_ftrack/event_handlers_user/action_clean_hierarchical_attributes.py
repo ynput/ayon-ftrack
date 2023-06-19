@@ -1,18 +1,19 @@
 import collections
 import ftrack_api
-from ayon_ftrack.lib import (
+
+from ayon_ftrack.common import (
     BaseAction,
-    statics_icon,
-    get_openpype_attr
+    get_ayon_attr_configs,
 )
+from ayon_ftrack.lib import get_ftrack_icon_url
 
 
 class CleanHierarchicalAttrsAction(BaseAction):
     identifier = "clean.hierarchical.attr"
-    label = "OpenPype Admin"
+    label = "AYON Admin"
     variant = "- Clean hierarchical custom attributes"
     description = "Unset empty hierarchical attribute values."
-    icon = statics_icon("ftrack", "action_icons", "OpenPypeAdmin.svg")
+    icon = get_ftrack_icon_url("AYONAdmin.svg")
 
     all_project_entities_query = (
         "select id, name, parent_id, link"
@@ -55,7 +56,7 @@ class CleanHierarchicalAttrsAction(BaseAction):
         )
         entity_ids_joined = ", ".join(all_entities_ids)
 
-        attrs, hier_attrs = get_openpype_attr(session)
+        attrs, hier_attrs = get_ayon_attr_configs(session)
 
         for attr in hier_attrs:
             configuration_key = attr["key"]

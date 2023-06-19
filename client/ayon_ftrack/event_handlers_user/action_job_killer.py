@@ -1,15 +1,16 @@
 import json
-from ayon_ftrack.lib import BaseAction, statics_icon
+from ayon_ftrack.common import BaseAction
+from ayon_ftrack.lib import get_ftrack_icon_url
 
 
 class JobKiller(BaseAction):
     """Kill jobs that are marked as running."""
 
     identifier = "job.killer"
-    label = "OpenPype Admin"
+    label = "AYON Admin"
     variant = "- Job Killer"
     description = "Killing selected running jobs"
-    icon = statics_icon("ftrack", "action_icons", "OpenPypeAdmin.svg")
+    icon = get_ftrack_icon_url("AYONAdmin.svg")
     settings_key = "job_killer"
 
     def discover(self, session, entities, event):
@@ -59,7 +60,7 @@ class JobKiller(BaseAction):
                 desctiption = "*No description*"
             user_id = job["user_id"]
             username = usernames_by_id.get(user_id) or "Unknown user"
-            created = job["created_at"].strftime('%d.%m.%Y %H:%M:%S')
+            created = job["created_at"].strftime("%d.%m.%Y %H:%M:%S")
             label = "{} - {} - {}".format(
                 username, desctiption, created
             )
@@ -129,6 +130,4 @@ class JobKiller(BaseAction):
 
 
 def register(session):
-    '''Register plugin. Called when used as an plugin.'''
-
     JobKiller(session).register()

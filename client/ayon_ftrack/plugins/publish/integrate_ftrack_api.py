@@ -24,6 +24,8 @@ class IntegrateFtrackApi(pyblish.api.InstancePlugin):
     label = "Integrate Ftrack Api"
     families = ["ftrack"]
 
+    settings_category = "ftrack"
+
     def process(self, instance):
         component_list = instance.data.get("ftrackComponentsList")
         if not component_list:

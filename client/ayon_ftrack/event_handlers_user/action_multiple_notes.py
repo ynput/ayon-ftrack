@@ -1,118 +1,103 @@
-from ayon_ftrack.lib import BaseAction, statics_icon
+from ayon_ftrack.common import BaseAction
+from ayon_ftrack.lib import get_ftrack_icon_url
 
 
 class MultipleNotes(BaseAction):
-    '''Edit meta data action.'''
-
-    #: Action identifier.
-    identifier = 'multiple.notes'
-    #: Action label.
-    label = 'Multiple Notes'
-    #: Action description.
-    description = 'Add same note to multiple entities'
-    icon = statics_icon("ftrack", "action_icons", "MultipleNotes.svg")
+    identifier = "multiple.notes"
+    label = "Multiple Notes"
+    description = "Add same note to multiple entities"
+    icon = get_ftrack_icon_url("MultipleNotes.svg")
 
     def discover(self, session, entities, event):
-        ''' Validation '''
-        valid = True
-
         # Check for multiple selection.
         if len(entities) < 2:
-            valid = False
+            return False
 
         # Check for valid entities.
-        valid_entity_types = ['assetversion', 'task']
         for entity in entities:
-            if entity.entity_type.lower() not in valid_entity_types:
-                valid = False
-                break
+            if entity.entity_type.lower() not in {"assetversion", "task"}:
+                return False
 
-        return valid
+        return True
 
     def interface(self, session, entities, event):
-        if not event['data'].get('values', {}):
-            note_label = {
-                'type': 'label',
-                'value': '# Enter note: #'
-            }
+        if event["data"].get("values"):
+            return None
 
-            note_value = {
-                'name': 'note',
-                'type': 'textarea'
-            }
-
-            category_label = {
-                'type': 'label',
-                'value': '## Category: ##'
-            }
-
-            category_data = []
+        category_data = [{
+            "label": "- None -",
+            "value": "none"
+        }]
+        all_categories = session.query(
+            "select id, name from NoteCategory"
+        ).all()
+        for cat in all_categories:
             category_data.append({
-                'label': '- None -',
-                'value': 'none'
+                "label": cat["name"],
+                "value": cat["id"]
             })
-            all_categories = session.query('NoteCategory').all()
-            for cat in all_categories:
-                category_data.append({
-                    'label': cat['name'],
-                    'value': cat['id']
-                })
-            category_value = {
-                'type': 'enumerator',
-                'name': 'category',
-                'data': category_data,
-                'value': 'none'
-            }
+        category_value = {
+            "type": "enumerator",
+            "name": "category",
+            "data": category_data,
+            "value": "none"
+        }
 
-            splitter = {
-                'type': 'label',
-                'value': '{}'.format(200 * "-")
-            }
-
-            items = []
-            items.append(note_label)
-            items.append(note_value)
-            items.append(splitter)
-            items.append(category_label)
-            items.append(category_value)
-            return items
+        return [
+            {
+                "type": "label",
+                "value": "# Enter note: #"
+            },
+            {
+                "name": "note",
+                "type": "textarea"
+            },
+            {
+                "type": "label",
+                "value": "---"
+            },
+            {
+                "type": "label",
+                "value": "## Category: ##"
+            },
+            category_value,
+        ]
 
     def launch(self, session, entities, event):
-        if 'values' not in event['data']:
+        if "values" not in event["data"]:
             return
 
-        values = event['data']['values']
-        if len(values) <= 0 or 'note' not in values:
+        values = event["data"].get("values")
+        if not values or "note" not in values:
             return False
         # Get Note text
-        note_value = values['note']
-        if note_value.lower().strip() == '':
+        note_value = values["note"]
+        if note_value.lower().strip() == "":
             return False
+
         # Get User
         user = session.query(
-            'User where username is "{}"'.format(session.api_user)
+            f"User where username is \"{session.api_user}\""
         ).one()
         # Base note data
         note_data = {
-            'content': note_value,
-            'author': user
+            "content": note_value,
+            "author": user
         }
         # Get category
-        category_value = values['category']
-        if category_value != 'none':
+        category_value = values["category"]
+        if category_value != "none":
             category = session.query(
-                'NoteCategory where id is "{}"'.format(category_value)
+                f"NoteCategory where id is \"{category_value}\""
             ).one()
-            note_data['category'] = category
+            note_data["category"] = category
         # Create notes for entities
         for entity in entities:
-            new_note = session.create('Note', note_data)
-            entity['notes'].append(new_note)
+            new_note = session.create("Note", note_data)
+            entity["notes"].append(new_note)
             session.commit()
         return True
 
 
 def register(session):
-    '''Register plugin. Called when used as an plugin.'''
-
     MultipleNotes(session).register()

@@ -11,7 +11,7 @@ class IntegrateFtrackFarmStatus(pyblish.api.ContextPlugin):
 
     order = pyblish.api.IntegratorOrder + 0.48
     label = "Integrate Ftrack Farm Status"
-
+    settings_category = "ftrack"
     farm_status_profiles = []
 
     def process(self, context):
@@ -66,11 +66,11 @@ class IntegrateFtrackFarmStatus(pyblish.api.ContextPlugin):
             status_profile = filter_profiles(
                 self.farm_status_profiles,
                 {
-                    "hosts": host_name,
+                    "host_names": host_name,
                     "task_types": task_type,
                     "task_names": task_name,
-                    "families": family,
-                    "subsets": subset_name,
+                    "product_types": family,
+                    "product_names": subset_name,
                 },
                 logger=self.log
             )

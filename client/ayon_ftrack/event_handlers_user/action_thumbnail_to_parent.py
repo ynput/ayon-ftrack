@@ -1,91 +1,79 @@
 import json
-from ayon_ftrack.lib import BaseAction, statics_icon
+from ayon_ftrack.common import BaseAction
+from ayon_ftrack.lib import get_ftrack_icon_url
 
 
 class ThumbToParent(BaseAction):
-    '''Custom action.'''
-
-    # Action identifier
-    identifier = 'thumb.to.parent'
-    # Action label
-    label = 'Thumbnail'
-    # Action variant
+    identifier = "thumb.to.parent"
+    label = "Thumbnail"
     variant = " to Parent"
-    # Action icon
-    icon = statics_icon("ftrack", "action_icons", "Thumbnail.svg")
+    icon = get_ftrack_icon_url("Thumbnail.svg")
 
     def discover(self, session, entities, event):
-        '''Return action config if triggered on asset versions.'''
-
-        if len(entities) <= 0 or entities[0].entity_type in ['Project']:
-            return False
-
-        return True
+        if entities and entities[0].entity_type != "Project":
+            return True
+        return False
 
     def launch(self, session, entities, event):
-        '''Callback method for action.'''
+        user_id = event["source"]["user"]["id"]
+        user = session.query(f"User where id is {user_id}").one()
 
-        userId = event['source']['user']['id']
-        user = session.query('User where id is ' + userId).one()
-
-        job = session.create('Job', {
-            'user': user,
-            'status': 'running',
-            'data': json.dumps({
-                'description': 'Push thumbnails to parents'
+        job = session.create("Job", {
+            "user": user,
+            "status": "running",
+            "data": json.dumps({
+                "description": "Push thumbnails to parents"
             })
         })
         session.commit()
         try:
+            # TODO we should probably crash nicely and don't crash on first
+            #   issue but create a report of all entities with issues
             for entity in entities:
-                parent = None
-                thumbid = None
-                if entity.entity_type.lower() == 'assetversion':
-                    parent = entity['task']
-
+                if entity.entity_type.lower() == "assetversion":
+                    parent = entity["task"]
                     if parent is None:
-                        par_ent = entity['link'][-2]
-                        parent = session.get(par_ent['type'], par_ent['id'])
+                        par_ent = entity["link"][-2]
+                        parent = session.query(
+                            "select thumbnail_id from TypedContext"
+                            f" where id is \"{par_ent['id']}\""
+                        ).first()
                 else:
                     try:
-                        parent = entity['parent']
-                    except Exception as e:
+                        parent = entity["parent"]
+                    except Exception as exc:
                         msg = (
-                            "During Action 'Thumb to Parent'"
+                            "During Action 'Thumbnail to Parent'"
                             " went something wrong"
                         )
                         self.log.error(msg)
-                        raise e
-                thumbid = entity['thumbnail_id']
+                        raise exc
 
-                if parent and thumbid:
-                    parent['thumbnail_id'] = thumbid
-                    status = 'done'
-                else:
+                thumbnail_id = entity["thumbnail_id"]
+                if not parent or not thumbnail_id:
                     raise Exception(
                         "Parent or thumbnail id not found. Parent: {}. "
-                        "Thumbnail id: {}".format(parent, thumbid)
+                        "Thumbnail id: {}".format(parent, thumbnail_id)
                     )
+                parent["thumbnail_id"] = thumbnail_id
 
             # inform the user that the job is done
-            job['status'] = status or 'done'
+            job["status"] = "done"
 
         except Exception as exc:
             session.rollback()
             # fail the job if something goes wrong
-            job['status'] = 'failed'
+            job["status"] = "failed"
             raise exc
 
         finally:
             session.commit()
 
         return {
-            'success': True,
-            'message': 'Created job for updating thumbnails!'
+            "success": True,
+            "message": "Created job for updating thumbnails!"
         }
 
 
 def register(session):
-    '''Register action. Called when used as an event plugin.'''
-
     ThumbToParent(session).register()

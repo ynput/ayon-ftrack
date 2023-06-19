@@ -4,7 +4,8 @@ from openpype.pipeline.project_folders import (
     get_project_basic_paths,
     create_project_folders,
 )
-from ayon_ftrack.lib import BaseAction, statics_icon
+from ayon_ftrack.common import BaseAction
+from ayon_ftrack.lib import get_ftrack_icon_url
 
 
 class CreateProjectFolders(BaseAction):
@@ -54,7 +55,7 @@ class CreateProjectFolders(BaseAction):
     label = "Create Project Structure"
     description = "Creates folder structure"
     role_list = ["Pypeclub", "Administrator", "Project Manager"]
-    icon = statics_icon("ftrack", "action_icons", "CreateProjectFolders.svg")
+    icon = get_ftrack_icon_url("CreateProjectFolders.svg")
 
     pattern_array = re.compile(r"\[.*\]")
     pattern_ftrack = re.compile(r".*\[[.]*ftrack[.]*")
@@ -83,12 +84,12 @@ class CreateProjectFolders(BaseAction):
                     "message": "Project structure is not set."
                 }
 
-            # Invoking OpenPype API to create the project folders
+            # Invoking AYON API to create the project folders
             create_project_folders(project_name, basic_paths)
             self.create_ftrack_entities(basic_paths, project_entity)
 
             self.trigger_event(
-                "openpype.project.structure.created",
+                "ayon.project.structure.created",
                 {"project_name": project_name}
             )
 

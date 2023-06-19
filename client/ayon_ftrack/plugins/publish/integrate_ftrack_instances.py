@@ -22,6 +22,7 @@ class IntegrateFtrackInstance(pyblish.api.InstancePlugin):
     order = pyblish.api.IntegratorOrder + 0.48
     label = "Integrate Ftrack Component"
     families = ["ftrack"]
+    settings_category = "ftrack"
 
     metadata_keys_to_label = {
         "openpype_version": "OpenPype version",
@@ -34,28 +35,28 @@ class IntegrateFtrackInstance(pyblish.api.InstancePlugin):
         "codec": "Codec"
     }
 
-    family_mapping = {
-        "camera": "cam",
-        "look": "look",
-        "mayaAscii": "scene",
-        "model": "geo",
-        "rig": "rig",
-        "setdress": "setdress",
-        "pointcache": "cache",
-        "render": "render",
-        "prerender": "render",
-        "render2d": "render",
-        "nukescript": "comp",
-        "write": "render",
-        "review": "mov",
-        "plate": "img",
-        "audio": "audio",
-        "workfile": "scene",
-        "animation": "cache",
-        "image": "img",
-        "reference": "reference"
-    }
-    keep_first_subset_name_for_review = True
+    product_type_mapping = [
+        {"name": "camera", "asset_type": "cam"},
+        {"name": "look", "asset_type": "look"},
+        {"name": "mayaAscii", "asset_type": "scene"},
+        {"name": "model", "asset_type": "geo"},
+        {"name": "rig", "asset_type": "rig"},
+        {"name": "setdress", "asset_type": "setdress"},
+        {"name": "pointcache", "asset_type": "cache"},
+        {"name": "render", "asset_type": "render"},
+        {"name": "prerender", "asset_type": "render"},
+        {"name": "render2d", "asset_type": "render"},
+        {"name": "nukescript", "asset_type": "comp"},
+        {"name": "write", "asset_type": "render"},
+        {"name": "review", "asset_type": "mov"},
+        {"name": "plate", "asset_type": "img"},
+        {"name": "audio", "asset_type": "audio"},
+        {"name": "workfile", "asset_type": "scene"},
+        {"name": "animation", "asset_type": "cache"},
+        {"name": "image", "asset_type": "img"},
+        {"name": "reference", "asset_type": "reference"}
+    ]
+    keep_first_product_name_for_review = True
     upload_reviewable_with_origin_name = False
     asset_versions_status_profiles = []
     additional_metadata_keys = []
@@ -82,7 +83,9 @@ class IntegrateFtrackInstance(pyblish.api.InstancePlugin):
         family_low = family.lower()
         asset_type = instance.data.get("ftrackFamily")
         if not asset_type:
-            for map_family, map_value in self.family_mapping.items():
+            for item in self.product_type_mapping:
+                map_family = item["name"]
+                map_value = item["asset_type"]
                 if map_family.lower() == family_low:
                     asset_type = map_value
                     break
@@ -91,7 +94,8 @@ class IntegrateFtrackInstance(pyblish.api.InstancePlugin):
             asset_type = "upload"
 
         self.log.debug(
-            "Family: {}\nMapping: {}".format(family_low, self.family_mapping)
+            "Family: {}\nMapping: {}".format(
+                family_low, self.product_type_mapping)
         )
         status_name = self._get_asset_version_status_name(instance)
 
@@ -230,7 +234,7 @@ class IntegrateFtrackInstance(pyblish.api.InstancePlugin):
 
             # reset extended if no need for extended asset name
             if (
-                self.keep_first_subset_name_for_review
+                self.keep_first_product_name_for_review
                 and is_first_review_repre
             ):
                 extended_asset_name = ""
@@ -341,7 +345,7 @@ class IntegrateFtrackInstance(pyblish.api.InstancePlugin):
 
             # add extended name if any
             if (
-                not self.keep_first_subset_name_for_review
+                not self.keep_first_product_name_for_review
                 and extended_asset_name
             ):
                 other_item["asset_data"]["name"] = extended_asset_name
@@ -381,8 +385,8 @@ class IntegrateFtrackInstance(pyblish.api.InstancePlugin):
         anatomy_data = instance.data["anatomyData"]
         task_type = anatomy_data.get("task", {}).get("type")
         filtering_criteria = {
-            "families": instance.data["family"],
-            "hosts": instance.context.data["hostName"],
+            "product_types": instance.data["family"],
+            "host_names": instance.context.data["hostName"],
             "task_types": task_type
         }
         matching_profile = filter_profiles(

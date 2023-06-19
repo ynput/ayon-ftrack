@@ -1,6 +1,6 @@
 import collections
 
-from processor.lib import BaseEventHandler
+from ftrack_common import BaseEventHandler
 
 
 class TaskStatusToParent(BaseEventHandler):
@@ -323,10 +323,6 @@ class TaskStatusToParent(BaseEventHandler):
         _all_match = (
             event_settings["parent_status_match_all_task_statuses"]
         )
-        _mod_all_match = {}
-        for item in _all_match:
-            _mod_all_match[item["name"]] = item["value"]
-        _all_match = _mod_all_match
         _single_match = (
             event_settings["parent_status_by_task_status"]
         )
@@ -343,7 +339,9 @@ class TaskStatusToParent(BaseEventHandler):
             for item in _parent_object_types
         ]
         all_match = {}
-        for new_status_name, task_statuses in _all_match.items():
+        for item in _all_match:
+            new_status_name = item["name"]
+            task_statuses = item["value"]
             all_match[new_status_name.lower()] = [
                 status_name.lower()
                 for status_name in task_statuses

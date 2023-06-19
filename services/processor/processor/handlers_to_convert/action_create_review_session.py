@@ -10,7 +10,7 @@ from openpype.settings.lib import (
     get_project_settings,
     get_default_project_settings
 )
-from processor.lib import ServerAction, get_icon_url
+from ftrack_common import ServerAction, get_service_ftrack_icon_url
 
 
 class CreateDailyReviewSessionServerAction(ServerAction):
@@ -30,9 +30,9 @@ class CreateDailyReviewSessionServerAction(ServerAction):
 
     identifier = "create.daily.review.session"
     #: Action label.
-    label = "OpenPype Admin"
+    label = "AYON Admin"
     variant = "- Create Daily Review Session (Server)"
-    icon = get_icon_url("OpenPypeAdmin.svg")
+    icon = get_service_ftrack_icon_url("AYONAdmin.svg")
     #: Action description.
     description = "Manually create daily review session"
     role_list = {"Pypeclub", "Administrator", "Project Manager"}
