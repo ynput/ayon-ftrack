@@ -339,7 +339,7 @@ class TaskStatusToParent(BaseEventHandler):
             for item in _parent_object_types
         ]
         all_match = {}
-        for item in _all_match.items():
+        for item in _all_match:
             new_status_name = item["name"]
             task_statuses = item["value"]
             all_match[new_status_name.lower()] = [
