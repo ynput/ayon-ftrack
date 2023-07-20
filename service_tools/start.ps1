@@ -24,7 +24,7 @@ function defaultfunc {
 
 function install {
   # TODO Install/verify venv is created
-  & pip install -r requirements.txt
+  & python -m pip install -r "$($script_dir)\requirements.txt"
 }
 
 function run_leecher {

@@ -7,7 +7,7 @@ colorama==0.4.6
 ftrack-python-api==2.3.3
 future==0.18.2
 idna==3.4
-ayon-python-api==0.1.16
+ayon-python-api==0.3.2
 pydantic==1.10.2
 pyparsing==2.4.7
 python-dateutil==2.8.2
