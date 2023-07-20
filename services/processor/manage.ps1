@@ -1,6 +1,6 @@
 # Receive first positional argument
 Param([Parameter(Position=0)]$FunctionName)
-$image = "ynput/ayon-ftrack-processor:0.0.1"
+$image = "ynput/ayon-ftrack-processor:0.1.0"
 $current_dir = Get-Location
 $script_dir_rel = Split-Path -Path $MyInvocation.MyCommand.Definition -Parent
 $script_dir = (Get-Item $script_dir_rel).FullName
@@ -37,10 +37,10 @@ function dev {
   & docker run --rm -ti `
     -v "$($current_dir):/service" `
   	--hostname ftrackproc `
-  	--env AY_API_KEY="verysecureapikey" `
-  	--env AY_SERVER_URL="http://localhost:5000" `
-  	--env AY_ADDON_NAME=ftrack `
-  	--env AY_ADDON_VERSION=0.0.1 `
+  	--env AYON_API_KEY="verysecureapikey" `
+  	--env AYON_SERVER_URL="http://localhost:5000" `
+  	--env AYON_ADDON_NAME=ftrack `
+  	--env AYON_ADDON_VERSION=0.1.0 `
   	"$($image)" python -m processor
   & Remove-Item -Recurse -Force "$current_dir/ftrack_common"
 }

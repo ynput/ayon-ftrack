@@ -36,10 +36,10 @@ function run_processor {
 }
 
 function main {
-  $env:AY_ADDON_NAME = "ftrack"
-  $env:AY_ADDON_VERSION = "0.0.1"
-  $env:AY_SERVER_URL = "http://localhost:5000"
-  $env:AY_API_KEY = "verysecureapikey"
+  $env:AYON_ADDON_NAME = "ftrack"
+  $env:AYON_ADDON_VERSION = "0.1.0"
+  $env:AYON_SERVER_URL = "http://localhost:5000"
+  $env:AYON_API_KEY = "verysecureapikey"
 
   & "$($script_dir)\venv\Scripts\activate.ps1"
   if ($FunctionName -eq "install") {

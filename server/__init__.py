@@ -17,8 +17,8 @@ class FtrackAddon(BaseServerAddon):
     version = __version__
     settings_model: Type[FtrackSettings] = FtrackSettings
     services = {
-        "leecher": {"image": "ynput/ayon-ftrack-leecher:0.0.1"},
-        "processor": {"image": "ynput/ayon-ftrack-processor:0.0.1"}
+        "leecher": {"image": "ynput/ayon-ftrack-leecher:0.1.0"},
+        "processor": {"image": "ynput/ayon-ftrack-processor:0.1.0"}
     }
 
     async def get_default_settings(self):
