@@ -11,7 +11,7 @@ from abc import ABCMeta, abstractmethod
 
 import ftrack_api
 
-from ayon_api import get_bundle_settings
+from ayon_api import get_bundle_settings, get_project
 
 
 class BaseHandler(object, metaclass=ABCMeta):
@@ -471,9 +471,12 @@ class BaseHandler(object, metaclass=ABCMeta):
             # TODO Should we somehow find out if ftrack is enabled for the
             #   project?
             # TODO how to find out which bundle should be used?
-            bundle_settings = get_bundle_settings(
-                project_name=project_name
-            )
+            if get_project(project_name):
+                bundle_settings = get_bundle_settings(
+                    project_name=project_name
+                )
+            else:
+                bundle_settings = get_bundle_settings()
             project_settings = {
                 addon_data["name"]: addon_data["settings"]
                 for addon_data in bundle_settings["addons"]
