@@ -210,19 +210,23 @@ def zip_client_side(
     common_dir: str = os.path.join(current_dir, COMMON_DIR_NAME)
     version_filepath: str = os.path.join(current_dir, "version.py")
     addon_subdir_name: str = "ayon_ftrack"
+    addon_subdir_path = os.path.join(client_dir, addon_subdir_name)
 
     zip_filename: str = zip_basename + ".zip"
     zip_filepath: str = os.path.join(os.path.join(private_dir, zip_filename))
     with zipfile.ZipFile(zip_filepath, "w", zipfile.ZIP_DEFLATED) as zipf:
-        for path, sub_path in find_files_in_subdir(client_dir):
-            zipf.write(path, sub_path)
+        for path, sub_path in find_files_in_subdir(addon_subdir_path):
+            dst_path = "/".join((addon_subdir_name, sub_path))
+            zipf.write(path, dst_path)
 
         for path, sub_path in find_files_in_subdir(common_dir):
-            zipf.write(path, "/".join((addon_subdir_name, "common", sub_path)))
+            dst_path = "/".join((addon_subdir_name, "common", sub_path))
+            zipf.write(path, dst_path)
 
         zipf.write(
             version_filepath, os.path.join(addon_subdir_name, "version.py")
         )
+    shutil.copy(os.path.join(client_dir, "pyproject.toml"), private_dir)
 
 
 def main(output_dir: Optional[str] = None):
