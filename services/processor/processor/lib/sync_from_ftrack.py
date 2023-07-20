@@ -79,21 +79,150 @@ class SyncFromFtrack:
 
     @property
     def project_name(self):
+        """Name of project which is synchronized.
+
+        Returns:
+            str: Project name which is synchronized.
+        """
+
         return self._project_name
 
     @property
     def log(self):
+        """Logger object.
+
+        Returns:
+            logging.Logger: Logger object.
+        """
+
         if self._log is None:
             self._log = logging.getLogger(self.__class__.__name__)
         return self._log
 
     @property
     def report_items(self):
+        """Report items shown once finished.
+
+        Returns:
+            list[dict[str, Any]]: List of interface items for ftrack UI.
+        """
+
         return self._report_items
 
-    def sync_to_server(self, preset_name=None):
+    def sync_project_types(self, ft_project, ft_session):
+        """Sync project types from ftrack to AYON.
+
+        Todos:
+            Add statuses sync.
+
+        Args:
+            ft_project (ftrack_api.entity.Entity): Ftrack project entity.
+            ft_session (ftrack_api.Session): Ftrack session.
+
+        Returns:
+            tuple[list, list]: Tuple of object types and task types.
+        """
+
+        self._entity_hub.fill_project_from_server()
+        # Get Folder types and Task types from ftrack
+        ft_object_types = ft_session.query(
+            "select id, name, sort from ObjectType").all()
+        ft_object_types_by_id = {
+            ft_object_type["id"]: ft_object_type
+            for ft_object_type in ft_object_types
+        }
+
+        ft_types = ft_session.query("select id, name, sort from Type").all()
+        ft_types_by_id = {
+            ft_type["id"]: ft_type
+            for ft_type in ft_types
+        }
+
+        # Filter folder and task types for this project based on schema
+        project_schema = ft_project["project_schema"]
+        object_types = {
+            ft_object_types_by_id[object_type["id"]]
+            for object_type in project_schema["object_types"]
+        }
+        task_types = {
+            ft_types_by_id[task_type["id"]]
+            for task_type in project_schema["task_type_schema"]["types"]
+        }
+
+        # Update types on project entity from ftrack
+        self.update_project_types(object_types, task_types)
+        return object_types, task_types
+
+    def project_exists_in_ayon(self):
+        """Does project exists on AYON server by name.
+
+        Returns:
+            bool: Project exists in AYON.
+        """
+
+        # Make sure project exists on server
+        project = get_project(self.project_name)
+        if not project:
+            return False
+        return True
+
+    def create_project(self, preset_name, attributes):
+        """Create project on AYON server.
+
+        Args:
+            preset_name (str): Name of anatomy preset that will be used.
+            attributes (dict[str, Any]): Attributes for project creation.
+        """
+
+        project_name = self.project_name
+        if self.project_exists_in_ayon():
+            return
+
+        ft_session = self._ft_session
+        ft_project = _get_ftrack_project(ft_session, project_name)
+        self.log.info(f"Creating project \"{project_name}\" on server")
+        project_code = ft_project["name"]
+        create_project(
+            project_name,
+            project_code,
+            preset_name=preset_name
+        )
+        self.log.info(f"Project \"{project_name}\" created on server")
+
+        self.sync_project_types(ft_project, ft_session)
+        project_entity = self._entity_hub.project_entity
+        for key, value in attributes.items():
+            project_entity.attribs[key] = value
+        self._entity_hub.commit_changes()
+
+    def sync_to_server(self):
+        """Sync project with hierarchy from ftrack to AYON server."""
+
         t_start = time.perf_counter()
         project_name = self.project_name
+        # Make sure project exists on server
+        if not self.project_exists_in_ayon():
+            self.log.info(
+                f"Project \"{project_name}\" does not exist on server."
+                " Skipping project synchronization."
+            )
+            self._report_items.extend([
+                {
+                    "type": "label",
+                    "value": "## Project does not exist in AYON"
+                },
+                {
+                    "type": "label",
+                    "value": (
+                        "Synchronization was skipped."
+                        "<br/>Run Prepare Project action or create the"
+                        " project manually on server and then run the"
+                        " action again."
+                    )
+                }
+            ])
+            return
+
         ft_session = self._ft_session
 
         self.log.info(f"Synchronization of project \"{project_name}\" started")
@@ -139,13 +268,11 @@ class SyncFromFtrack:
 
         # Query ftrack project
         ft_project = _get_ftrack_project(ft_session, project_name)
-        # Make sure project exists on server
-        self.make_sure_project_exists(ft_project, preset_name)
+
         t_project_existence_1 = time.perf_counter()
         self.log.debug(
-            f"Project existence check took {t_project_existence_1 - t_start}"
+            f"Initial preparation took {t_project_existence_1 - t_start}"
         )
-
         self.log.debug("Loading entities from server")
         # Query entities from server (project, folders and tasks)
         self._entity_hub.query_entities_from_server()
@@ -160,34 +287,9 @@ class SyncFromFtrack:
 
         self.log.info("Querying necessary data from ftrack")
 
-        # Get Folder types and Task types from ftrack
-        ft_object_types = ft_session.query(
-            "select id, name, sort from ObjectType").all()
-        ft_object_types_by_id = {
-            ft_object_type["id"]: ft_object_type
-            for ft_object_type in ft_object_types
-        }
-
-        ft_types = ft_session.query("select id, name, sort from Type").all()
-        ft_types_by_id = {
-            ft_type["id"]: ft_type
-            for ft_type in ft_types
-        }
-
-        # Filter folder and task types for this project based on schema
-        project_schema = ft_project["project_schema"]
-        object_types = {
-            ft_object_types_by_id[object_type["id"]]
-            for object_type in project_schema["object_types"]
-        }
-        task_types = {
-            ft_types_by_id[task_type["id"]]
-            for task_type in project_schema["task_type_schema"]["types"]
-        }
-
-        # Update types on project entity from ftrack
-        self.update_project_types(object_types, task_types)
-
+        object_types, task_types = self.sync_project_types(
+            ft_project, ft_session
+        )
         ft_object_type_name_by_id = {
             object_type["id"]: object_type["name"]
             for object_type in object_types
@@ -262,19 +364,6 @@ class SyncFromFtrack:
             f"Synchronization of project \"{project_name}\" finished"
             f" in {t_end-t_start}"
         ))
-
-    def make_sure_project_exists(self, ft_project, preset_name=None):
-        project_name = ft_project["full_name"]
-        # Make sure project exists on server
-        project = get_project(project_name)
-        if not project:
-            self.log.info(f"Creating project \"{project_name}\" on server")
-            project_code = ft_project["name"]
-            create_project(
-                project_name,
-                project_code,
-                preset_name=preset_name
-            )
 
     def update_project_types(self, object_types, task_types):
         project_entity = self._entity_hub.project_entity
