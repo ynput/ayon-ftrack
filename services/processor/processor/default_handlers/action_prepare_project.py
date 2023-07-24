@@ -373,6 +373,30 @@ class PrepareProjectServer(ServerAction):
         syncer.create_project(anatomy_preset, attributes)
         self._set_ftrack_attributes(session, project_entity)
 
+        if event_values["sync_project"]:
+            event_data = {
+                "actionIdentifier": "sync.to.avalon.server",
+                "selection": [{
+                    "entityId": project_entity["id"],
+                    "entityType": "show"
+                }]
+            }
+            user = session.query(
+                "User where username is \"{}\"".format(session.api_user)
+            ).one()
+            user_data = {
+                "username": user["username"],
+                "id": user["id"]
+            }
+            self.trigger_event(
+                "ftrack.action.launch",
+                event_data=event_data,
+                session=session,
+                source=user_data,
+                event=event,
+                on_error="ignore"
+            )
+
         report_items = syncer.report_items
         if report_items:
             self.show_interface(
