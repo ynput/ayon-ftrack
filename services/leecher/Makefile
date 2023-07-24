@@ -1,4 +1,4 @@
-image := ynput/ayon-ftrack-leecher:0.0.1
+image := ynput/ayon-ftrack-leecher:0.1.0
 
 build:
 	docker build -t $(image)  . 
@@ -9,8 +9,8 @@ clean:
 dev:
 	docker run --rm -ti \
 		-v $(CURDIR):/service \
-		--env AY_API_KEY=verysecureapikey \
-		--env AY_SERVER_URL="http://172.18.0.1:5000" \
-		--env AY_ADDON_NAME=ftrack \
-		--env AY_ADDON_VERSION=1.0.0 \
+		--env AYON_API_KEY=verysecureapikey \
+		--env AYON_SERVER_URL="http://172.18.0.1:5000" \
+		--env AYON_ADDON_NAME=ftrack \
+		--env AYON_ADDON_VERSION=0.1.0 \
 		$(image) python -m leecher

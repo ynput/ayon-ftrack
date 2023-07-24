@@ -9,20 +9,12 @@ import time
 import logging
 from abc import ABCMeta, abstractmethod
 
-import six
 import ftrack_api
 
-# Exception is not available in ayon api at the time of creating this
-try:
-    from ayon_api.exceptions import HTTPRequestError
-except ImportError:
-    from requests.exceptions import HTTPError as HTTPRequestError
-
-from ayon_api import get_addons_project_settings, get_addons_studio_settings
+from ayon_api import get_bundle_settings, get_project
 
 
-@six.add_metaclass(ABCMeta)
-class BaseHandler(object):
+class BaseHandler(object, metaclass=ABCMeta):
     """Base class for handling ftrack events.
 
     Attributes:
@@ -362,7 +354,6 @@ class BaseHandler(object):
             if user_data is None:
                 user_data = event.get("source", {}).get("user")
 
-
         # Without selection and user data skip triggering
         msg = "Can't trigger \"{}\" action without {}."
         if selection is None:
@@ -479,10 +470,17 @@ class BaseHandler(object):
             #   does not exist on AYON server.
             # TODO Should we somehow find out if ftrack is enabled for the
             #   project?
-            try:
-                project_settings = get_addons_project_settings(project_name)
-            except HTTPRequestError:
-                project_settings = get_addons_studio_settings()
+            # TODO how to find out which bundle should be used?
+            if get_project(project_name):
+                bundle_settings = get_bundle_settings(
+                    project_name=project_name
+                )
+            else:
+                bundle_settings = get_bundle_settings()
+            project_settings = {
+                addon_data["name"]: addon_data["settings"]
+                for addon_data in bundle_settings["addons"]
+            }
             event["data"]["project_settings"][project_name] = project_settings
         return project_settings
 
@@ -530,11 +528,10 @@ class BaseHandler(object):
         job["status"] = job_status
 
         # Create temp file where traceback will be stored
-        temp_obj = tempfile.NamedTemporaryFile(
+        with tempfile.NamedTemporaryFile(
             mode="w", prefix="ayon_ftrack_", suffix=".txt", delete=False
-        )
-        temp_obj.close()
-        temp_filepath = temp_obj.name
+        ) as temp_obj:
+            temp_filepath = temp_obj.name
 
         # Store traceback to file
         result = traceback.format_exception(*exc_info)
