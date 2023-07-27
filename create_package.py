@@ -22,17 +22,19 @@ client side code zipped in `private` subfolder.
 import os
 import sys
 import re
+import json
 import shutil
 import argparse
+import platform
 import logging
 import collections
 import zipfile
-from typing import Optional, Any
+from typing import Optional, Any, Pattern
 
 COMMON_DIR_NAME: str = "ftrack_common"
 
 # Patterns of directories to be skipped for server part of addon
-IGNORE_DIR_PATTERNS: list[re.Pattern] = [
+IGNORE_DIR_PATTERNS: list[Pattern] = [
     re.compile(pattern)
     for pattern in {
         # Skip directories starting with '.'
@@ -43,7 +45,7 @@ IGNORE_DIR_PATTERNS: list[re.Pattern] = [
 ]
 
 # Patterns of files to be skipped for server part of addon
-IGNORE_FILE_PATTERNS: list[re.Pattern] = [
+IGNORE_FILE_PATTERNS: list[Pattern] = [
     re.compile(pattern)
     for pattern in {
         # Skip files starting with '.'
@@ -53,6 +55,29 @@ IGNORE_FILE_PATTERNS: list[re.Pattern] = [
         r"\.pyc$"
     }
 ]
+
+
+class ZipFileLongPaths(zipfile.ZipFile):
+    """Allows longer paths in zip files.
+
+    Regular DOS paths are limited to MAX_PATH (260) characters, including
+    the string's terminating NUL character.
+    That limit can be exceeded by using an extended-length path that
+    starts with the '\\?\' prefix.
+    """
+    _is_windows = platform.system().lower() == "windows"
+
+    def _extract_member(self, member, tpath, pwd):
+        if self._is_windows:
+            tpath = os.path.abspath(tpath)
+            if tpath.startswith("\\\\"):
+                tpath = "\\\\?\\UNC\\" + tpath[2:]
+            else:
+                tpath = "\\\\?\\" + tpath
+
+        return super(ZipFileLongPaths, self)._extract_member(
+            member, tpath, pwd
+        )
 
 
 def safe_copy_file(src_path: str, dst_path: str):
@@ -77,7 +102,7 @@ def safe_copy_file(src_path: str, dst_path: str):
     shutil.copy2(src_path, dst_path)
 
 
-def _value_match_regexes(value: str, regexes: list[re.Pattern]) -> bool:
+def _value_match_regexes(value: str, regexes: list[Pattern]) -> bool:
     for regex in regexes:
         if regex.search(value):
             return True
@@ -86,14 +111,14 @@ def _value_match_regexes(value: str, regexes: list[re.Pattern]) -> bool:
 
 def find_files_in_subdir(
     src_path: str,
-    ignore_file_patterns: Optional[list[re.Pattern]] = None,
-    ignore_dir_patterns: Optional[list[re.Pattern]] = None
+    ignore_file_patterns: Optional[list[Pattern]] = None,
+    ignore_dir_patterns: Optional[list[Pattern]] = None
 ) -> list[tuple[str, str]]:
     if ignore_file_patterns is None:
-        ignore_file_patterns: list[re.Pattern] = IGNORE_FILE_PATTERNS
+        ignore_file_patterns: list[Pattern] = IGNORE_FILE_PATTERNS
 
     if ignore_dir_patterns is None:
-        ignore_dir_patterns: list[re.Pattern] = IGNORE_DIR_PATTERNS
+        ignore_dir_patterns: list[Pattern] = IGNORE_DIR_PATTERNS
     output: list[tuple[str, str]] = []
 
     hierarchy_queue: collections.deque[tuple[str, list[str]]] = (
@@ -214,7 +239,7 @@ def zip_client_side(
 
     zip_filename: str = zip_basename + ".zip"
     zip_filepath: str = os.path.join(os.path.join(private_dir, zip_filename))
-    with zipfile.ZipFile(zip_filepath, "w", zipfile.ZIP_DEFLATED) as zipf:
+    with ZipFileLongPaths(zip_filepath, "w", zipfile.ZIP_DEFLATED) as zipf:
         for path, sub_path in find_files_in_subdir(addon_subdir_path):
             dst_path = "/".join((addon_subdir_name, sub_path))
             zipf.write(path, dst_path)
@@ -229,7 +254,59 @@ def zip_client_side(
     shutil.copy(os.path.join(client_dir, "pyproject.toml"), private_dir)
 
 
-def main(output_dir: Optional[str] = None):
+def create_server_package(
+    output_dir: str,
+    addon_output_dir: str,
+    addon_version: str,
+    log: logging.Logger
+):
+    """Create server package zip file.
+
+    The zip file can be installed to a server using UI or rest api endpoints.
+
+    Args:
+        output_dir (str): Directory path to output zip file.
+        addon_output_dir (str): Directory path to addon output directory.
+        addon_version (str): Version of addon.
+        log (logging.Logger): Logger object.
+    """
+
+    log.info("Creating server package")
+    output_path = os.path.join(
+        output_dir, f"ftrack-{addon_version}.zip"
+    )
+    manifest_data: dict[str, str] = {
+        "addon_name": "ftrack",
+        "addon_version": addon_version
+    }
+    with ZipFileLongPaths(output_path, "w", zipfile.ZIP_DEFLATED) as zipf:
+        # Write a manifest to zip
+        zipf.writestr("manifest.json", json.dumps(manifest_data, indent=4))
+
+        # Move addon content to zip into 'addon' directory
+        addon_output_dir_offset = len(addon_output_dir) + 1
+        for root, _, filenames in os.walk(addon_output_dir):
+            if not filenames:
+                continue
+
+            dst_root = "addon"
+            if root != addon_output_dir_offset:
+                dst_root = os.path.join(
+                    dst_root, root[addon_output_dir_offset:]
+                )
+            for filename in filenames:
+                src_path = os.path.join(root, filename)
+                dst_path = os.path.join(dst_root, filename)
+                zipf.write(src_path, dst_path)
+
+    log.info(f"Output package can be found: {output_path}")
+
+
+def main(
+    output_dir: Optional[str]=None,
+    skip_zip: Optional[bool]=False,
+    keep_sources: Optional[bool]=False
+):
     addon_name: str = "ftrack"
     log: logging.Logger = logging.getLogger("create_package")
     log.info("Start creating package")
@@ -244,16 +321,13 @@ def main(output_dir: Optional[str] = None):
         exec(stream.read(), version_content)
     addon_version: str = version_content["__version__"]
 
-    new_created_version_dir: str = os.path.join(
-        output_dir, addon_name, addon_version
-    )
-    if os.path.isdir(new_created_version_dir):
-        log.info(f"Purging {new_created_version_dir}")
-        shutil.rmtree(output_dir)
+    addon_output_root: str = os.path.join(output_dir, addon_name)
+    if os.path.isdir(addon_output_root):
+        log.info(f"Purging {addon_output_root}")
+        shutil.rmtree(addon_output_root)
 
     log.info(f"Preparing package for {addon_name}-{addon_version}")
-
-    addon_output_dir: str = os.path.join(output_dir, addon_name, addon_version)
+    addon_output_dir: str = os.path.join(addon_output_root, addon_version)
     if not os.path.exists(addon_output_dir):
         os.makedirs(addon_output_dir)
 
@@ -261,16 +335,47 @@ def main(output_dir: Optional[str] = None):
 
     zip_client_side(addon_output_dir, current_dir, log)
 
+    # Skip server zipping
+    if not skip_zip:
+        create_server_package(
+            output_dir, addon_output_dir, addon_version, log
+        )
+        # Remove sources only if zip file is created
+        if not keep_sources:
+            log.info("Removing source files for server package")
+            shutil.rmtree(addon_output_root)
+    log.info("Package creation finished")
+
 
 if __name__ == "__main__":
-    parser: argparse.ArgumentParser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--output_dir",
+        "--skip-zip",
+        dest="skip_zip",
+        action="store_true",
+        help=(
+            "Directory path where package will be created"
+            " (Will be purged if already exists!)"
+        )
+    )
+    parser.add_argument(
+        "--keep-sources",
+        dest="keep_sources",
+        action="store_true",
+        help=(
+            "Directory path where package will be created"
+            " (Will be purged if already exists!)"
+        )
+    )
+    parser.add_argument(
+        "-o", "--output",
+        dest="output_dir",
+        default=None,
         help=(
             "Directory path where package will be created"
             " (Will be purged if already exists!)"
         )
     )
 
-    args: argparse.Namespace = parser.parse_args(sys.argv[1:])
-    main(args.output_dir)
+    args = parser.parse_args(sys.argv[1:])
+    main(args.output_dir, args.skip_zip, args.keep_sources)

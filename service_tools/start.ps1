@@ -42,18 +42,21 @@ function main {
   $env:AYON_API_KEY = "verysecureapikey"
 
   & "$($script_dir)\venv\Scripts\activate.ps1"
-  if ($FunctionName -eq "install") {
-    install
-  } elseif ($FunctionName -eq "leecher") {
-    run_leecher
-  } elseif ($FunctionName -eq "processor") {
-    run_processor
-  } elseif ($FunctionName -eq $null) {
-    defaultfunc
-  } else {
-    Write-Host "Unknown function ""$FunctionName"""
+  try {
+    if ($FunctionName -eq "install") {
+      install
+    } elseif ($FunctionName -eq "leecher") {
+      run_leecher
+    } elseif ($FunctionName -eq "processor") {
+      run_processor
+    } elseif ($FunctionName -eq $null) {
+      defaultfunc
+    } else {
+      Write-Host "Unknown function ""$FunctionName"""
+    }
+  } finally {
+    & deactivate
   }
-  & deactivate
 }
 
 main
