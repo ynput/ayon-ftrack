@@ -32,6 +32,8 @@ import zipfile
 from typing import Optional, Any, Pattern
 
 COMMON_DIR_NAME: str = "ftrack_common"
+ADDON_NAME: str = "ftrack"
+ADDON_CLIENT_DIR: str = "ayon_ftrack"
 
 # Patterns of directories to be skipped for server part of addon
 IGNORE_DIR_PATTERNS: list[Pattern] = [
@@ -234,22 +236,21 @@ def zip_client_side(
 
     common_dir: str = os.path.join(current_dir, COMMON_DIR_NAME)
     version_filepath: str = os.path.join(current_dir, "version.py")
-    addon_subdir_name: str = "ayon_ftrack"
-    addon_subdir_path = os.path.join(client_dir, addon_subdir_name)
+    addon_subdir_path = os.path.join(client_dir, ADDON_CLIENT_DIR)
 
     zip_filename: str = zip_basename + ".zip"
     zip_filepath: str = os.path.join(os.path.join(private_dir, zip_filename))
     with ZipFileLongPaths(zip_filepath, "w", zipfile.ZIP_DEFLATED) as zipf:
         for path, sub_path in find_files_in_subdir(addon_subdir_path):
-            dst_path = "/".join((addon_subdir_name, sub_path))
+            dst_path = "/".join((ADDON_CLIENT_DIR, sub_path))
             zipf.write(path, dst_path)
 
         for path, sub_path in find_files_in_subdir(common_dir):
-            dst_path = "/".join((addon_subdir_name, "common", sub_path))
+            dst_path = "/".join((ADDON_CLIENT_DIR, "common", sub_path))
             zipf.write(path, dst_path)
 
         zipf.write(
-            version_filepath, os.path.join(addon_subdir_name, "version.py")
+            version_filepath, os.path.join(ADDON_CLIENT_DIR, "version.py")
         )
     shutil.copy(os.path.join(client_dir, "pyproject.toml"), private_dir)
 
@@ -273,10 +274,10 @@ def create_server_package(
 
     log.info("Creating server package")
     output_path = os.path.join(
-        output_dir, f"ftrack-{addon_version}.zip"
+        output_dir, f"{ADDON_NAME}-{addon_version}.zip"
     )
     manifest_data: dict[str, str] = {
-        "addon_name": "ftrack",
+        "addon_name": ADDON_NAME,
         "addon_version": addon_version
     }
     with ZipFileLongPaths(output_path, "w", zipfile.ZIP_DEFLATED) as zipf:
@@ -290,7 +291,7 @@ def create_server_package(
                 continue
 
             dst_root = "addon"
-            if root != addon_output_dir_offset:
+            if root != addon_output_dir:
                 dst_root = os.path.join(
                     dst_root, root[addon_output_dir_offset:]
                 )
@@ -307,7 +308,6 @@ def main(
     skip_zip: Optional[bool]=False,
     keep_sources: Optional[bool]=False
 ):
-    addon_name: str = "ftrack"
     log: logging.Logger = logging.getLogger("create_package")
     log.info("Start creating package")
 
@@ -321,12 +321,12 @@ def main(
         exec(stream.read(), version_content)
     addon_version: str = version_content["__version__"]
 
-    addon_output_root: str = os.path.join(output_dir, addon_name)
+    addon_output_root: str = os.path.join(output_dir, ADDON_NAME)
     if os.path.isdir(addon_output_root):
         log.info(f"Purging {addon_output_root}")
         shutil.rmtree(addon_output_root)
 
-    log.info(f"Preparing package for {addon_name}-{addon_version}")
+    log.info(f"Preparing package for {ADDON_NAME}-{addon_version}")
     addon_output_dir: str = os.path.join(addon_output_root, addon_version)
     if not os.path.exists(addon_output_dir):
         os.makedirs(addon_output_dir)
@@ -354,8 +354,8 @@ if __name__ == "__main__":
         dest="skip_zip",
         action="store_true",
         help=(
-            "Directory path where package will be created"
-            " (Will be purged if already exists!)"
+            "Skip zipping server package and create only"
+            " server folder structure."
         )
     )
     parser.add_argument(
@@ -363,8 +363,7 @@ if __name__ == "__main__":
         dest="keep_sources",
         action="store_true",
         help=(
-            "Directory path where package will be created"
-            " (Will be purged if already exists!)"
+            "Keep folder structure when server package is created."
         )
     )
     parser.add_argument(
