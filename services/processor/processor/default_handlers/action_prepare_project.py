@@ -1,15 +1,17 @@
 import collections
 import uuid
 import json
+import copy
 
 import ayon_api
 import ftrack_api
 
 from ftrack_common import (
-    ServerAction,
-    get_service_ftrack_icon_url,
+    CUST_ATTR_AUTO_SYNC,
     FTRACK_ID_ATTRIB,
     FTRACK_PATH_ATTRIB,
+    ServerAction,
+    get_service_ftrack_icon_url,
     get_ayon_attr_configs,
     query_custom_attribute_values,
 )
@@ -90,77 +92,91 @@ class PrepareProjectServer(ServerAction):
         })
         return output
 
-    def interface(self, session, entities, event):
-        event_values = event["data"].get("values")
+    def _get_autosync_value(self, session, project_entity):
+        custom_attrs, _ = get_ayon_attr_configs(session)
+        auto_sync_attr = None
+        for attr in custom_attrs:
+            if (
+                attr["entity_type"] == "show"
+                and attr["key"] == CUST_ATTR_AUTO_SYNC
+            ):
+                auto_sync_attr = attr
+                break
 
-        project_entity = entities[0]
-        project_name = project_entity["full_name"]
-        syncer = SyncFromFtrack(session, project_name, self.log)
-        if syncer.project_exists_in_ayon():
-            return {
-                "message": "Project already exists in Ayon.",
-                "success": True
+        if auto_sync_attr is None:
+            return None
+
+        project_id = project_entity["id"]
+        attr_id = auto_sync_attr["id"]
+        value_items = query_custom_attribute_values(
+            session, [attr_id], [project_id]
+        )
+        for item in value_items:
+            value = item["value"]
+            if value is not None:
+                return value
+        return True
+
+    def _first_interface(self, session, project_entity):
+        # Inform user that this may take a while
+        self.log.debug("Preparing data which will be shown")
+
+        primary_preset = self.default_preset_name
+        anatomy_presets = [
+            {"label": "Default", "value": self.default_preset_name}
+        ]
+        for anatomy_preset in ayon_api.get_project_anatomy_presets():
+            name = anatomy_preset["name"]
+            anatomy_presets.append({"label": name, "value": name})
+            if anatomy_preset["primary"]:
+                primary_preset = name
+
+        ayon_autosync_value = self._get_autosync_value(
+            session, project_entity)
+        items = [
+            {
+                "type": "hidden",
+                "name": "in_attribute_set",
+                "value": False
+            },
+            {
+                "type": "label",
+                "value": "### Choose Anatomy Preset"
+            },
+            {
+                "label": "Anatomy Preset",
+                "type": "enumerator",
+                "name": "anatomy_preset",
+                "data": anatomy_presets,
+                "value": primary_preset
+            },
+            {
+                "label": "Modify attributes",
+                "type": "boolean",
+                "name": "modify_attributes",
+                "value": False
             }
+        ]
+        if ayon_autosync_value is not None:
+            items.append({
+                "label": "Enable auto-sync",
+                "type": "boolean",
+                "name": "auto_sync_project",
+                "value": ayon_autosync_value
+            })
+        items.append({
+            "label": "Sync project",
+            "type": "boolean",
+            "name": "sync_project",
+            "value": True
+        })
+        return {
+            "title": "Choose Anatomy Preset",
+            "submit_button_label": "Prepare project",
+            "items": items
+        }
 
-        self.show_message(event, "Preparing data... Please wait", True)
-        if not event_values:
-            # Inform user that this may take a while
-            self.log.debug("Preparing data which will be shown")
-
-            primary_preset = self.default_preset_name
-            anatomy_presets = [
-                {"label": "Default", "value": self.default_preset_name}
-            ]
-            for anatomy_preset in ayon_api.get_project_anatomy_presets():
-                name = anatomy_preset["name"]
-                anatomy_presets.append({"label": name, "value": name})
-                if anatomy_preset["primary"]:
-                    primary_preset = name
-
-            return {
-                "title": "Choose Anatomy Preset",
-                "submit_button_label": "Prepare project",
-                "items": [
-                    {
-                        "type": "hidden",
-                        "name": "in_attribute_set",
-                        "value": False
-                    },
-                    {
-                        "type": "label",
-                        "value": "### Choose Anatomy Preset"
-                    },
-                    {
-                        "label": "Anatomy Preset",
-                        "type": "enumerator",
-                        "name": "anatomy_preset",
-                        "data": anatomy_presets,
-                        "value": primary_preset
-                    },
-                    {
-                        "label": "Modify attributes",
-                        "type": "boolean",
-                        "name": "modify_attributes",
-                        "value": False
-                    },
-                    {
-                        "label": "Sync project",
-                        "type": "boolean",
-                        "name": "sync_project",
-                        "value": True
-                    }
-                ]
-            }
-
-        # Exit interface once attributes are confirmed
-        if event_values["in_attribute_set"]:
-            return
-
-        # User did not want to modify default attributes
-        modify_attributes = event_values["modify_attributes"]
-        if not event_values["modify_attributes"]:
-            return
-
+    def _attributes_interface(self, event_values):
         anatomy_preset = event_values["anatomy_preset"]
         attribute_items = [
             {
@@ -180,8 +196,13 @@ class PrepareProjectServer(ServerAction):
             },
             {
                 "type": "hidden",
+                "name": "auto_sync_project",
+                "value": event_values["auto_sync_project"]
+            },
+            {
+                "type": "hidden",
                 "name": "modify_attributes",
-                "value": modify_attributes
+                "value": event_values["modify_attributes"]
             },
             {
                 "type": "label",
@@ -264,8 +285,31 @@ class PrepareProjectServer(ServerAction):
             "items": attribute_items
         }
 
-    def _set_ftrack_attributes(self, session, project_entity):
-        ayon_project = ayon_api.get_project(project_entity["full_name"])
+    def interface(self, session, entities, event):
+        event_values = event["data"].get("values")
+
+        project_entity = entities[0]
+        project_name = project_entity["full_name"]
+        syncer = SyncFromFtrack(session, project_name, self.log)
+        if syncer.project_exists_in_ayon():
+            return {
+                "message": "Project already exists in Ayon.",
+                "success": True
+            }
+
+        self.show_message(event, "Preparing data... Please wait", True)
+        if not event_values:
+            return self._first_interface(session, project_entity)
+
+        # Exit interface once attributes are confirmed
+        if event_values["in_attribute_set"]:
+            return
+
+        # User did not want to modify default attributes
+        if event_values["modify_attributes"]:
+            return self._attributes_interface(event_values)
+
+    def _set_ftrack_attributes(self, session, project_entity, values):
         custom_attrs, hier_custom_attrs = get_ayon_attr_configs(session)
         project_attrs = [
             attr
@@ -295,7 +339,7 @@ class PrepareProjectServer(ServerAction):
             attr_id = value_item["configuration_id"]
             values_by_attr_id[attr_id] = value
 
-        for attr_name, attr_value in ayon_project["attrib"].items():
+        for attr_name, attr_value in values.items():
             attrs = [
                 attrs_by_name.get(attr_name),
                 hier_attrs_by_name.get(attr_name)
@@ -371,9 +415,14 @@ class PrepareProjectServer(ServerAction):
         if anatomy_preset == self.default_preset_name:
             anatomy_preset = None
         syncer.create_project(anatomy_preset, attributes)
-        self._set_ftrack_attributes(session, project_entity)
 
-        if event_values["sync_project"]:
+        ayon_project = ayon_api.get_project(project_entity["full_name"])
+        values = copy.deepcopy(ayon_project["attrib"])
+        auto_sync_project = event_values["auto_sync_project"]
+        values[CUST_ATTR_AUTO_SYNC] = auto_sync_project
+        self._set_ftrack_attributes(session, project_entity, values)
+
+        if not auto_sync_project and event_values["sync_project"]:
             event_data = {
                 "actionIdentifier": "sync.to.avalon.server",
                 "selection": [{
