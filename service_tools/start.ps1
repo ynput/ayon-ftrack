@@ -5,6 +5,8 @@ $current_dir = Get-Location
 $script_dir_rel = Split-Path -Path $MyInvocation.MyCommand.Definition -Parent
 $script_dir = (Get-Item $script_dir_rel).FullName
 
+$ADDON_VERSION = Invoke-Expression -Command "python -c ""import os;import sys;content={};f=open(r'$($script_dir)/../version.py');exec(f.read(),content);f.close();print(content['__version__'])"""
+
 function defaultfunc {
   Write-Host ""
   Write-Host "*************************"
@@ -37,7 +39,7 @@ function run_processor {
 
 function main {
   $env:AYON_ADDON_NAME = "ftrack"
-  $env:AYON_ADDON_VERSION = "0.1.0"
+  $env:AYON_ADDON_VERSION = $ADDON_VERSION
   $env:AYON_SERVER_URL = "http://localhost:5000"
   $env:AYON_API_KEY = "verysecureapikey"
 
