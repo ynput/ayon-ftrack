@@ -13,7 +13,6 @@ CUST_ATTR_GROUP = "ayon"
 
 # Project custom attribute which define if project should be auto-synced
 CUST_ATTR_AUTO_SYNC = "auto_sync_enabled"
-CUST_ATTR_AUTO_SYNC = "avalon_auto_sync" # TODO remove this line
 
 FPS_KEYS = {
     "fps",
