@@ -163,16 +163,7 @@ def copy_server_content(
     log.info("Copying server content")
 
     server_dir: str = os.path.join(current_dir, "server")
-    services_dir: str = os.path.join(current_dir, "services")
     common_dir: str = os.path.join(current_dir, COMMON_DIR_NAME)
-
-    # Copy ftrack common to 'processor' service
-    dst_processor_dir: str = os.path.join(
-        addon_output_dir,
-        "services",
-        "processor",
-        COMMON_DIR_NAME
-    )
 
     filepaths_to_copy: list[tuple[str, str]] = [
         (
@@ -189,16 +180,6 @@ def copy_server_content(
     for path, sub_path in find_files_in_subdir(server_dir):
         filepaths_to_copy.append(
             (path, os.path.join(addon_output_dir, sub_path))
-        )
-
-    for path, sub_path in find_files_in_subdir(services_dir):
-        filepaths_to_copy.append(
-            (path, os.path.join(addon_output_dir, "services", sub_path))
-        )
-
-    for path, sub_path in find_files_in_subdir(common_dir):
-        filepaths_to_copy.append(
-            (path, os.path.join(dst_processor_dir, sub_path))
         )
 
     # Copy files
