@@ -1,8 +1,8 @@
 import os
 
 import ftrack_api
-from ayon_api import get_addons_project_settings
 
+from openpype.settings import get_project_settings
 from openpype.lib import PostLaunchHook
 
 
@@ -102,7 +102,7 @@ class PostFtrackHook(PostLaunchHook):
         return filtered_entities[0]
 
     def ftrack_status_change(self, session, entity, project_name):
-        project_settings = get_addons_project_settings(project_name)
+        project_settings = get_project_settings(project_name)
         status_update = (
             project_settings
             ["ftrack"]

@@ -1173,8 +1173,11 @@ class SyncProcess:
         cust_attr_config = json.loads(cust_attr_conf["config"])
 
         if cust_attr_type_name == "number":
+            # Always convert to float ('1001.0' -> 1001.0) first
+            #   - int('1001.0') -> is crashing
+            value = float(value)
             if cust_attr_config["isdecimal"]:
-                return float(value)
+                return value
             return int(value)
 
         if cust_attr_type_name == "enumerator":

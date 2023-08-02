@@ -5,6 +5,8 @@ $current_dir = Get-Location
 $script_dir_rel = Split-Path -Path $MyInvocation.MyCommand.Definition -Parent
 $script_dir = (Get-Item $script_dir_rel).FullName
 
+$ADDON_VERSION = Invoke-Expression -Command "python -c ""import os;import sys;content={};f=open(r'$($script_dir)/../version.py');exec(f.read(),content);f.close();print(content['__version__'])"""
+
 function defaultfunc {
   Write-Host ""
   Write-Host "*************************"
@@ -20,11 +22,12 @@ function defaultfunc {
   Write-Host "  install    Install requirements to currently actie python (recommended to create venv)"
   Write-Host "  leecher    Start leecher of ftrack events"
   Write-Host "  processor  Main processing logic"
+  Write-Host ""
 }
 
 function install {
   # TODO Install/verify venv is created
-  & pip install -r requirements.txt
+  & python -m pip install -r "$($script_dir)\requirements.txt"
 }
 
 function run_leecher {
@@ -36,24 +39,27 @@ function run_processor {
 }
 
 function main {
-  $env:AY_ADDON_NAME = "ftrack"
-  $env:AY_ADDON_VERSION = "0.0.1"
-  $env:AY_SERVER_URL = "http://localhost:5000"
-  $env:AY_API_KEY = "verysecureapikey"
+  $env:AYON_ADDON_NAME = "ftrack"
+  $env:AYON_ADDON_VERSION = $ADDON_VERSION
+  $env:AYON_SERVER_URL = "http://localhost:5000"
+  $env:AYON_API_KEY = "verysecureapikey"
 
   & "$($script_dir)\venv\Scripts\activate.ps1"
-  if ($FunctionName -eq "install") {
-    install
-  } elseif ($FunctionName -eq "leecher") {
-    run_leecher
-  } elseif ($FunctionName -eq "processor") {
-    run_processor
-  } elseif ($FunctionName -eq $null) {
-    defaultfunc
-  } else {
-    Write-Host "Unknown function ""$FunctionName"""
+  try {
+    if ($FunctionName -eq "install") {
+      install
+    } elseif ($FunctionName -eq "leecher") {
+      run_leecher
+    } elseif ($FunctionName -eq "processor") {
+      run_processor
+    } elseif ($FunctionName -eq $null) {
+      defaultfunc
+    } else {
+      Write-Host "Unknown function ""$FunctionName"""
+    }
+  } finally {
+    & deactivate
   }
-  & deactivate
 }
 
 main

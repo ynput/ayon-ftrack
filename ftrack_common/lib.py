@@ -237,6 +237,6 @@ def get_service_ftrack_icon_url(
 
     return get_ftrack_icon_url(
         icon_name,
-        addon_version=addon_version or get_service_addon_name(),
-        addon_name=addon_name or get_service_addon_version()
+        addon_version=addon_version or get_service_addon_version(),
+        addon_name=addon_name or get_service_addon_name()
     )

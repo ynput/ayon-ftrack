@@ -47,6 +47,18 @@ def listen_loop(session, callback):
     session.event_hub.wait()
 
 
+def get_secrets():
+    """Backwards compatibility for older ayon api versions.
+
+    Returns:
+        list[dict[str, str]]: List of secrets from server.
+    """
+
+    if hasattr(ayon_api, "get_secrets"):
+        return ayon_api.get_secrets()
+    return ayon_api.get("secrets").data
+
+
 def main(func: Union[Callable, None] = None):
     logging.basicConfig()
     log.setLevel(logging.DEBUG)
@@ -58,11 +70,23 @@ def main(func: Union[Callable, None] = None):
     ayon_api.init_service()
     settings = ayon_api.get_service_addon_settings()
 
+    secrets_by_name = {
+        secret["name"]: secret["value"]
+        for secret in get_secrets()
+    }
+    api_key = settings["service_settings"]["api_key"]
+    username = settings["service_settings"]["username"]
+    if api_key in secrets_by_name:
+        api_key = secrets_by_name[api_key]
+
+    if username in secrets_by_name:
+        username = secrets_by_name[username]
+
     log.debug("Creating ftrack session")
     session = ftrack_api.Session(
         settings["ftrack_server"],
-        settings["service_settings"]["api_key"],
-        settings["service_settings"]["username"],
+        api_key,
+        username,
         auto_connect_event_hub=True,
     )
 

@@ -1,6 +1,7 @@
 from pydantic import Field, validator
 
 from ayon_server.settings import BaseSettingsModel, ensure_unique_names
+from ayon_server.settings.enum import secrets_enum
 
 from .service_handlers import (
     FtrackServiceHandlers,
@@ -25,11 +26,11 @@ class FtrackServiceSettings(BaseSettingsModel):
     """
 
     username: str = Field(
-        "",
-        title="Ftrack user name",
+        enum_resolver=secrets_enum,
+        title="Ftrack user name"
     )
     api_key: str = Field(
-        "",
+        enum_resolver=secrets_enum,
         title="Ftrack API key"
     )
 
@@ -66,6 +67,7 @@ class FtrackSettings(BaseSettingsModel):
     ftrack_server: str = Field(
         "",
         title="Ftrack server url",
+        scope=["studio"],
     )
 
     service_event_handlers: FtrackServiceHandlers = Field(
@@ -75,6 +77,7 @@ class FtrackSettings(BaseSettingsModel):
     service_settings: FtrackServiceSettings = Field(
         default_factory=FtrackServiceSettings,
         title="Service settings",
+        scope=["studio"],
     )
     post_launch_hook: PostLaunchHookSettings = Field(
         default_factory=PostLaunchHookSettings,
