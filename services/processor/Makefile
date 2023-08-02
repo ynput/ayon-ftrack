@@ -11,6 +11,7 @@ clean:
 	docker rmi $(image)
 
 dev:
+	cp -r ../../ftrack_common .
 	docker run --rm -ti \
 		-v $(CURDIR):/service \
 		--hostname ftrackproc \
@@ -19,3 +20,4 @@ dev:
 		--env AYON_ADDON_NAME=ftrack \
 		--env AYON_ADDON_VERSION=$(VERSION) \
 		$(IMAGE) python -m processor
+	rm -rf ftrack_common

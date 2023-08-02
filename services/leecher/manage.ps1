@@ -41,12 +41,25 @@ function dist {
   docker push "$IMAGE_FULL_NAME"
 }
 
+function load-env {
+  $env_path = "$($current_dir)/.env"
+  if (Test-Path $env_path) {
+    Get-Content $env_path | foreach {
+      $name, $value = $_.split("=")
+      if (-not([string]::IsNullOrWhiteSpace($name) || $name.Contains("#"))) {
+        Set-Content env:\$name $value
+      }
+    }
+  }
+}
+
 function dev {
+  load-env
   & docker run --rm -ti `
     -v "$($current_dir):/service" `
   	--hostname ftrackproc `
-  	--env AYON_API_KEY="verysecureapikey" `
-  	--env AYON_SERVER_URL="http://localhost:5000" `
+  	--env AYON_API_KEY=$env:AYON_API_KEY `
+  	--env AYON_SERVER_URL=$env:AYON_SERVER_URL `
   	--env AYON_ADDON_NAME=ftrack `
   	--env AYON_ADDON_VERSION=$ADDON_VERSION `
   	"$($IMAGE_FULL_NAME)" python -m leecher

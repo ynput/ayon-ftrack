@@ -38,11 +38,22 @@ function run_processor {
   & python "$($script_dir)\processor_main.py"
 }
 
+function load-env {
+  $env_path = "$($current_dir)/.env"
+  if (Test-Path $env_path) {
+    Get-Content $env_path | foreach {
+      $name, $value = $_.split("=")
+      if (-not([string]::IsNullOrWhiteSpace($name) || $name.Contains("#"))) {
+        Set-Content env:\$name $value
+      }
+    }
+  }
+}
+
 function main {
   $env:AYON_ADDON_NAME = "ftrack"
   $env:AYON_ADDON_VERSION = $ADDON_VERSION
-  $env:AYON_SERVER_URL = "http://localhost:5000"
-  $env:AYON_API_KEY = "verysecureapikey"
+  load-env
 
   & "$($script_dir)\venv\Scripts\activate.ps1"
   try {
