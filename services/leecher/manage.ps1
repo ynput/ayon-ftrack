@@ -59,6 +59,8 @@ function main {
     clean
   } elseif ($FunctionName -eq "dev") {
     dev
+  } elseif ($FunctionName -eq "dist") {
+    dist
   } elseif ($FunctionName -eq $null) {
     defaultfunc
   } else {
