@@ -3,11 +3,19 @@ import os
 import ftrack_api
 
 from openpype.settings import get_project_settings
-from openpype.lib import PostLaunchHook
+from openpype.lib.applications import PostLaunchHook
+try:
+    # Backwards compatibility
+    # TODO remove in next minor version bump (after 0.3.x)
+    from openpype.lib.applications import LaunchTypes
+    local_launch_type = LaunchTypes.local
+except Exception:
+    local_launch_type = "local"
 
 
 class PostFtrackHook(PostLaunchHook):
     order = None
+    launch_types = {local_launch_type}
 
     def execute(self):
         project_name = self.data.get("project_name")
