@@ -2,10 +2,10 @@
 Taken from https://github.com/tokejepsen/ftrack-hooks/tree/master/batch_tasks
 """
 
-from ayon_ftrack.common import BaseAction
+from ayon_ftrack.common import LocalAction
 from ayon_ftrack.lib import get_ftrack_icon_url
 
-class BatchTasksAction(BaseAction):
+class BatchTasksAction(LocalAction):
     '''Batch Tasks action
     `label` a descriptive string identifing your action.
     `varaint` To group actions together, give them the same

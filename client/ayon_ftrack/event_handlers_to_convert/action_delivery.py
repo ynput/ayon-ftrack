@@ -4,7 +4,7 @@ import json
 import collections
 
 from ayon_ftrack.common import (
-    BaseAction,
+    LocalAction,
     query_custom_attribute_values,
     CUST_ATTR_KEY_SERVER_ID,
 )
@@ -27,7 +27,7 @@ from openpype.pipeline.delivery import (
 )
 
 
-class Delivery(BaseAction):
+class Delivery(LocalAction):
     identifier = "delivery.action"
     label = "Delivery"
     description = "Deliver data to client"

@@ -1,4 +1,4 @@
-from ayon_ftrack.common import BaseAction
+from ayon_ftrack.common import LocalAction
 from ayon_ftrack.lib import get_ftrack_icon_url
 try:
     from functools import cmp_to_key
@@ -42,7 +42,7 @@ task_name_kwarg_key = "key" if cmp_to_key else "cmp"
 task_name_sort_kwargs = {task_name_kwarg_key: task_name_sorter}
 
 
-class ClientReviewSort(BaseAction):
+class ClientReviewSort(LocalAction):
     identifier = "client.review.sort"
     label = "Sort Review"
     icon = get_ftrack_icon_url("SortReview.svg")

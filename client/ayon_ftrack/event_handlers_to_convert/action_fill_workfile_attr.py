@@ -16,13 +16,13 @@ from openpype.lib import StringTemplate
 from openpype.pipeline import Anatomy
 from openpype.pipeline.template_data import get_template_data
 from openpype.pipeline.workfile import get_workfile_template_key
-from ayon_ftrack.common import BaseAction, create_chunks
+from ayon_ftrack.common import LocalAction, create_chunks
 from ayon_ftrack.lib import get_ftrack_icon_url
 
 NOT_SYNCHRONIZED_TITLE = "Not synchronized"
 
 
-class FillWorkfileAttributeAction(BaseAction):
+class FillWorkfileAttributeAction(LocalAction):
     """Action fill work filename into custom attribute on tasks.
 
     Prerequirements are that the project is synchronized so it is possible to

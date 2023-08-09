@@ -109,7 +109,7 @@ import json
 import arrow
 
 from ayon_ftrack.common import (
-    BaseAction,
+    LocalAction,
 
     CUST_ATTR_GROUP,
     CUST_ATTR_KEY_SERVER_ID,
@@ -135,7 +135,7 @@ class CustAttrException(Exception):
     pass
 
 
-class CustomAttributes(BaseAction):
+class CustomAttributes(LocalAction):
     identifier = "create.update.attributes"
     label = "AYON Admin"
     variant = "- Create/Update Custom Attributes"

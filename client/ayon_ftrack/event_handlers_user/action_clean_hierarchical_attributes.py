@@ -2,13 +2,13 @@ import collections
 import ftrack_api
 
 from ayon_ftrack.common import (
-    BaseAction,
+    LocalAction,
     get_ayon_attr_configs,
 )
 from ayon_ftrack.lib import get_ftrack_icon_url
 
 
-class CleanHierarchicalAttrsAction(BaseAction):
+class CleanHierarchicalAttrsAction(LocalAction):
     identifier = "clean.hierarchical.attr"
     label = "AYON Admin"
     variant = "- Clean hierarchical custom attributes"
