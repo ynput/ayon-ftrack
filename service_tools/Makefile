@@ -22,19 +22,13 @@ help:
 	@echo "$$HELP_INFO"
 
 install:
-	$(CURDIR)/venv/Scripts/activate
-	python -m pip install -r "$(CURDIR)/requirements.txt"
-	deactivate
+	. $(CURDIR)/venv/bin/activate && python -m pip install -r "$(CURDIR)/requirements.txt"
 
 leecher:
-	$(CURDIR)/venv/Scripts/activate
-	python "$(CURDIR)/leecher_main.py"
-	deactivate
+	. $(CURDIR)/venv/bin/activate && python "$(CURDIR)/leecher_main.py"
 
 processor:
-	$(CURDIR)/venv/Scripts/activate
-	python "$(CURDIR)/processor_main.py"
-	deactivate
+	. $(CURDIR)/venv/bin/activate && python "$(CURDIR)/processor_main.py"
 
 info: help
 default: help
