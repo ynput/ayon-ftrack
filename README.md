@@ -51,3 +51,25 @@ Commands:
 - `install` - Create venv and install dependencies (run only once) 
 - `leecher` - Start leecher process
 - `processor` - Start processor process
+
+These scripts depend on the existance of a `.env` file which you need to put here: `./service_tools/.env`. The contents of the file should be:
+
+1. on linux:
+
+```
+export AYON_API_KEY={insert your ftrack api key}
+export AYON_SERVER_URL={your ayon server url:5000}
+export AYON_ADDON_NAME=ftrack
+export AYON_ADDON_VERSION={the addon version}
+```
+
+2. on windows:
+
+```
+AYON_API_KEY={insert your ftrack api key}
+AYON_SERVER_URL={your ayon server url:5000}
+AYON_ADDON_NAME=ftrack
+AYON_ADDON_VERSION={the addon version}
+```
+
+where you replace the stuff in the curly braces with your details.
