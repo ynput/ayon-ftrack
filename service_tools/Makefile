@@ -28,19 +28,19 @@ help:
 	@echo "$$HELP_INFO"
 
 install:
-	. $(CURDIR)/venv/bin/activate && python -m pip install -r "$(CURDIR)/requirements.txt"
+    . $(CURDIR)/venv/bin/activate && python -m pip install -r "$(CURDIR)/requirements.txt"
 
 leecher:
     export AYON_ADDON_NAME="ftrack" && \
     export AYON_ADDON_VERSION=$(VERSION) && \
-	. $(CURDIR)/venv/bin/activate && \
-	python "$(CURDIR)/leecher_main.py"
+    . $(CURDIR)/venv/bin/activate && \
+    python "$(CURDIR)/leecher_main.py"
 
 processor:
     export AYON_ADDON_NAME="ftrack" && \
     export AYON_ADDON_VERSION=$(VERSION) && \
-	. $(CURDIR)/venv/bin/activate && \
-	python "$(CURDIR)/processor_main.py"
+    . $(CURDIR)/venv/bin/activate && \
+    python "$(CURDIR)/processor_main.py"
 
 info: help
 default: help
