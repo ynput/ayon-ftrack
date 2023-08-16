@@ -3,6 +3,8 @@ ifneq (,$(wildcard ./.env))
     export
 endif
 
+VERSION=$(shell python -c "import os;import sys;content={};f=open('$(CURDIR)/../version.py');exec(f.read(),content);f.close();print(content['__version__'])")
+
 define HELP_INFO
 
 *************************
@@ -29,10 +31,16 @@ install:
 	. $(CURDIR)/venv/bin/activate && python -m pip install -r "$(CURDIR)/requirements.txt"
 
 leecher:
-	. $(CURDIR)/venv/bin/activate && python "$(CURDIR)/leecher_main.py"
+    export AYON_ADDON_NAME="ftrack" && \
+    export AYON_ADDON_VERSION=$(VERSION) && \
+	. $(CURDIR)/venv/bin/activate && \
+	python "$(CURDIR)/leecher_main.py"
 
 processor:
-	. $(CURDIR)/venv/bin/activate && python "$(CURDIR)/processor_main.py"
+    export AYON_ADDON_NAME="ftrack" && \
+    export AYON_ADDON_VERSION=$(VERSION) && \
+	. $(CURDIR)/venv/bin/activate && \
+	python "$(CURDIR)/processor_main.py"
 
 info: help
 default: help
