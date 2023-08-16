@@ -3,11 +3,11 @@ import time
 import subprocess
 from operator import itemgetter
 from openpype.lib import ApplicationManager
-from ayon_ftrack.common import BaseAction
+from ayon_ftrack.common import LocalAction
 from ayon_ftrack.lib import statics_icon
 
 
-class DJVViewAction(BaseAction):
+class DJVViewAction(LocalAction):
     """Launch DJVView action."""
     identifier = "djvview-launch-action"
     label = "DJV View"

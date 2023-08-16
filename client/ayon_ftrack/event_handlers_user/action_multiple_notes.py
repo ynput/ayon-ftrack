@@ -1,8 +1,8 @@
-from ayon_ftrack.common import BaseAction
+from ayon_ftrack.common import LocalAction
 from ayon_ftrack.lib import get_ftrack_icon_url
 
 
-class MultipleNotes(BaseAction):
+class MultipleNotes(LocalAction):
     identifier = "multiple.notes"
     label = "Multiple Notes"
     description = "Add same note to multiple entities"

@@ -1,9 +1,9 @@
 import json
-from ayon_ftrack.common import BaseAction
+from ayon_ftrack.common import LocalAction
 from ayon_ftrack.lib import get_ftrack_icon_url
 
 
-class ThumbToParent(BaseAction):
+class ThumbToParent(LocalAction):
     identifier = "thumb.to.parent"
     label = "Thumbnail"
     variant = " to Parent"

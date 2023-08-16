@@ -5,14 +5,14 @@ from openpype.client import get_project, create_project
 from openpype.settings import ProjectSettings, SaveWarningExc
 
 from ayon_ftrack.common import (
-    BaseAction,
+    LocalAction,
     get_ayon_attr_configs,
     CUST_ATTR_AUTO_SYNC,
 )
 from ayon_ftrack.lib import get_ftrack_icon_url
 
 
-class PrepareProjectLocal(BaseAction):
+class PrepareProjectLocal(LocalAction):
     """Prepare project attributes in Anatomy."""
 
     identifier = "prepare.project.local"

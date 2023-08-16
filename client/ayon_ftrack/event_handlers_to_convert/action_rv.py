@@ -16,11 +16,11 @@ from openpype.pipeline import (
     AvalonMongoDB,
     Anatomy,
 )
-from ayon_ftrack.common import BaseAction
+from ayon_ftrack.common import LocalAction
 from ayon_ftrack.lib import statics_icon
 
 
-class RVAction(BaseAction):
+class RVAction(LocalAction):
     """ Launch RV action """
     identifier = "rv.launch.action"
     label = "rv"

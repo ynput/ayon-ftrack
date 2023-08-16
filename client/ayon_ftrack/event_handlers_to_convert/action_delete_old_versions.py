@@ -17,11 +17,11 @@ from openpype.lib import (
     format_file_size,
 )
 from openpype.pipeline import AvalonMongoDB, Anatomy
-from ayon_ftrack.common import BaseAction
+from ayon_ftrack.common import LocalAction
 from ayon_ftrack.lib import get_ftrack_icon_url
 
 
-class DeleteOldVersions(BaseAction):
+class DeleteOldVersions(LocalAction):
 
     identifier = "delete.old.versions"
     label = "AYON Admin"

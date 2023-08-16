@@ -2,10 +2,10 @@ import platform
 import socket
 import getpass
 
-from ayon_ftrack.common import get_host_ip, BaseAction
+from ayon_ftrack.common import get_host_ip, LocalAction
 
 
-class ActionWhereIRun(BaseAction):
+class ActionWhereIRun(LocalAction):
     """Show where same user has running AYON instances."""
 
     identifier = "ask.where.i.run"

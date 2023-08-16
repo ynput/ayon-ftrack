@@ -1,8 +1,8 @@
-from ayon_ftrack.common import BaseAction
+from ayon_ftrack.common import LocalAction
 from ayon_ftrack.lib import get_ftrack_icon_url
 
 
-class TestAction(BaseAction):
+class TestAction(LocalAction):
     """Action for testing purpose or as base for new actions."""
 
     enabled = False

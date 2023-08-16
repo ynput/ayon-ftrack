@@ -4,12 +4,12 @@ from datetime import datetime
 
 from bson.objectid import ObjectId
 
-from ayon_ftrack.common import create_chunks, BaseAction
+from ayon_ftrack.common import create_chunks, LocalAction
 from ayon_ftrack.lib import get_ftrack_icon_url
 from openpype.client import get_assets, get_subsets
 
 
-class DeleteAssetSubset(BaseAction):
+class DeleteAssetSubset(LocalAction):
     identifier = "delete.folder.subset"
     label = "Delete Folder/Subsets"
     description = "Removes from AYON and from ftrack with all children"

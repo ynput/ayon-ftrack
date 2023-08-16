@@ -6,7 +6,7 @@ import requests
 from bson.objectid import ObjectId
 
 from ayon_ftrack.common import (
-    BaseAction,
+    LocalAction,
     CUST_ATTR_KEY_SERVER_ID,
 )
 from ayon_ftrack.lib import get_ftrack_icon_url
@@ -21,7 +21,7 @@ from openpype.client import (
 from openpype.pipeline import AvalonMongoDB, Anatomy
 
 
-class StoreThumbnailsToAvalon(BaseAction):
+class StoreThumbnailsToAvalon(LocalAction):
     # Action identifier
     identifier = "store.thubmnail.to.avalon"
     # Action label

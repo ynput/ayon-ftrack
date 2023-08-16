@@ -161,7 +161,7 @@ class AppplicationsAction(BaseAction):
         # Check if identifier is same
         # - show message that acion may not be triggered on this machine
         if event_identifier.startswith(self.launch_identifier_with_id):
-            return BaseAction._launch(self, event)
+            return LocalAction._launch(self, event)
 
         return {
             "success": False,

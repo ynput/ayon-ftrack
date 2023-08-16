@@ -1,9 +1,9 @@
 import json
-from ayon_ftrack.common import BaseAction
+from ayon_ftrack.common import LocalAction
 from ayon_ftrack.lib import get_ftrack_icon_url
 
 
-class JobKiller(BaseAction):
+class JobKiller(LocalAction):
     """Kill jobs that are marked as running."""
 
     identifier = "job.killer"

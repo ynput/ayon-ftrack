@@ -4,11 +4,11 @@ from openpype.pipeline.project_folders import (
     get_project_basic_paths,
     create_project_folders,
 )
-from ayon_ftrack.common import BaseAction
+from ayon_ftrack.common import LocalAction
 from ayon_ftrack.lib import get_ftrack_icon_url
 
 
-class CreateProjectFolders(BaseAction):
+class CreateProjectFolders(LocalAction):
     """Action create folder structure and may create hierarchy in Ftrack.
 
     Creation of folder structure and hierarchy in Ftrack is based on presets.
