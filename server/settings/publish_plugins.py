@@ -8,6 +8,7 @@ from ayon_server.settings import (
 
 
 class CollectFamilyProfile(BaseSettingsModel):
+    _layout = "expanded"
     host_names: list[str] = Field(
         default_factory=list,
         title="Host names",
@@ -70,6 +71,7 @@ class ValidateFtrackAttributesModel(BaseSettingsModel):
 
 
 class IntegrateHierarchyProfile(BaseSettingsModel):
+    _layout = "expanded"
     task_types: list[str] = Field(
         default_factory=list,
         title="Task types",
@@ -127,6 +129,7 @@ class IntegrateFtrackComponentOverwriteModel(BaseSettingsModel):
 
 
 class AssetVersionStatusProfile(BaseSettingsModel):
+    _layout = "expanded"
     host_names: list[str] = Field(
         default_factory=list,
         title="Host names",
@@ -190,6 +193,7 @@ class IntegrateFtrackInstanceModel(BaseSettingsModel):
 
 
 class IntegrateFarmStartusProfile(BaseSettingsModel):
+    _layout = "expanded"
     host_names: list[str] = Field(
         default_factory=list,
         title="Host names",
@@ -221,6 +225,67 @@ class IntegrateFtrackFarmStatusModel(BaseSettingsModel):
     farm_status_profiles: list[IntegrateFarmStartusProfile] = Field(
         title="Farm status profiles",
         default_factory=list,
+    )
+
+
+class FtrackTaskStatusProfile(BaseSettingsModel):
+    _layout = "expanded"
+    host_names: list[str] = Field(
+        default_factory=list,
+        title="Host names",
+    )
+    task_types: list[str] = Field(
+        default_factory=list,
+        title="Task types",
+    )
+    task_names: list[str] = Field(
+        default_factory=list,
+        title="Task names",
+    )
+    families: list[str] = Field(
+        default_factory=list,
+        title="Families",
+    )
+    subset_names: list[str] = Field(
+        default_factory=list,
+        title="Subset names",
+    )
+    status_name: str = Field(
+        "",
+        title="Status name"
+    )
+
+
+class FtrackTaskStatusLocalModel(BaseSettingsModel):
+    _isGroup = True
+    status_profiles: list[FtrackTaskStatusProfile] = Field(
+        title="Status profiles",
+        default_factory=list,
+        description="Change status of task when is integrated locally"
+    )
+
+
+class FtrackTaskStatusOnFarmModel(BaseSettingsModel):
+    _isGroup = True
+    status_profiles: list[FtrackTaskStatusProfile] = Field(
+        title="Status profiles",
+        default_factory=list,
+        description=(
+            "Change status of task when it's subset is integrated on farm"
+        )
+    )
+
+
+class IntegrateFtrackTaskStatusModel(BaseSettingsModel):
+    _isGroup = True
+    after_version_statuses: bool = Field(
+        True,
+        title="After version integration",
+        description=(
+            "Apply collected task statuses. This plugin can run before or"
+            " after version integration. Some status automations may conflict"
+            " with status changes on versions because of wrong order."
+        )
     )
 
 
@@ -276,6 +341,18 @@ class FtrackPublishPlugins(BaseSettingsModel):
         description=(
             "Change status of task when it's subset is submitted to farm"
         ),
+    )
+    ftrack_task_status_local_publish: FtrackTaskStatusLocalModel = Field(
+        default_factory=FtrackTaskStatusLocalModel,
+        title="Ftrack Status Local Integration",
+    )
+    ftrack_task_status_on_farm_publish: FtrackTaskStatusOnFarmModel = Field(
+        default_factory=FtrackTaskStatusOnFarmModel,
+        title="Ftrack Status On Farm Integration",
+    )
+    IntegrateFtrackTaskStatus: IntegrateFtrackTaskStatusModel = Field(
+        default_factory=IntegrateFtrackTaskStatusModel,
+        title="Integrate Ftrack Task Status"
     )
 
 
@@ -613,6 +690,28 @@ DEFAULT_PUBLISH_SETTINGS = {
         "additional_metadata_keys": []
     },
     "IntegrateFtrackFarmStatus": {
-        "farm_status_profiles": []
+        "farm_status_profiles": [
+            {
+                "hosts": [
+                    "celaction"
+                ],
+                "task_types": [],
+                "task_names": [],
+                "families": [
+                    "render"
+                ],
+                "subsets": [],
+                "status_name": "Render"
+            }
+        ]
+    },
+    "ftrack_task_status_local_publish": {
+        "status_profiles": []
+    },
+    "ftrack_task_status_on_farm_publish": {
+        "status_profiles": []
+    },
+    "IntegrateFtrackTaskStatus": {
+        "after_version_statuses": True
     }
 }
