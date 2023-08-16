@@ -8,6 +8,7 @@ from ayon_server.settings import (
 
 
 class CollectFamilyProfile(BaseSettingsModel):
+    _layout = "expanded"
     host_names: list[str] = Field(
         default_factory=list,
         title="Host names",
@@ -70,6 +71,7 @@ class ValidateFtrackAttributesModel(BaseSettingsModel):
 
 
 class IntegrateHierarchyProfile(BaseSettingsModel):
+    _layout = "expanded"
     task_types: list[str] = Field(
         default_factory=list,
         title="Task types",
@@ -127,6 +129,7 @@ class IntegrateFtrackComponentOverwriteModel(BaseSettingsModel):
 
 
 class AssetVersionStatusProfile(BaseSettingsModel):
+    _layout = "expanded"
     host_names: list[str] = Field(
         default_factory=list,
         title="Host names",
@@ -190,6 +193,7 @@ class IntegrateFtrackInstanceModel(BaseSettingsModel):
 
 
 class IntegrateFarmStartusProfile(BaseSettingsModel):
+    _layout = "expanded"
     host_names: list[str] = Field(
         default_factory=list,
         title="Host names",
@@ -225,6 +229,7 @@ class IntegrateFtrackFarmStatusModel(BaseSettingsModel):
 
 
 class FtrackTaskStatusProfile(BaseSettingsModel):
+    _layout = "expanded"
     host_names: list[str] = Field(
         default_factory=list,
         title="Host names",
