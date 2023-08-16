@@ -47,29 +47,4 @@ There are also `docker-compose.yml` files that will create a docker stack if you
 ### Start with prepared tools
 Tools require to have available Python 3.9. Prepared scripts can be found in `./service_tools` directory. There are 2 scripts `start.ps1` for Windows and `Makefile` for Linux. Both scripts are doing the same thing and have same commands.
 
-Commands:
-- `install` - Create venv and install dependencies (run only once) 
-- `leecher` - Start leecher process
-- `processor` - Start processor process
-
-These scripts depend on the existance of a `.env` file which you need to put here: `./service_tools/.env`. The contents of the file should be:
-
-1. on linux:
-
-```
-export AYON_API_KEY={insert your ftrack api key}
-export AYON_SERVER_URL={your ayon server url:5000}
-export AYON_ADDON_NAME=ftrack
-export AYON_ADDON_VERSION={the addon version}
-```
-
-2. on windows:
-
-```
-AYON_API_KEY={insert your ftrack api key}
-AYON_SERVER_URL={your ayon server url:5000}
-AYON_ADDON_NAME=ftrack
-AYON_ADDON_VERSION={the addon version}
-```
-
-where you replace the stuff in the curly braces with your details.
+For more information check [README](service_tools/README.md).

@@ -2,12 +2,17 @@
 Helper tools to develop ftrack services or parts of the services.
 
 ### How to run
-At this moment is available only PowerShell script. All commands expect that there is created virtual environment in `./venv`. Script also contains hardcoded url to server and API key.
+At this moment there is available PowerShell script and Makefile. All commands expect that there is created virtual environment in `./venv`. These scripts depend on the existance of a `./.env`. The contents of the file should be:
+```
+AYON_SERVER_URL={AYON server url}
+AYON_API_KEY={AYON server api key (ideally service user)}
+```
 
 ### Commands
 - `install` - install requirements needed for running processed (requires Git)
 - `leecher` - start leecher
 - `processor` - start processor
+
 ### Leecher 
 Ftrack leecher postpone ftrack events into Ayon event database. Is separated from processor to be able restart or have different ftrack processors for different purposes loading events from single place. Using Ayon server as middle-ware helps to know which event was already processed or is processing. In theory one event should not be processed multiple times. 
 
