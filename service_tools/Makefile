@@ -1,4 +1,8 @@
-include .env
+ifneq (,$(wildcard ./.env))
+    include .env
+    export
+endif
+
 define HELP_INFO
 
 *************************
