@@ -47,7 +47,4 @@ There are also `docker-compose.yml` files that will create a docker stack if you
 ### Start with prepared tools
 Tools require to have available Python 3.9. Prepared scripts can be found in `./service_tools` directory. There are 2 scripts `start.ps1` for Windows and `Makefile` for Linux. Both scripts are doing the same thing and have same commands.
 
-Commands:
-- `install` - Create venv and install dependencies (run only once) 
-- `leecher` - Start leecher process
-- `processor` - Start processor process
+For more information check [README](service_tools/README.md).
