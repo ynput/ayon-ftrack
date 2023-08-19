@@ -59,7 +59,7 @@ class FtrackAddon(BaseServerAddon):
             position += 1
             if row["name"] == FTRACK_ID_ATTRIB:
                 # Check if scope is matching ftrack addon requirements
-                if set(row["scope"]) == set(expected_scope):
+                if set(row["scope"]) == set(expected_scope + ["version"]):
                     ftrack_id_matches = True
                 ftrack_id_match_position = row["position"]
 
