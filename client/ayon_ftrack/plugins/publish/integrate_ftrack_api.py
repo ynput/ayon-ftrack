@@ -166,12 +166,9 @@ class IntegrateFtrackApi(pyblish.api.InstancePlugin):
 
             # for version attributes `IntegrateVersionAttributes`
             version_attributes = instance.data.setdefault(
-                "versionAttributes",
-                {
-                    FTRACK_ID_ATTRIB: version_id,
-                }
+                "versionAttributes", {}
             )
-            instance.data["versionAttributes"] = version_attributes
+            version_attributes[FTRACK_ID_ATTRIB] = version_id
 
         self._create_components(session, asset_versions_data_by_id)
 
