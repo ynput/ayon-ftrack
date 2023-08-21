@@ -65,11 +65,13 @@ class FtrackAddon(BaseServerAddon):
         query = "SELECT name, position, scope, data from public.attributes"
         ftrack_id_attribute_data = {
             "type": "string",
-            "title": "Ftrack id"
+            "title": "Ftrack id",
+            "inherit": False,
         }
         ftrack_path_attribute_data = {
             "type": "string",
-            "title": "Ftrack path"
+            "title": "Ftrack path",
+            "inherit": False,
         }
         ftrack_id_expected_scope = ["project", "folder", "task", "version"]
         ftrack_path_expected_scope = ["project", "folder", "task"]
