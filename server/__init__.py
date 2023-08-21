@@ -1,6 +1,7 @@
+import semver
 from typing import Type
 
-from ayon_server.addons import BaseServerAddon
+from ayon_server.addons import BaseServerAddon, AddonLibrary
 from ayon_server.lib.postgres import Postgres
 
 from .settings import FtrackSettings, DEFAULT_VALUES
@@ -25,10 +26,34 @@ class FtrackAddon(BaseServerAddon):
         settings_model_cls = self.get_settings_model()
         return settings_model_cls(**DEFAULT_VALUES)
 
+    async def pre_setup(self):
+        """Make sure older version of addon use the new way of attributes."""
+
+        # Force older addon versions to skip creation of attributes
+        #   - this was added in version 0.2.2
+        instance = AddonLibrary.getinstance()
+        app_defs = instance.data.get(self.name)
+        my_version = semver.Version.parse(self.version)
+        for version, addon in app_defs.versions.items():
+            if version == self.version:
+                continue
+            try:
+                addon_version = semver.Version.parse(version)
+                if addon_version > my_version:
+                    continue
+            except Exception:
+                pass
+            if hasattr(addon, "create_ftrack_attributes"):
+                addon.create_ftrack_attributes = (
+                    self._empty_create_ftrack_attributes)
+
     async def setup(self):
         need_restart = await self.create_ftrack_attributes()
         if need_restart:
             self.request_server_restart()
+
+    async def _empty_create_ftrack_attributes(self):
+        return False
 
     async def create_ftrack_attributes(self) -> bool:
         """Make sure there are required attributes which ftrack addon needs.
