@@ -1,6 +1,7 @@
+import semver
 from typing import Type
 
-from ayon_server.addons import BaseServerAddon
+from ayon_server.addons import BaseServerAddon, AddonLibrary
 from ayon_server.lib.postgres import Postgres
 
 from .settings import FtrackSettings, DEFAULT_VALUES
@@ -25,10 +26,34 @@ class FtrackAddon(BaseServerAddon):
         settings_model_cls = self.get_settings_model()
         return settings_model_cls(**DEFAULT_VALUES)
 
+    async def pre_setup(self):
+        """Make sure older version of addon use the new way of attributes."""
+
+        # Force older addon versions to skip creation of attributes
+        #   - this was added in version 0.2.2
+        instance = AddonLibrary.getinstance()
+        app_defs = instance.data.get(self.name)
+        my_version = semver.Version.parse(self.version)
+        for version, addon in app_defs.versions.items():
+            if version == self.version:
+                continue
+            try:
+                addon_version = semver.Version.parse(version)
+                if addon_version > my_version:
+                    continue
+            except Exception:
+                pass
+            if hasattr(addon, "create_ftrack_attributes"):
+                addon.create_ftrack_attributes = (
+                    self._empty_create_ftrack_attributes)
+
     async def setup(self):
         need_restart = await self.create_ftrack_attributes()
         if need_restart:
             self.request_server_restart()
+
+    async def _empty_create_ftrack_attributes(self):
+        return False
 
     async def create_ftrack_attributes(self) -> bool:
         """Make sure there are required attributes which ftrack addon needs.
@@ -40,13 +65,16 @@ class FtrackAddon(BaseServerAddon):
         query = "SELECT name, position, scope, data from public.attributes"
         ftrack_id_attribute_data = {
             "type": "string",
-            "title": "Ftrack id"
+            "title": "Ftrack id",
+            "inherit": False,
         }
         ftrack_path_attribute_data = {
             "type": "string",
-            "title": "Ftrack path"
+            "title": "Ftrack path",
+            "inherit": False,
         }
-        expected_scope = ["project", "folder", "task"]
+        ftrack_id_expected_scope = ["project", "folder", "task", "version"]
+        ftrack_path_expected_scope = ["project", "folder", "task"]
 
         ftrack_id_match_position = None
         ftrack_id_matches = False
@@ -59,12 +87,12 @@ class FtrackAddon(BaseServerAddon):
             position += 1
             if row["name"] == FTRACK_ID_ATTRIB:
                 # Check if scope is matching ftrack addon requirements
-                if set(row["scope"]) == set(expected_scope):
+                if not set(ftrack_id_expected_scope) - set(row["scope"]):
                     ftrack_id_matches = True
                 ftrack_id_match_position = row["position"]
 
             elif row["name"] == FTRACK_PATH_ATTRIB:
-                if set(row["scope"]) == set(expected_scope):
+                if not set(ftrack_path_expected_scope) - set(row["scope"]):
                     ftrack_path_matches = True
                 ftrack_path_match_position = row["position"]
 
@@ -91,7 +119,7 @@ class FtrackAddon(BaseServerAddon):
                 postgre_query,
                 FTRACK_ID_ATTRIB,
                 ftrack_id_match_position,
-                expected_scope,
+                ftrack_id_expected_scope,
                 ftrack_id_attribute_data,
             )
 
@@ -104,7 +132,7 @@ class FtrackAddon(BaseServerAddon):
                 postgre_query,
                 FTRACK_PATH_ATTRIB,
                 ftrack_path_match_position,
-                expected_scope,
+                ftrack_path_expected_scope,
                 ftrack_path_attribute_data,
             )
         return True

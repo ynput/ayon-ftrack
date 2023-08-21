@@ -16,6 +16,7 @@ import collections
 import pyblish.api
 import clique
 
+from ftrack_common.constants import FTRACK_ID_ATTRIB
 
 class IntegrateFtrackApi(pyblish.api.InstancePlugin):
     """ Commit components to server. """
@@ -162,6 +163,12 @@ class IntegrateFtrackApi(pyblish.api.InstancePlugin):
             # Backwards compatibility
             if asset_version_entity not in used_asset_versions:
                 used_asset_versions.append(asset_version_entity)
+
+            # for version attributes `IntegrateVersionAttributes`
+            version_attributes = instance.data.setdefault(
+                "versionAttributes", {}
+            )
+            version_attributes[FTRACK_ID_ATTRIB] = version_id
 
         self._create_components(session, asset_versions_data_by_id)
 
