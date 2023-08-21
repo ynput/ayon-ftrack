@@ -46,7 +46,8 @@ class FtrackAddon(BaseServerAddon):
             "type": "string",
             "title": "Ftrack path"
         }
-        expected_scope = ["project", "folder", "task"]
+        ftrack_id_expected_scope = ["project", "folder", "task", "version"]
+        ftrack_path_expected_scope = ["project", "folder", "task"]
 
         ftrack_id_match_position = None
         ftrack_id_matches = False
@@ -59,12 +60,12 @@ class FtrackAddon(BaseServerAddon):
             position += 1
             if row["name"] == FTRACK_ID_ATTRIB:
                 # Check if scope is matching ftrack addon requirements
-                if set(row["scope"]) == set(expected_scope + ["version"]):
+                if set(row["scope"]) == set(ftrack_id_expected_scope):
                     ftrack_id_matches = True
                 ftrack_id_match_position = row["position"]
 
             elif row["name"] == FTRACK_PATH_ATTRIB:
-                if set(row["scope"]) == set(expected_scope):
+                if set(row["scope"]) == set(ftrack_path_expected_scope):
                     ftrack_path_matches = True
                 ftrack_path_match_position = row["position"]
 
@@ -91,7 +92,7 @@ class FtrackAddon(BaseServerAddon):
                 postgre_query,
                 FTRACK_ID_ATTRIB,
                 ftrack_id_match_position,
-                expected_scope,
+                ftrack_id_expected_scope,
                 ftrack_id_attribute_data,
             )
 
@@ -104,7 +105,7 @@ class FtrackAddon(BaseServerAddon):
                 postgre_query,
                 FTRACK_PATH_ATTRIB,
                 ftrack_path_match_position,
-                expected_scope,
+                ftrack_path_expected_scope,
                 ftrack_path_attribute_data,
             )
         return True
