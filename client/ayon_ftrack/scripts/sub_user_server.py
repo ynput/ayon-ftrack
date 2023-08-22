@@ -25,8 +25,12 @@ def main(args):
     log.debug(
         "User Ftrack Server connected to {} port {}".format(*server_address)
     )
-    sock.connect(server_address)
-    sock.sendall(b"CreatedUser")
+    try:
+        sock.connect(server_address)
+        sock.sendall(b"CreatedUser")
+    except OSError:
+        log.error(f"Failed to create connection to server {server_address}")
+        return 1
 
     try:
         session = SocketSession(
