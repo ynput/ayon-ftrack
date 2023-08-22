@@ -25,8 +25,12 @@ def main(args):
     log.debug(
         "User Ftrack Server connected to {} port {}".format(*server_address)
     )
-    sock.connect(server_address)
-    sock.sendall(b"CreatedUser")
+    try:
+        sock.connect(server_address)
+        sock.sendall(b"CreatedUser")
+    except OSError:
+        log.error(f"Failed to create connection to server {server_address}")
+        return 1
 
     try:
         session = SocketSession(
@@ -40,14 +44,15 @@ def main(args):
         )
         log.debug("Launching User Ftrack Server")
         server.run_server(session=session)
+        return 0
 
     except Exception:
         log.warning("Ftrack session server failed.", exc_info=True)
+        return 1
 
     finally:
         log.debug("Closing socket")
         sock.close()
-        return 1
 
 
 if __name__ == "__main__":
