@@ -44,14 +44,15 @@ def main(args):
         )
         log.debug("Launching User Ftrack Server")
         server.run_server(session=session)
+        return 0
 
     except Exception:
         log.warning("Ftrack session server failed.", exc_info=True)
+        return 1
 
     finally:
         log.debug("Closing socket")
         sock.close()
-        return 1
 
 
 if __name__ == "__main__":
