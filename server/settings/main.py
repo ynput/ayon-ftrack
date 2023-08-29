@@ -15,6 +15,10 @@ from .publish_plugins import (
     FtrackPublishPlugins,
     DEFAULT_PUBLISH_SETTINGS,
 )
+from .custom_attributes import (
+    CustomAttributesModel,
+    DEFAULT_CUSTOM_ATTRIBUTES_SETTINGS,
+)
 
 
 class FtrackServiceSettings(BaseSettingsModel):
@@ -90,6 +94,10 @@ class FtrackSettings(BaseSettingsModel):
     publish: FtrackPublishPlugins = Field(
         default_factory=FtrackPublishPlugins,
         title="Publish plugins"
+    )
+    custom_attributes: CustomAttributesModel = Field(
+        title="Custom Attributes",
+        default_factory=CustomAttributesModel
     )
 
 

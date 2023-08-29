@@ -1,8 +1,8 @@
 {
     "show": {
         "library_project": {
-          "label": "Library Project",
-          "type": "boolean"
+            "label": "Library Project",
+            "type": "boolean"
         }
     },
     "is_hierarchical": {
