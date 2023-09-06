@@ -9,9 +9,11 @@ $current_dir = Get-Location
 $script_dir_rel = Split-Path -Path $MyInvocation.MyCommand.Definition -Parent
 $script_dir = (Get-Item $script_dir_rel).FullName
 
-$IMAGE_NAME = "ynput/ayon-ftrack-processor"
+$BASE_NAME = "ayon-ftrack-processor"
+$IMAGE_NAME = "ynput/$($BASE_NAME)"
 $ADDON_VERSION = Invoke-Expression -Command "python -c ""import os;import sys;content={};f=open(r'$($script_dir)/../../version.py');exec(f.read(),content);f.close();print(content['__version__'])"""
 $IMAGE_FULL_NAME = "$($IMAGE_NAME):$($ADDON_VERSION)"
+$BASH_CONTAINER_NAME = "$($BASE_NAME)-bash-$($ADDON_VERSION)"
 
 function defaultfunc {
   Write-Host ""
@@ -30,6 +32,8 @@ function defaultfunc {
   Write-Host "  clean    Remove docker image"
   Write-Host "  dist     Publish docker image to docker hub"
   Write-Host "  dev      Run docker (for development purposes)"
+  Write-Host "  bash     Run bash in docker image (for development purposes)"
+  Write-Host ""
 }
 
 function build {
@@ -81,6 +85,10 @@ function dev {
   }
 }
 
+function bash {
+  & docker run --name "$($BASH_CONTAINER_NAME)" --rm -it --entrypoint /bin/bash "$($IMAGE_FULL_NAME)"
+}
+
 function main {
   if ($FunctionName -eq "build") {
     build
@@ -90,6 +98,8 @@ function main {
     dev
   } elseif ($FunctionName -eq "dist") {
     dist
+  } elseif ($FunctionName -eq "bash") {
+    bash
   } elseif ($FunctionName -eq $null) {
     defaultfunc
   } else {

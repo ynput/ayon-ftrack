@@ -1,6 +1,8 @@
 include .env
 VERSION=$(shell python -c "import os;import sys;content={};f=open('$(CURDIR)/../../version.py');exec(f.read(),content);f.close();print(content['__version__'])")
-IMAGE := ynput/ayon-ftrack-leecher:$(VERSION)
+BASE_NAME := ayon-ftrack-leecher
+IMAGE := ynput/$(BASE_NAME):$(VERSION)
+BASH_CONTAINER_NAME := $(BASE_NAME)-bash-$(VERSION)
 
 build:
 	docker build -t $(IMAGE)  .
@@ -16,3 +18,6 @@ dev:
 		--env AYON_ADDON_NAME=ftrack \
 		--env AYON_ADDON_VERSION=$(VERSION) \
 		$(IMAGE) python -m leecher
+
+bash:
+	docker run --name $(BASH_CONTAINER_NAME) --rm -it --entrypoint /bin/bash $(IMAGE)
