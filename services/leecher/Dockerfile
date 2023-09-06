@@ -6,7 +6,8 @@ RUN apt-get update \
   && pip install poetry
 
 RUN mkdir /service
-COPY . /service
+COPY ./leecher /service/leecher
+COPY ./pyproject.toml /service/pyproject.toml
 WORKDIR /service
 
 
