@@ -6,7 +6,7 @@ authors = ["Martastain <martas@imm.cz>"]
 
 [tool.poetry.dependencies]
 python = ">=3.9,<3.10"
-ayon-python-api = "^0.3"
+ayon-python-api = "^0.4"
 ftrack-python-api = "2.3.3"
 
 [tool.poetry.dev-dependencies]
