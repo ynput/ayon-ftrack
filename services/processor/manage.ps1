@@ -52,7 +52,7 @@ function load-env {
     Get-Content $env_path `
     | foreach {
       $name, $value = $_.split("=")
-      if (-not([string]::IsNullOrWhiteSpace($name) || $name.Contains("#"))) {
+      if (-not([string]::IsNullOrWhiteSpace($name) -or $name.Contains("#"))) {
         Set-Content env:\$name $value
       }
     }
