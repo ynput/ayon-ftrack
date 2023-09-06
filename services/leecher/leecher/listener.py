@@ -60,8 +60,7 @@ def get_secrets():
 
 
 def main(func: Union[Callable, None] = None):
-    logging.basicConfig()
-    log.setLevel(logging.DEBUG)
+    logging.basicConfig(level=logging.DEBUG)
 
     log.info("Starting listener")
     if func is None:

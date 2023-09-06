@@ -29,13 +29,12 @@ def get_secrets():
 
 
 def main():
-    logging.basicConfig()
+    logging.basicConfig(level=logging.DEBUG)
 
     init_service()
 
     handler_paths = get_handler_paths()
-    settings = get_addons_studio_settings()
-    ftrack_settings = settings["ftrack"]
+    ftrack_settings = ayon_api.get_service_addon_settings()
     service_settings = ftrack_settings["service_settings"]
 
     secrets_by_name = {
