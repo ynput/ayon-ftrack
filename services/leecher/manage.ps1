@@ -1,5 +1,9 @@
 # Receive first positional argument
-Param([Parameter(Position=0)]$FunctionName)
+$FunctionName=$ARGS[0]
+$arguments=@()
+if ($ARGS.Length -gt 1) {
+    $arguments = $ARGS[1..($ARGS.Length - 1)]
+}
 
 $current_dir = Get-Location
 $script_dir_rel = Split-Path -Path $MyInvocation.MyCommand.Definition -Parent
