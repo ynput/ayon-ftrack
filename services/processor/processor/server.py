@@ -29,13 +29,14 @@ def get_secrets():
 
 
 def main():
-    logging.basicConfig()
+    logging.basicConfig(level=logging.INFO)
 
     init_service()
 
     handler_paths = get_handler_paths()
     settings = get_addons_studio_settings()
     ftrack_settings = settings["ftrack"]
+    ftrack_url = ftrack_settings["ftrack_server"]
     service_settings = ftrack_settings["service_settings"]
 
     secrets_by_name = {
@@ -51,7 +52,7 @@ def main():
         username = secrets_by_name[username]
 
     session = AYONServerSession(
-        ftrack_settings["ftrack_server"],
+        ftrack_url.strip("/ "),
         api_key,
         username,
         auto_connect_event_hub=False

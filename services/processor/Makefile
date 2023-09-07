@@ -1,6 +1,8 @@
 include .env
 VERSION=$(shell python -c "import os;import sys;content={};f=open('$(CURDIR)/../../version.py');exec(f.read(),content);f.close();print(content['__version__'])")
-IMAGE := ynput/ayon-ftrack-processor:$(VERSION)
+BASE_NAME := ayon-ftrack-processor
+IMAGE := ynput/$(BASE_NAME):$(VERSION)
+BASH_CONTAINER_NAME := $(BASE_NAME)-bash-$(VERSION)
 
 build:
 	cp -r ../../ftrack_common .
@@ -21,3 +23,6 @@ dev:
 		--env AYON_ADDON_VERSION=$(VERSION) \
 		$(IMAGE) python -m processor
 	rm -rf ftrack_common
+
+bash:
+	docker run --name $(BASH_CONTAINER_NAME) --rm -it --entrypoint /bin/bash $(IMAGE)

@@ -6,7 +6,9 @@ RUN apt-get update \
   && pip install poetry
 
 RUN mkdir /service
-COPY . /service
+COPY ./processor /service/processor
+COPY ./ftrack_common /service/ftrack_common
+COPY ./pyproject.toml /service/pyproject.toml
 WORKDIR /service
 
 

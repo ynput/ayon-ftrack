@@ -60,8 +60,7 @@ def get_secrets():
 
 
 def main(func: Union[Callable, None] = None):
-    logging.basicConfig()
-    log.setLevel(logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
 
     log.info("Starting listener")
     if func is None:
@@ -74,6 +73,7 @@ def main(func: Union[Callable, None] = None):
         secret["name"]: secret["value"]
         for secret in get_secrets()
     }
+    ftrack_url = settings["ftrack_server"]
     api_key = settings["service_settings"]["api_key"]
     username = settings["service_settings"]["username"]
     if api_key in secrets_by_name:
@@ -84,7 +84,7 @@ def main(func: Union[Callable, None] = None):
 
     log.debug("Creating ftrack session")
     session = ftrack_api.Session(
-        settings["ftrack_server"],
+        ftrack_url.strip("/ "),
         api_key,
         username,
         auto_connect_event_hub=True,
