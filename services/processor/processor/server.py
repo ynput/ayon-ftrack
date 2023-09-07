@@ -29,7 +29,7 @@ def get_secrets():
 
 
 def main():
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
 
     init_service()
 
