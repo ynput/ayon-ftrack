@@ -16,7 +16,8 @@ import collections
 import pyblish.api
 import clique
 
-from ftrack_common.constants import FTRACK_ID_ATTRIB
+from ayon_ftrack.common.constants import FTRACK_ID_ATTRIB
+
 
 class IntegrateFtrackApi(pyblish.api.InstancePlugin):
     """ Commit components to server. """
