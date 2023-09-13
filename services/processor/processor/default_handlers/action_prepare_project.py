@@ -28,8 +28,6 @@ class PrepareProjectServer(ServerAction):
     description = "Set basic attributes on the project"
     icon = get_service_ftrack_icon_url("AYONAdmin.svg")
 
-    settings_key = "prepare_project"
-
     role_list = ["Pypeclub", "Administrator", "Project Manager"]
 
     settings_key = "prepare_project"
