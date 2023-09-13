@@ -39,10 +39,30 @@ def callback(event):
     log.info(f"Stored event {event_data['topic']}")
 
 
+def _trigger_leecher_started_event(session):
+    user = session.query(
+        "User where username is \"{}\"".format(session.api_user)
+    ).one()
+    user_data = {
+        "username": user["username"],
+        "id": user["id"]
+    }
+
+    session.event_hub.publish(
+        ftrack_api.event.base.Event(
+            topic="ayon.ftrack.leecher.started",
+            data={},
+            source=dict(user=user_data)
+        ),
+        on_error="ignore"
+    )
+
+
 def listen_loop(session, callback):
     while not session.event_hub.connected:
         time.sleep(0.1)
 
+    _trigger_leecher_started_event(session)
     session.event_hub.subscribe("topic=*", callback)
     session.event_hub.wait()
 

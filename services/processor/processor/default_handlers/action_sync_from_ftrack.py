@@ -1,6 +1,9 @@
+import ftrack_api
+
 from ftrack_common import (
     ServerAction,
     get_service_ftrack_icon_url,
+    CUST_ATTR_AUTO_SYNC,
 )
 from processor.lib import SyncFromFtrack
 
@@ -42,6 +45,71 @@ class SyncFromFtrackAction(ServerAction):
             )
         self.log.info("Synchronization finished")
         return True
+
+    def register(self):
+        super().register()
+
+        # Listen to leecher start event
+        self.session.event_hub.subscribe(
+            "topic=ayon.ftrack.leecher.started",
+            self._on_leecher_start,
+            priority=self.priority
+        )
+
+    def _on_leecher_start(self, event):
+        """Trigger Sync to AYON action when leecher starts.
+
+        The action is triggered for all project that have enabled auto-sync.
+        """
+
+        session = self.session
+        if session is None:
+            self.log.warning(
+                "Session is not set. Can't trigger Sync to AYON action.")
+            return True
+
+        projects = session.query("Project").all()
+        if not projects:
+            return True
+
+        selections = []
+        for project in projects:
+            if project["status"] != "active":
+                continue
+
+            auto_sync = project["custom_attributes"].get(CUST_ATTR_AUTO_SYNC)
+            if not auto_sync:
+                continue
+
+            selections.append({
+                "entityId": project["id"],
+                "entityType": "show"
+            })
+
+        if not selections:
+            return
+
+        user = session.query(
+            "User where username is \"{}\"".format(session.api_user)
+        ).one()
+        user_data = {
+            "username": user["username"],
+            "id": user["id"]
+        }
+
+        for selection in selections:
+            event_data = {
+                "actionIdentifier": self.launch_identifier,
+                "selection": [selection]
+            }
+            session.event_hub.publish(
+                ftrack_api.event.base.Event(
+                    topic="ftrack.action.launch",
+                    data=event_data,
+                    source=dict(user=user_data)
+                ),
+                on_error="ignore"
+            )
 
 
 def register(session):
