@@ -183,7 +183,7 @@ class FtrackServiceHandlers(BaseSettingsModel):
         default_factory=PrepareProjectAction,
     )
     sync_from_ftrack: SyncFromFtrackAction = Field(
-        title="Sync from ftrack",
+        title="Sync to AYON",
         default_factory=SyncFromFtrackAction,
     )
     sync_hier_entity_attributes: SyncHierarchicalAttributes = Field(
