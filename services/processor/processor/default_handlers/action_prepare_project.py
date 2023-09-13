@@ -433,7 +433,7 @@ class PrepareProjectServer(ServerAction):
             )
         self.log.info(f"Project '{project_name}' prepared")
         return {
-            "message": "Project created in Ayon.",
+            "message": "Project created in AYON.",
             "success": True
         }
 
