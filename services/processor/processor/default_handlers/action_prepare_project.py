@@ -24,11 +24,9 @@ class PrepareProjectServer(ServerAction):
     default_preset_name = "__default__"
     identifier = "prepare.project.server"
     label = "AYON Admin"
-    variant = "- Prepare Project (Server)"
+    variant = "- Prepare Project for AYON"
     description = "Set basic attributes on the project"
     icon = get_service_ftrack_icon_url("AYONAdmin.svg")
-
-    settings_key = "prepare_project"
 
     role_list = ["Pypeclub", "Administrator", "Project Manager"]
 
@@ -144,17 +142,11 @@ class PrepareProjectServer(ServerAction):
                 "value": "### Choose Anatomy Preset"
             },
             {
-                "label": "Anatomy Preset",
+                "label": "AYON Anatomy Preset",
                 "type": "enumerator",
                 "name": "anatomy_preset",
                 "data": anatomy_presets,
                 "value": primary_preset
-            },
-            {
-                "label": "Modify attributes",
-                "type": "boolean",
-                "name": "modify_attributes",
-                "value": False
             }
         ]
         if ayon_autosync_value is not None:
@@ -164,15 +156,10 @@ class PrepareProjectServer(ServerAction):
                 "name": "auto_sync_project",
                 "value": ayon_autosync_value
             })
-        items.append({
-            "label": "Sync project",
-            "type": "boolean",
-            "name": "sync_project",
-            "value": True
-        })
+
         return {
-            "title": "Choose Anatomy Preset",
-            "submit_button_label": "Prepare project",
+            "title": "Choose AYON Anatomy Preset",
+            "submit_button_label": "Continue",
             "items": items
         }
 
@@ -191,22 +178,15 @@ class PrepareProjectServer(ServerAction):
             },
             {
                 "type": "hidden",
-                "name": "sync_project",
-                "value": event_values["sync_project"]
-            },
-            {
-                "type": "hidden",
                 "name": "auto_sync_project",
                 "value": event_values["auto_sync_project"]
             },
             {
-                "type": "hidden",
-                "name": "modify_attributes",
-                "value": event_values["modify_attributes"]
-            },
-            {
                 "type": "label",
-                "value": "### Change default attributes"
+                "value": (
+                    "<b>You can validate or change your default"
+                    " project attributes.</b>"
+                )
             }
         ]
         if anatomy_preset == self.default_preset_name:
@@ -280,8 +260,8 @@ class PrepareProjectServer(ServerAction):
             attribute_items.extend(unknown_attributes)
 
         return {
-            "title": "Modify attributes",
-            "submit_button_label": "Prepare project",
+            "title": "Default project attributes",
+            "submit_button_label": "Confirm",
             "items": attribute_items
         }
 
@@ -306,8 +286,7 @@ class PrepareProjectServer(ServerAction):
             return
 
         # User did not want to modify default attributes
-        if event_values["modify_attributes"]:
-            return self._attributes_interface(event_values)
+        return self._attributes_interface(event_values)
 
     def _set_ftrack_attributes(self, session, project_entity, values):
         custom_attrs, hier_custom_attrs = get_ayon_attr_configs(session)
@@ -393,23 +372,22 @@ class PrepareProjectServer(ServerAction):
             }
 
         attributes = {}
-        if event_values["modify_attributes"]:
-            list_mapping = {}
-            for key, value in event_values.items():
-                if key.startswith("attr_list_"):
-                    attr_name = key[10:]
-                    list_mapping[attr_name] = json.loads(value)
-                elif key.startswith("attr_"):
-                    attributes[key[5:]] = value
+        list_mapping = {}
+        for key, value in event_values.items():
+            if key.startswith("attr_list_"):
+                attr_name = key[10:]
+                list_mapping[attr_name] = json.loads(value)
+            elif key.startswith("attr_"):
+                attributes[key[5:]] = value
 
-            for attr_name, mapping in list_mapping.items():
-                final_value = []
-                for item_id, value in mapping.items():
-                    item_value = event_values[item_id]
-                    if item_value:
-                        final_value.append(value)
+        for attr_name, mapping in list_mapping.items():
+            final_value = []
+            for item_id, value in mapping.items():
+                item_value = event_values[item_id]
+                if item_value:
+                    final_value.append(value)
 
-                attributes[attr_name] = final_value
+            attributes[attr_name] = final_value
 
         anatomy_preset = event_values["anatomy_preset"]
         if anatomy_preset == self.default_preset_name:
@@ -422,7 +400,7 @@ class PrepareProjectServer(ServerAction):
         values[CUST_ATTR_AUTO_SYNC] = auto_sync_project
         self._set_ftrack_attributes(session, project_entity, values)
 
-        if not auto_sync_project and event_values["sync_project"]:
+        if not auto_sync_project:
             event_data = {
                 "actionIdentifier": "sync.to.avalon.server",
                 "selection": [{
@@ -455,7 +433,7 @@ class PrepareProjectServer(ServerAction):
             )
         self.log.info(f"Project '{project_name}' prepared")
         return {
-            "message": "Project created in Ayon.",
+            "message": "Project created in AYON.",
             "success": True
         }
 

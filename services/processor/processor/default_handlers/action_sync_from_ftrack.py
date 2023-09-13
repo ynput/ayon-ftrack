@@ -10,7 +10,7 @@ class SyncFromFtrackAction(ServerAction):
 
     identifier = "sync.from.ftrack.server"
     label = "AYON Admin"
-    variant = "- Sync from ftrack"
+    variant = "- Sync to AYON"
     description = "Synchronize project hierarchy based on ftrack"
     icon = get_service_ftrack_icon_url("AYONAdmin.svg")
 
@@ -37,7 +37,7 @@ class SyncFromFtrackAction(ServerAction):
         if report_items:
             self.show_interface(
                 report_items,
-                title="Sync from ftrack report",
+                title="Sync to AYON report",
                 event=event
             )
         self.log.info("Synchronization finished")
