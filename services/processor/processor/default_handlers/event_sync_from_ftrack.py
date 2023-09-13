@@ -1574,6 +1574,12 @@ class AutoSyncFromFtrack(BaseEventHandler):
                     selection=selection
                 )
 
+        if sync_process.ft_project is None:
+            self.log.warning(
+                f"Project was not found. Skipping."
+                "\nEvent data: {event['data']}\n"
+            )
+
         if not sync_process.is_event_valid:
             self.log.debug(
                 f"Project has disabled autosync {sync_process.project_name}."
