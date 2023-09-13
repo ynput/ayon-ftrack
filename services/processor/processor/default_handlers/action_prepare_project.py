@@ -149,12 +149,6 @@ class PrepareProjectServer(ServerAction):
                 "name": "anatomy_preset",
                 "data": anatomy_presets,
                 "value": primary_preset
-            },
-            {
-                "label": "Modify attributes",
-                "type": "boolean",
-                "name": "modify_attributes",
-                "value": False
             }
         ]
         if ayon_autosync_value is not None:
@@ -198,11 +192,6 @@ class PrepareProjectServer(ServerAction):
                 "type": "hidden",
                 "name": "auto_sync_project",
                 "value": event_values["auto_sync_project"]
-            },
-            {
-                "type": "hidden",
-                "name": "modify_attributes",
-                "value": event_values["modify_attributes"]
             },
             {
                 "type": "label",
@@ -306,8 +295,7 @@ class PrepareProjectServer(ServerAction):
             return
 
         # User did not want to modify default attributes
-        if event_values["modify_attributes"]:
-            return self._attributes_interface(event_values)
+        return self._attributes_interface(event_values)
 
     def _set_ftrack_attributes(self, session, project_entity, values):
         custom_attrs, hier_custom_attrs = get_ayon_attr_configs(session)
@@ -393,23 +381,22 @@ class PrepareProjectServer(ServerAction):
             }
 
         attributes = {}
-        if event_values["modify_attributes"]:
-            list_mapping = {}
-            for key, value in event_values.items():
-                if key.startswith("attr_list_"):
-                    attr_name = key[10:]
-                    list_mapping[attr_name] = json.loads(value)
-                elif key.startswith("attr_"):
-                    attributes[key[5:]] = value
+        list_mapping = {}
+        for key, value in event_values.items():
+            if key.startswith("attr_list_"):
+                attr_name = key[10:]
+                list_mapping[attr_name] = json.loads(value)
+            elif key.startswith("attr_"):
+                attributes[key[5:]] = value
 
-            for attr_name, mapping in list_mapping.items():
-                final_value = []
-                for item_id, value in mapping.items():
-                    item_value = event_values[item_id]
-                    if item_value:
-                        final_value.append(value)
+        for attr_name, mapping in list_mapping.items():
+            final_value = []
+            for item_id, value in mapping.items():
+                item_value = event_values[item_id]
+                if item_value:
+                    final_value.append(value)
 
-                attributes[attr_name] = final_value
+            attributes[attr_name] = final_value
 
         anatomy_preset = event_values["anatomy_preset"]
         if anatomy_preset == self.default_preset_name:
