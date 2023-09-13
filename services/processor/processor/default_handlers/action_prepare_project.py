@@ -24,7 +24,7 @@ class PrepareProjectServer(ServerAction):
     default_preset_name = "__default__"
     identifier = "prepare.project.server"
     label = "AYON Admin"
-    variant = "- Prepare Project (Server)"
+    variant = "- Prepare Project for AYON"
     description = "Set basic attributes on the project"
     icon = get_service_ftrack_icon_url("AYONAdmin.svg")
 
@@ -144,7 +144,7 @@ class PrepareProjectServer(ServerAction):
                 "value": "### Choose Anatomy Preset"
             },
             {
-                "label": "Anatomy Preset",
+                "label": "AYON Anatomy Preset",
                 "type": "enumerator",
                 "name": "anatomy_preset",
                 "data": anatomy_presets,
@@ -160,8 +160,8 @@ class PrepareProjectServer(ServerAction):
             })
 
         return {
-            "title": "Choose Anatomy Preset",
-            "submit_button_label": "Prepare project",
+            "title": "Choose AYON Anatomy Preset",
+            "submit_button_label": "Continue",
             "items": items
         }
 
@@ -185,7 +185,10 @@ class PrepareProjectServer(ServerAction):
             },
             {
                 "type": "label",
-                "value": "### Change default attributes"
+                "value": (
+                    "<b>You can validate or change your default"
+                    " project attributes.</b>"
+                )
             }
         ]
         if anatomy_preset == self.default_preset_name:
@@ -259,8 +262,8 @@ class PrepareProjectServer(ServerAction):
             attribute_items.extend(unknown_attributes)
 
         return {
-            "title": "Modify attributes",
-            "submit_button_label": "Prepare project",
+            "title": "Default project attributes",
+            "submit_button_label": "Confirm",
             "items": attribute_items
         }
 
