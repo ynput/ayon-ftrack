@@ -158,12 +158,7 @@ class PrepareProjectServer(ServerAction):
                 "name": "auto_sync_project",
                 "value": ayon_autosync_value
             })
-        items.append({
-            "label": "Sync project",
-            "type": "boolean",
-            "name": "sync_project",
-            "value": True
-        })
+
         return {
             "title": "Choose Anatomy Preset",
             "submit_button_label": "Prepare project",
@@ -182,11 +177,6 @@ class PrepareProjectServer(ServerAction):
                 "type": "hidden",
                 "name": "anatomy_preset",
                 "value": anatomy_preset
-            },
-            {
-                "type": "hidden",
-                "name": "sync_project",
-                "value": event_values["sync_project"]
             },
             {
                 "type": "hidden",
@@ -409,7 +399,7 @@ class PrepareProjectServer(ServerAction):
         values[CUST_ATTR_AUTO_SYNC] = auto_sync_project
         self._set_ftrack_attributes(session, project_entity, values)
 
-        if not auto_sync_project and event_values["sync_project"]:
+        if not auto_sync_project:
             event_data = {
                 "actionIdentifier": "sync.to.avalon.server",
                 "selection": [{
