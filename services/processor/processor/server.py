@@ -34,8 +34,8 @@ def main():
     init_service()
 
     handler_paths = get_handler_paths()
-    settings = get_addons_studio_settings()
-    ftrack_settings = settings["ftrack"]
+
+    ftrack_settings = ayon_api.get_service_addon_settings()
     ftrack_url = ftrack_settings["ftrack_server"]
     service_settings = ftrack_settings["service_settings"]
 
