@@ -5,7 +5,6 @@ if ($ARGS.Length -gt 1) {
     $arguments = $ARGS[1..($ARGS.Length - 1)]
 }
 
-$current_dir = Get-Location
 $script_dir_rel = Split-Path -Path $MyInvocation.MyCommand.Definition -Parent
 $script_dir = (Get-Item $script_dir_rel).FullName
 
@@ -49,7 +48,7 @@ function dist {
 }
 
 function load-env {
-  $env_path = "$($current_dir)/.env"
+  $env_path = "$($script_dir)/.env"
   if (Test-Path $env_path) {
     Get-Content $env_path | foreach {
       $name, $value = $_.split("=")
@@ -63,7 +62,7 @@ function load-env {
 function dev {
   load-env
   & docker run --rm -ti `
-    -v "$($current_dir):/service" `
+    -v "$($script_dir):/service" `
   	--hostname ftrackproc `
   	--env AYON_API_KEY=$env:AYON_API_KEY `
   	--env AYON_SERVER_URL=$env:AYON_SERVER_URL `
