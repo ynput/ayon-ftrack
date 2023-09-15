@@ -1,7 +1,6 @@
 # Receive first positional argument
 Param([Parameter(Position=0)]$FunctionName)
 
-$current_dir = Get-Location
 $script_dir_rel = Split-Path -Path $MyInvocation.MyCommand.Definition -Parent
 $script_dir = (Get-Item $script_dir_rel).FullName
 
@@ -39,11 +38,11 @@ function run_processor {
 }
 
 function load-env {
-  $env_path = "$($current_dir)/.env"
+  $env_path = "$($script_dir)/.env"
   if (Test-Path $env_path) {
     Get-Content $env_path | foreach {
       $name, $value = $_.split("=")
-      if (-not([string]::IsNullOrWhiteSpace($name) || $name.Contains("#"))) {
+      if (-not([string]::IsNullOrWhiteSpace($name) -or $name.Contains("#"))) {
         Set-Content env:\$name $value
       }
     }
