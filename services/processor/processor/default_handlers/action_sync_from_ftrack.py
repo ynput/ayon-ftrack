@@ -11,7 +11,7 @@ from processor.lib import SyncFromFtrack
 class SyncFromFtrackAction(ServerAction):
     """Prepare project attributes in Anatomy."""
 
-    identifier = "sync.from.ftrack.server"
+    identifier = "sync.from.ftrack.to.ayon"
     label = "AYON Admin"
     variant = "- Sync to AYON"
     description = "Synchronize project hierarchy based on ftrack"

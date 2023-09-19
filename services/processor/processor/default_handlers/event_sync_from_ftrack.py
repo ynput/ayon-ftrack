@@ -1569,7 +1569,7 @@ class AutoSyncFromFtrack(BaseEventHandler):
                 }]
                 # TODO uncomment when out of testing stage
                 self.trigger_action(
-                    action_identifier="sync.from.ftrack.server",
+                    action_identifier="sync.from.ftrack.to.ayon",
                     event=sync_process.event,
                     selection=selection
                 )

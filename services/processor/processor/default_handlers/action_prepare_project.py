@@ -408,7 +408,7 @@ class PrepareProjectServer(ServerAction):
 
         if not auto_sync_project:
             event_data = {
-                "actionIdentifier": "sync.to.avalon.server",
+                "actionIdentifier": "sync.from.ftrack.to.ayon",
                 "selection": [{
                     "entityId": project_entity["id"],
                     "entityType": "show"
