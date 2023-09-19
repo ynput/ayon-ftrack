@@ -156,8 +156,8 @@ class ValidateFtrackAttributes(pyblish.api.InstancePlugin):
             "select id, entity_type, object_type_id, is_hierarchical"
             " from CustomAttributeConfiguration"
         )
-        all_avalon_attr = session.query(cust_attrs_query).all()
-        for cust_attr in all_avalon_attr:
+        all_attrs = session.query(cust_attrs_query).all()
+        for cust_attr in all_attrs:
             if cust_attr["is_hierarchical"]:
                 hier_custom_attributes.append(cust_attr["key"])
 

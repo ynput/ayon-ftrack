@@ -75,7 +75,7 @@ class FtrackDesktopAppHandlers(BaseSettingsModel):
         default_factory=ApplicationLaunchStatuses,
     )
     create_update_attributes: CreateUpdateCustomAttributesAction = Field(
-        title="Create/Update Avalon Attributes",
+        title="Create/Update Custom Attributes",
         default_factory=CreateUpdateCustomAttributesAction,
     )
     prepare_project: PrepareProjectAction = Field(
