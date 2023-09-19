@@ -156,6 +156,12 @@ class PrepareProjectServer(ServerAction):
                 "name": "auto_sync_project",
                 "value": ayon_autosync_value
             })
+        else:
+            items.append({
+                "type": "hidden",
+                "name": "auto_sync_project",
+                "value": False
+            })
 
         return {
             "title": "Choose AYON Anatomy Preset",
