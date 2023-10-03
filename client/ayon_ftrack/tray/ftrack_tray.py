@@ -178,7 +178,10 @@ class FtrackTrayWrapper:
             if self.thread_socket_server is None:
                 if failed_count < max_fail_count:
                     self.thread_socket_server = SocketThread(
-                        thread_name, thread_port, subprocess_path
+                        thread_name,
+                        thread_port,
+                        subprocess_path,
+                        ["--headless"],
                     )
                     self.thread_socket_server.start()
                     self.bool_action_thread_running = True
