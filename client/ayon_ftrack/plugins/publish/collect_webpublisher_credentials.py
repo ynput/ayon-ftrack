@@ -1,40 +1,39 @@
-"""Loads publishing context from json and continues in publish process.
+"""Translates uploader's user email to Ftrack username.
 
 Should run before 'CollectAnatomyContextData' so the user on context is
 changed before it's stored to context anatomy data or instance anatomy data.
 
 Requires:
-    anatomy -> context["anatomy"] *(pyblish.api.CollectorOrder - 0.11)
+    instance.data.get("user_email") or os.environ.get("USER_EMAIL")
 
 Provides:
-    context, instances -> All data from previous publishing process.
+   os.environ["FTRACK_API_USER"]
+   context.data["user"]
 """
 
 import os
 
 import ftrack_api
 import pyblish.api
+import ayon_api
 
 
-class CollectUsernameForWebpublish(pyblish.api.ContextPlugin):
+class CollectWebpublisherCredentials(pyblish.api.ContextPlugin):
     """
-        Translates user email to Ftrack username.
+        Translates uploader's user email to Ftrack username.
 
-        Emails in Ftrack are same as company's Slack, username is needed to
-        load data to Ftrack.
+    It expects that user email in Ftrack is same as user email in Ayon server,
+    Ftrack username is needed to load data to Ftrack.
 
-        Expects "pype.club" user created on Ftrack and FTRACK_BOT_API_KEY env
-        var set up.
-
-        Resets `context.data["user"] to correctly populate `version.author` and
-        `representation.context.username`
+    Resets `context.data["user"] to correctly populate `version.author` and
+    `representation.context.username`
 
     """
 
     settings_category = "ftrack"
 
     order = pyblish.api.CollectorOrder + 0.0015
-    label = "Collect ftrack username"
+    label = "Collect webpublisher credentials"
     hosts = ["webpublisher", "photoshop"]
     targets = ["remotepublish", "filespublish", "tvpaint_worker"]
 
