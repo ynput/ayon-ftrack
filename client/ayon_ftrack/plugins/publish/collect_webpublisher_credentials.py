@@ -40,8 +40,9 @@ class CollectUsernameForWebpublish(pyblish.api.ContextPlugin):
 
     def process(self, context):
         self.log.info("{}".format(self.__class__.__name__))
-        os.environ["FTRACK_API_USER"] = os.environ["FTRACK_BOT_API_USER"]
-        os.environ["FTRACK_API_KEY"] = os.environ["FTRACK_BOT_API_KEY"]
+        service_api_key, service_username = self._get_username_key()
+        os.environ["FTRACK_API_USER"] = service_username
+        os.environ["FTRACK_API_KEY"] = service_api_key
 
         # for publishes with studio processing
         user_email = os.environ.get("USER_EMAIL")
@@ -74,3 +75,20 @@ class CollectUsernameForWebpublish(pyblish.api.ContextPlugin):
         if '@' in burnin_name:
             burnin_name = burnin_name[:burnin_name.index('@')]
         context.data["user"] = burnin_name
+    def _get_username_key(self):
+        """Query settings for ftrack credentials."""
+        ftrack_settings = ayon_api.get_service_addon_settings()
+        service_settings = ftrack_settings["service_settings"]
+
+        api_key = service_settings["api_key"]
+        username = service_settings["username"]
+
+        secrets_by_name = {
+            secret["name"]: secret["value"]
+            for secret in ayon_api.get_secrets()
+        }
+        if api_key in secrets_by_name:
+            api_key = secrets_by_name[api_key]
+        if username in secrets_by_name:
+            username = secrets_by_name[username]
+        return api_key, username
