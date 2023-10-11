@@ -88,12 +88,19 @@ class CollectWebpublisherCredentials(pyblish.api.ContextPlugin):
         return user_email
 
     def _get_username_key(self):
-        """Query settings for ftrack credentials."""
+        """Query settings for ftrack credentials.
+
+        Raises:
+            ValueError: if Ftrack service credentials are not configured
+        """
         ftrack_settings = ayon_api.get_service_addon_settings()
         service_settings = ftrack_settings["service_settings"]
 
         api_key = service_settings["api_key"]
         username = service_settings["username"]
+
+        if not username:
+            raise ValueError("Configuration expected in 'ayon+settings://ftrack/service_settings'")  # noqa
 
         secrets_by_name = {
             secret["name"]: secret["value"]
