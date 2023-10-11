@@ -16,6 +16,7 @@ import os
 import ftrack_api
 import pyblish.api
 import ayon_api
+from openpype.settings import get_project_settings
 
 
 class CollectWebpublisherCredentials(pyblish.api.ContextPlugin):
@@ -39,7 +40,7 @@ class CollectWebpublisherCredentials(pyblish.api.ContextPlugin):
 
     def process(self, context):
         self.log.info("{}".format(self.__class__.__name__))
-        service_api_key, service_username = self._get_username_key()
+        service_api_key, service_username = self._get_username_key(context)
         os.environ["FTRACK_API_USER"] = service_username
         os.environ["FTRACK_API_KEY"] = service_api_key
 
@@ -69,9 +70,9 @@ class CollectWebpublisherCredentials(pyblish.api.ContextPlugin):
         ).first()
         if not user:
             raise ValueError(
-                "Couldn't find user with {} email".format(user_email))
+                "Couldn't find user with '{}' email".format(user_email))
         username = user.get("username")
-        self.log.debug("Resolved ftrack username:: {}".format(username))
+        self.log.debug("Resolved ftrack username:: '{}'".format(username))
         return username
 
     def _get_user_email(self, context):
@@ -87,20 +88,15 @@ class CollectWebpublisherCredentials(pyblish.api.ContextPlugin):
                 break
         return user_email
 
-    def _get_username_key(self):
-        """Query settings for ftrack credentials.
-
-        Raises:
-            ValueError: if Ftrack service credentials are not configured
-        """
-        ftrack_settings = ayon_api.get_service_addon_settings()
+    def _get_username_key(self, context):
+        """Query settings for ftrack credentials."""
+        project_name = context.data["projectName"]
+        project_settings = get_project_settings(project_name)
+        ftrack_settings = project_settings["ftrack"]
         service_settings = ftrack_settings["service_settings"]
 
         api_key = service_settings["api_key"]
         username = service_settings["username"]
-
-        if not username:
-            raise ValueError("Configuration expected in 'ayon+settings://ftrack/service_settings'")  # noqa
 
         secrets_by_name = {
             secret["name"]: secret["value"]
