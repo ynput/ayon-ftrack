@@ -44,6 +44,39 @@ class CollectUsernameForWebpublish(pyblish.api.ContextPlugin):
         os.environ["FTRACK_API_USER"] = service_username
         os.environ["FTRACK_API_KEY"] = service_api_key
 
+        user_email = self._get_user_email(context)
+
+        if not user_email:
+            self.log.warning("No email found")
+            return
+
+        username = self._get_ftrack_username(user_email)
+        os.environ["FTRACK_API_USER"] = username
+
+        burnin_name = username
+        if '@' in burnin_name:
+            burnin_name = burnin_name[:burnin_name.index('@')]
+        context.data["user"] = burnin_name
+
+    def _get_ftrack_username(self, user_email):
+        """Queries Ftrack api for user with 'user_email'.
+
+        Raises:
+            ValueError: if user not found
+        """
+        session = ftrack_api.Session(auto_connect_event_hub=False)
+        user = session.query(
+            "User where email like '{}'".format(user_email)
+        ).first()
+        if not user:
+            raise ValueError(
+                "Couldn't find user with {} email".format(user_email))
+        username = user.get("username")
+        self.log.debug("Resolved ftrack username:: {}".format(username))
+        return username
+
+    def _get_user_email(self, context):
+        """Collect uploader's email address to lookup user in Ftrack"""
         # for publishes with studio processing
         user_email = os.environ.get("USER_EMAIL")
         self.log.debug("Email from env:: {}".format(user_email))
@@ -53,28 +86,8 @@ class CollectUsernameForWebpublish(pyblish.api.ContextPlugin):
                 user_email = instance.data.get("user_email")
                 self.log.debug("Email from instance:: {}".format(user_email))
                 break
+        return user_email
 
-        if not user_email:
-            self.log.info("No email found")
-            return
-
-        session = ftrack_api.Session(auto_connect_event_hub=False)
-        user = session.query(
-            "User where email like '{}'".format(user_email)
-        ).first()
-
-        if not user:
-            raise ValueError(
-                "Couldn't find user with {} email".format(user_email))
-
-        username = user.get("username")
-        self.log.debug("Resolved ftrack username:: {}".format(username))
-        os.environ["FTRACK_API_USER"] = username
-
-        burnin_name = username
-        if '@' in burnin_name:
-            burnin_name = burnin_name[:burnin_name.index('@')]
-        context.data["user"] = burnin_name
     def _get_username_key(self):
         """Query settings for ftrack credentials."""
         ftrack_settings = ayon_api.get_service_addon_settings()
