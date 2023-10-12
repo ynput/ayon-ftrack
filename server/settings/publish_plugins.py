@@ -5,6 +5,7 @@ from ayon_server.settings import (
     BaseSettingsModel,
     ensure_unique_names,
 )
+from ayon_server.settings.enum import secrets_enum
 
 
 class CollectFamilyProfile(BaseSettingsModel):
@@ -46,6 +47,20 @@ class CollectFtrackCustomAttributeDataModel(BaseSettingsModel):
     custom_attribute_keys: list[str] = Field(
         title="Custom attribute keys",
         default_factory=list,
+    )
+
+
+class CollectWebpublisherCredentialsModel(BaseSettingsModel):
+    """Ftrack credentials used for querying Ftrack users for webpublisher."""
+    _isGroup = True
+    enabled: bool = True
+    username: str = Field(
+        enum_resolver=secrets_enum,
+        title="Ftrack user name"
+    )
+    api_key: str = Field(
+        enum_resolver=secrets_enum,
+        title="Ftrack API key"
     )
 
 
@@ -306,6 +321,17 @@ class FtrackPublishPlugins(BaseSettingsModel):
             )
         )
     )
+    CollectWebpublisherCredentials: CollectWebpublisherCredentialsModel = (
+        Field(
+            title="Collect webpublisher credentials",
+            default_factory=CollectWebpublisherCredentialsModel,
+            description=(
+                "Credentials used in Webpublisher to translate uploader "
+                "email address to Ftrack username"
+            )
+        )
+    )
+
     ValidateFtrackAttributes: ValidateFtrackAttributesModel = Field(
         title="Validate Ftrack Attributes",
         default_factory=ValidateFtrackAttributesModel,
@@ -563,6 +589,11 @@ DEFAULT_PUBLISH_SETTINGS = {
     "CollectFtrackCustomAttributeData": {
         "enabled": False,
         "custom_attribute_keys": []
+    },
+    "CollectWebpublisherCredentials": {
+        "enabled": False,
+        "username": "",
+        "api_key": "",
     },
     "IntegrateHierarchyToFtrack": {
         "create_task_status_profiles": []
