@@ -16,6 +16,7 @@ import os
 import ftrack_api
 import pyblish.api
 import ayon_api
+from openpype.settings import get_project_settings
 
 
 class CollectWebpublisherCredentials(pyblish.api.ContextPlugin):
@@ -35,15 +36,13 @@ class CollectWebpublisherCredentials(pyblish.api.ContextPlugin):
     order = pyblish.api.CollectorOrder + 0.0015
     label = "Collect webpublisher credentials"
     hosts = ["webpublisher", "photoshop"]
-    targets = ["webpublish"]
-
-    username = None
-    api_key = None
+    targets = ["remotepublish", "filespublish", "tvpaint_worker"]
 
     def process(self, context):
-        api_key, username = self._get_username_key(context)
-        os.environ["FTRACK_API_USER"] = username
-        os.environ["FTRACK_API_KEY"] = api_key
+        self.log.info("{}".format(self.__class__.__name__))
+        service_api_key, service_username = self._get_username_key(context)
+        os.environ["FTRACK_API_USER"] = service_username
+        os.environ["FTRACK_API_KEY"] = service_api_key
 
         user_email = self._get_user_email(context)
 
@@ -91,8 +90,13 @@ class CollectWebpublisherCredentials(pyblish.api.ContextPlugin):
 
     def _get_username_key(self, context):
         """Query settings for ftrack credentials."""
-        username = self.username
-        api_key = self.api_key
+        project_name = context.data["projectName"]
+        project_settings = get_project_settings(project_name)
+        ftrack_settings = project_settings["ftrack"]
+        service_settings = ftrack_settings["service_settings"]
+
+        api_key = service_settings["api_key"]
+        username = service_settings["username"]
 
         secrets_by_name = {
             secret["name"]: secret["value"]
