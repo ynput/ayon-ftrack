@@ -105,5 +105,6 @@ class CollectWebpublisherCredentials(pyblish.api.ContextPlugin):
         api_key = secrets_by_name.get(api_key_secret)
         username = secrets_by_name.get(username_secret)
         if not api_key or not username:
-            raise KnownPublishError("Missing ftrack credentials in settings")
+            raise KnownPublishError("Missing ftrack credentials in settings. "
+                                    "Please let admin fill in 'ayon+settings://ftrack/service_settings'")  # noqa
         return api_key, username
