@@ -17,6 +17,7 @@ import ftrack_api
 import pyblish.api
 import ayon_api
 from openpype.settings import get_project_settings
+from openpype.pipeline import KnownPublishError
 
 
 class CollectWebpublisherCredentials(pyblish.api.ContextPlugin):
@@ -36,10 +37,9 @@ class CollectWebpublisherCredentials(pyblish.api.ContextPlugin):
     order = pyblish.api.CollectorOrder + 0.0015
     label = "Collect webpublisher credentials"
     hosts = ["webpublisher", "photoshop"]
-    targets = ["remotepublish", "filespublish", "tvpaint_worker"]
+    targets = ["webpublish"]
 
     def process(self, context):
-        self.log.info("{}".format(self.__class__.__name__))
         service_api_key, service_username = self._get_username_key(context)
         os.environ["FTRACK_API_USER"] = service_username
         os.environ["FTRACK_API_KEY"] = service_api_key
@@ -90,20 +90,19 @@ class CollectWebpublisherCredentials(pyblish.api.ContextPlugin):
 
     def _get_username_key(self, context):
         """Query settings for ftrack credentials."""
-        project_name = context.data["projectName"]
-        project_settings = get_project_settings(project_name)
-        ftrack_settings = project_settings["ftrack"]
-        service_settings = ftrack_settings["service_settings"]
+        project_settings = context.data["project_settings"]
+        service_settings = project_settings["ftrack"]["service_settings"]
 
-        api_key = service_settings["api_key"]
-        username = service_settings["username"]
+        api_key_secret = service_settings["api_key"]
+        username_secret = service_settings["username"]
 
         secrets_by_name = {
             secret["name"]: secret["value"]
             for secret in ayon_api.get_secrets()
         }
-        if api_key in secrets_by_name:
-            api_key = secrets_by_name[api_key]
-        if username in secrets_by_name:
-            username = secrets_by_name[username]
+        api_key = secrets_by_name.get(api_key_secret)
+        username = secrets_by_name.get(username_secret)
+        if not api_key or not username:
+            raise KnownPublishError("Missing ftrack credentials in settings. "
+                                    "Please let admin fill in 'ayon+settings://ftrack/service_settings'")  # noqa
         return api_key, username
