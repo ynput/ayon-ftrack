@@ -90,10 +90,8 @@ class CollectWebpublisherCredentials(pyblish.api.ContextPlugin):
 
     def _get_username_key(self, context):
         """Query settings for ftrack credentials."""
-        project_name = context.data["projectName"]
-        project_settings = get_project_settings(project_name)
-        ftrack_settings = project_settings["ftrack"]
-        service_settings = ftrack_settings["service_settings"]
+        project_settings = context.data["project_settings"]
+        service_settings = project_settings["ftrack"]["service_settings"]
 
         api_key_secret = service_settings["api_key"]
         username_secret = service_settings["username"]
