@@ -8,6 +8,7 @@ from ayon_server.settings import (
 
 
 class CollectFamilyAdvancedFilterModel(BaseSettingsModel):
+    _layout = "expanded"
     families: list[str] = Field(
         default_factory=list,
         title="Additional Families"
@@ -40,9 +41,9 @@ class CollectFamilyProfile(BaseSettingsModel):
         True,
         title="Add Ftrack Family",
     )
-    advanced_filtering: CollectFamilyAdvancedFilterModel = Field(
+    advanced_filtering: list[CollectFamilyAdvancedFilterModel] = Field(
         title="Advanced adding if additional families present",
-        default_factory=CollectFamilyAdvancedFilterModel,
+        default_factory=list,
     )
 
 
