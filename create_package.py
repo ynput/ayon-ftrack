@@ -301,17 +301,55 @@ def create_server_package(
     log.info(f"Output package can be found: {output_path}")
 
 
+def copy_client_code(current_dir: str, output_dir: str):
+    """Copy client code to output directory.
+
+    Args:
+        current_dir (str): Directory path of addon source.
+        output_dir (str): Directory path to output client code.
+    """
+
+    full_output_dir = os.path.join(output_dir, ADDON_CLIENT_DIR)
+    if os.path.exists(full_output_dir):
+        shutil.rmtree(full_output_dir)
+
+    if os.path.exists(full_output_dir):
+        raise RuntimeError(
+            f"Failed to remove target folder '{full_output_dir}'"
+        )
+
+    os.makedirs(output_dir, exist_ok=True)
+    mapping = _get_client_files_mapping(current_dir)
+    for (src_path, dst_path) in mapping:
+        full_dst_path = os.path.join(full_output_dir, dst_path)
+        os.makedirs(os.path.dirname(full_dst_path), exist_ok=True)
+        shutil.copy2(src_path, full_dst_path)
+
+
 def main(
     output_dir: Optional[str]=None,
     skip_zip: Optional[bool]=False,
-    keep_sources: Optional[bool]=False
+    keep_sources: Optional[bool]=False,
+    only_client: Optional[bool]=False,
 ):
     log: logging.Logger = logging.getLogger("create_package")
-    log.info("Start creating package")
 
     current_dir: str = os.path.dirname(os.path.abspath(__file__))
     if not output_dir:
         output_dir = os.path.join(current_dir, "package")
+
+    if only_client:
+        log.info("Creating client folder")
+        if not output_dir:
+            raise RuntimeError(
+                "Output directory must be defined"
+                " for client only preparation."
+            )
+        copy_client_code(current_dir, output_dir)
+        log.info("Client folder created")
+        return
+
+    log.info("Start creating package")
 
     version_filepath: str = os.path.join(current_dir, "version.py")
     version_content: dict[str, Any] = {}
@@ -373,6 +411,15 @@ if __name__ == "__main__":
             " (Will be purged if already exists!)"
         )
     )
+    parser.add_argument(
+        "--only-client",
+        dest="only_client",
+        action="store_true",
+        help=(
+            "Extract only client code. This is useful for development."
+            " Requires '-o', '--output' argument to be filled."
+        )
+    )
 
     args = parser.parse_args(sys.argv[1:])
-    main(args.output_dir, args.skip_zip, args.keep_sources)
+    main(args.output_dir, args.skip_zip, args.keep_sources, args.only_client)
