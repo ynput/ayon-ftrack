@@ -187,6 +187,33 @@ def copy_server_content(
         safe_copy_file(src_path, dst_path)
 
 
+def _get_client_dir(current_dir: str):
+    client_dir: str = os.path.join(current_dir, "client")
+    if not os.path.isdir(client_dir):
+        raise RuntimeError("Client directory was not found")
+    return client_dir
+
+
+def _get_client_files_mapping(current_dir: str):
+    client_dir: str = _get_client_dir(current_dir)
+    common_dir: str = os.path.join(current_dir, COMMON_DIR_NAME)
+    version_filepath: str = os.path.join(current_dir, "version.py")
+    addon_subdir_path = os.path.join(client_dir, ADDON_CLIENT_DIR)
+
+    output: list[tuple[str, str]] = []
+    for path, sub_path in find_files_in_subdir(addon_subdir_path):
+        output.append((path, sub_path))
+
+    for path, sub_path in find_files_in_subdir(common_dir):
+        dst_path = "/".join(("common", sub_path))
+        output.append((path, dst_path))
+
+    output.append((
+        version_filepath, "version.py"
+    ))
+    return output
+
+
 def zip_client_side(
     addon_package_dir: str,
     current_dir: str,
@@ -203,11 +230,7 @@ def zip_client_side(
         log (logging.Logger): Logger object.
     """
 
-    client_dir: str = os.path.join(current_dir, "client")
-    if not os.path.isdir(client_dir):
-        log.info("Client directory was not found. Skipping")
-        return
-
+    client_dir: str = _get_client_dir(current_dir)
     if not zip_basename:
         zip_basename = "client"
     log.info("Preparing client code zip")
@@ -215,24 +238,18 @@ def zip_client_side(
     if not os.path.exists(private_dir):
         os.makedirs(private_dir)
 
-    common_dir: str = os.path.join(current_dir, COMMON_DIR_NAME)
-    version_filepath: str = os.path.join(current_dir, "version.py")
-    addon_subdir_path = os.path.join(client_dir, ADDON_CLIENT_DIR)
-
+    files_mapping: list[tuple[str, str]] = _get_client_files_mapping(
+        current_dir
+    )
     zip_filename: str = zip_basename + ".zip"
     zip_filepath: str = os.path.join(os.path.join(private_dir, zip_filename))
-    with ZipFileLongPaths(zip_filepath, "w", zipfile.ZIP_DEFLATED) as zipf:
-        for path, sub_path in find_files_in_subdir(addon_subdir_path):
-            dst_path = "/".join((ADDON_CLIENT_DIR, sub_path))
-            zipf.write(path, dst_path)
+    with ZipFileLongPaths(
+        zip_filepath, "w", zipfile.ZIP_DEFLATED
+    ) as zipf:
+        for (src_path, dst_path) in files_mapping:
+            full_dst_path = "/".join((ADDON_CLIENT_DIR, dst_path))
+            zipf.write(src_path, full_dst_path)
 
-        for path, sub_path in find_files_in_subdir(common_dir):
-            dst_path = "/".join((ADDON_CLIENT_DIR, "common", sub_path))
-            zipf.write(path, dst_path)
-
-        zipf.write(
-            version_filepath, os.path.join(ADDON_CLIENT_DIR, "version.py")
-        )
     shutil.copy(os.path.join(client_dir, "pyproject.toml"), private_dir)
 
 
@@ -284,17 +301,55 @@ def create_server_package(
     log.info(f"Output package can be found: {output_path}")
 
 
+def copy_client_code(current_dir: str, output_dir: str):
+    """Copy client code to output directory.
+
+    Args:
+        current_dir (str): Directory path of addon source.
+        output_dir (str): Directory path to output client code.
+    """
+
+    full_output_dir = os.path.join(output_dir, ADDON_CLIENT_DIR)
+    if os.path.exists(full_output_dir):
+        shutil.rmtree(full_output_dir)
+
+    if os.path.exists(full_output_dir):
+        raise RuntimeError(
+            f"Failed to remove target folder '{full_output_dir}'"
+        )
+
+    os.makedirs(output_dir, exist_ok=True)
+    mapping = _get_client_files_mapping(current_dir)
+    for (src_path, dst_path) in mapping:
+        full_dst_path = os.path.join(full_output_dir, dst_path)
+        os.makedirs(os.path.dirname(full_dst_path), exist_ok=True)
+        shutil.copy2(src_path, full_dst_path)
+
+
 def main(
     output_dir: Optional[str]=None,
     skip_zip: Optional[bool]=False,
-    keep_sources: Optional[bool]=False
+    keep_sources: Optional[bool]=False,
+    only_client: Optional[bool]=False,
 ):
     log: logging.Logger = logging.getLogger("create_package")
-    log.info("Start creating package")
 
     current_dir: str = os.path.dirname(os.path.abspath(__file__))
     if not output_dir:
         output_dir = os.path.join(current_dir, "package")
+
+    if only_client:
+        log.info("Creating client folder")
+        if not output_dir:
+            raise RuntimeError(
+                "Output directory must be defined"
+                " for client only preparation."
+            )
+        copy_client_code(current_dir, output_dir)
+        log.info("Client folder created")
+        return
+
+    log.info("Start creating package")
 
     version_filepath: str = os.path.join(current_dir, "version.py")
     version_content: dict[str, Any] = {}
@@ -356,6 +411,15 @@ if __name__ == "__main__":
             " (Will be purged if already exists!)"
         )
     )
+    parser.add_argument(
+        "--only-client",
+        dest="only_client",
+        action="store_true",
+        help=(
+            "Extract only client code. This is useful for development."
+            " Requires '-o', '--output' argument to be filled."
+        )
+    )
 
     args = parser.parse_args(sys.argv[1:])
-    main(args.output_dir, args.skip_zip, args.keep_sources)
+    main(args.output_dir, args.skip_zip, args.keep_sources, args.only_client)
