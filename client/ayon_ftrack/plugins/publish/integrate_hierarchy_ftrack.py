@@ -10,6 +10,11 @@ from openpype.lib import filter_profiles
 from openpype.pipeline import KnownPublishError
 from ayon_ftrack.common import get_ayon_attr_configs
 
+try:
+    from openpype.client import get_asset_name_identifier
+except ImportError:
+    get_asset_name_identifier = None
+
 
 class IntegrateHierarchyToFtrack(pyblish.api.ContextPlugin):
     """
@@ -244,7 +249,7 @@ class IntegrateHierarchyToFtrack(pyblish.api.ContextPlugin):
             item = import_queue.popleft()
             entity_name, entity_data, parent = item
 
-            entity_type = entity_data['entity_type']
+            entity_type = entity_data["entity_type"]
             self.log.debug(entity_data)
 
             entity = entity_data.get("ft_entity")
@@ -261,7 +266,13 @@ class IntegrateHierarchyToFtrack(pyblish.api.ContextPlugin):
                 })
                 entity_data["ft_entity"] = entity
 
-            # self.log.info('entity: {}'.format(dict(entity)))
+            if get_asset_name_identifier is None:
+                entity_path = entity["name"]
+            else:
+                link_names = [item["name"] for item in entity["link"]]
+                link_names.pop(0)
+                entity_path = "/" + "/".join(link_names)
+
             # CUSTOM ATTRIBUTES
             custom_attributes = entity_data.get('custom_attributes', {})
             instances = []
@@ -269,7 +280,7 @@ class IntegrateHierarchyToFtrack(pyblish.api.ContextPlugin):
                 instance_asset_name = instance.data.get("asset")
                 if (
                     instance_asset_name
-                    and instance_asset_name.lower() == entity["name"].lower()
+                    and instance_asset_name.lower() == entity_path.lower()
                 ):
                     instances.append(instance)
 
@@ -480,14 +491,14 @@ class IntegrateHierarchyToFtrack(pyblish.api.ContextPlugin):
                     "Task status \"{}\" was not found".format(status_name)
                 )
 
-        task = self.session.create('Task', {
-            'name': name,
-            'parent': parent
+        task = self.session.create("Task", {
+            "name": name,
+            "parent": parent
         })
         # TODO not secured!!! - check if task_type exists
         self.log.info(task_type)
         self.log.info(self.task_types)
-        task['type'] = self.task_types[task_type]
+        task["type"] = self.task_types[task_type]
         if status_id is not None:
             task["status_id"] = status_id
 
