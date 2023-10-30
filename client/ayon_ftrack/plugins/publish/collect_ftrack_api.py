@@ -342,6 +342,6 @@ class CollectFtrackApi(pyblish.api.ContextPlugin):
                     break
             entity = entities_by_id.get(entity_id)
             if entity is not None:
-                output[entity_id] = entity
+                output[folder_path] = entity
         return output
 
