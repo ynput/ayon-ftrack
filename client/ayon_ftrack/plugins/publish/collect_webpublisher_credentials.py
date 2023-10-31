@@ -16,7 +16,7 @@ import os
 import ftrack_api
 import pyblish.api
 import ayon_api
-from openpype.settings import get_project_settings
+
 from openpype.pipeline import KnownPublishError
 
 
