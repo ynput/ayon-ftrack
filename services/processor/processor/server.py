@@ -106,7 +106,7 @@ def create_session():
             "message": error_message,
         }
     }
-    if tb_lines is None:
+    if tb_content is None:
         _GlobalContext.session_fail_logged = 2
         event_data["summary"] = error_summary
 
