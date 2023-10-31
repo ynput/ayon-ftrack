@@ -53,11 +53,6 @@ class CollectWebpublisherCredentials(pyblish.api.ContextPlugin):
         username = self._get_ftrack_username(user_email)
         os.environ["FTRACK_API_USER"] = username
 
-        burnin_name = username
-        if '@' in burnin_name:
-            burnin_name = burnin_name[:burnin_name.index('@')]
-        context.data["user"] = burnin_name
-
     def _get_ftrack_username(self, user_email):
         """Queries Ftrack api for user with 'user_email'.
 
