@@ -35,7 +35,7 @@ class CreateDailyReviewSessionServerAction(ServerAction):
     icon = get_service_ftrack_icon_url("AYONAdmin.svg")
     #: Action description.
     description = "Manually create daily review session"
-    role_list = {"Pypeclub", "Administrator", "Project Manager"}
+    role_list = {"Administrator", "Project Manager"}
 
     settings_key = "create_daily_review_session"
     default_template = "{yy}{mm}{dd}"
