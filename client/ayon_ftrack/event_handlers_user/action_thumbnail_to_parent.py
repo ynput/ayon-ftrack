@@ -4,7 +4,7 @@ from ayon_ftrack.lib import get_ftrack_icon_url
 
 
 class ThumbToParent(LocalAction):
-    identifier = "thumb.to.parent"
+    identifier = "ayon.thumb.to.parent"
     label = "Thumbnail"
     variant = " to Parent"
     icon = get_ftrack_icon_url("Thumbnail.svg")

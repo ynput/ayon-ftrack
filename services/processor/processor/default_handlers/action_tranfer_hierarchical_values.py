@@ -20,7 +20,7 @@ class TransferHierarchicalValues(ServerAction):
     - in, float -> string
     """
 
-    identifier = "transfer.hierarchical.values"
+    identifier = "ayon.transfer.hierarchical.values"
     label = "AYON Admin"
     variant = "- Transfer values between 2 custom attributes"
     description = (

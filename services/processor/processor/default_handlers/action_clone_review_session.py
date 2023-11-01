@@ -52,7 +52,7 @@ class CloneReviewSession(ServerAction):
      '''
     label = "Clone Review Session"
     variant = None
-    identifier = "clone-review-session"
+    identifier = "ayon.clone-review-session"
     description = None
     settings_key = "clone_review_session"
 

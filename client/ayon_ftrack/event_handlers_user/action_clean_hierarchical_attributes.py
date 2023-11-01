@@ -9,7 +9,7 @@ from ayon_ftrack.lib import get_ftrack_icon_url
 
 
 class CleanHierarchicalAttrsAction(LocalAction):
-    identifier = "clean.hierarchical.attr"
+    identifier = "ayon.clean.hierarchical.attr"
     label = "AYON Admin"
     variant = "- Clean hierarchical custom attributes"
     description = "Unset empty hierarchical attribute values."

@@ -8,7 +8,7 @@ from ayon_ftrack.lib import get_ftrack_icon_url
 
 
 class CreateFolders(LocalAction):
-    identifier = "create.folders"
+    identifier = "ayon.create.folders"
     label = "Create Folders"
     icon = get_ftrack_icon_url("CreateFolders.svg")
 

@@ -43,7 +43,7 @@ class PushHierValuesToNonHier(ServerAction):
             - custom attribute for `Task`: frameStart: 1001
     """
 
-    identifier = "admin.push_hier_values_to_non_hier"
+    identifier = "ayon.admin.push_hier_values_to_non_hier"
     label = "AYON Admin"
     variant = "- Push Hierarchical values To Non-Hierarchical"
     icon = get_service_ftrack_icon_url("AYONAdmin.svg")

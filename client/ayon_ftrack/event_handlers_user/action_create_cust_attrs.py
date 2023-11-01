@@ -136,7 +136,7 @@ class CustAttrException(Exception):
 
 
 class CustomAttributes(LocalAction):
-    identifier = "create.update.attributes"
+    identifier = "ayon.create.update.attributes"
     label = "AYON Admin"
     variant = "- Create/Update Custom Attributes"
     description = "Creates required custom attributes in ftrack"
