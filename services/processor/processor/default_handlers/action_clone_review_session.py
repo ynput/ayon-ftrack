@@ -50,7 +50,7 @@ class CloneReviewSession(ServerAction):
     `identifier` a unique identifier for your action.
     `description` a verbose descriptive text for you action
      '''
-    label = "Clone Review Session"
+    label = "Clone Review Session (AYON)"
     variant = None
     identifier = "ayon.clone-review-session"
     description = None

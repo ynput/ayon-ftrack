@@ -5,7 +5,7 @@ class PrivateProjectDetectionAction(ServerAction):
     """Action helps to identify if does not have access to project."""
 
     identifier = "ayon.server.missing.perm.private.project"
-    label = "Missing permissions"
+    label = "Missing permissions (AYON)"
     description = (
         "Main ftrack event server does not have access to this project."
     )

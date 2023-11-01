@@ -9,7 +9,7 @@ class MultipleNotesServer(ServerAction):
     """
 
     identifier = "ayon.multiple.notes.server"
-    label = "Multiple Notes (Server)"
+    label = "Multiple Notes (Server - AYON)"
     description = "Add same note to multiple Asset Versions"
 
     _none_category = "__NONE__"
