@@ -171,7 +171,7 @@ class FirstVersionStatus(BaseEventHandler):
                     exc_info=True
                 )
 
-    def filter_event_ents(self, event):
+    def filter_entities_info(self, event):
         filtered_entities_info = collections.defaultdict(list)
         for entity_info in event["data"].get("entities", []):
             # Care only about add actions
