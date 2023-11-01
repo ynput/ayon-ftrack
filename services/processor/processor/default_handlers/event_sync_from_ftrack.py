@@ -187,7 +187,7 @@ class SyncProcess:
 
         if self._ft_project_id is UNKNOWN_VALUE:
             found_id = None
-            for ent_info in self.event["data"]["entities"]:
+            for ent_info in self.event["data"].get("entities", []):
                 if found_id is not None:
                     break
                 parents = ent_info.get("parents") or []
@@ -1532,7 +1532,7 @@ class AutoSyncFromFtrack(BaseEventHandler):
             It separates changes into add|remove|update.
             All task changes are handled together by refresh from Ftrack.
         Args:
-            session (object): session to Ftrack
+            session (ftrack_api.Session): session to Ftrack
             event (dictionary): event content
 
         Returns:
@@ -1547,6 +1547,7 @@ class AutoSyncFromFtrack(BaseEventHandler):
         sync_process = SyncProcess(
             self.process_session, event, self.log
         )
+
         sync_process.initial_event_processing()
         if sync_process.project_changed_autosync:
             username = self._get_username(
@@ -1576,16 +1577,25 @@ class AutoSyncFromFtrack(BaseEventHandler):
 
         if sync_process.ft_project is None:
             self.log.warning(
-                f"Project was not found. Skipping."
-                "\nEvent data: {event['data']}\n"
+                "Project was not found. Skipping."
+                f"\nEvent data: {event['data']}\n"
             )
+            return
+
+        project = get_project(sync_process.project_name)
+        if project is None:
+            self.log.debug(
+                f"Project '{sync_process.project_name}' was not"
+                " found in AYON. Skipping."
+            )
+            return
 
         if not sync_process.is_event_valid:
             self.log.debug(
-                f"Project has disabled autosync {sync_process.project_name}."
-                " Skipping."
+                f"Project '{sync_process.project_name}' has disabled"
+                " autosync. Skipping."
             )
-            return True
+            return
 
         sync_process.process_event_data()
 
