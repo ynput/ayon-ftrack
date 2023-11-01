@@ -1,3 +1,5 @@
+import ayon_api
+
 from ftrack_common import BaseEventHandler
 
 
@@ -50,6 +52,10 @@ class VersionToTaskStatus(BaseEventHandler):
         project_name = self.get_project_name_from_event(
             session, event, project_id
         )
+        if ayon_api.get_project(project_name) is None:
+            self.log.debug("Project not found in AYON. Skipping")
+            return
+
         # Load settings
         project_settings = self.get_project_settings_from_event(
             event, project_name
