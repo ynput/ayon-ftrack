@@ -97,6 +97,7 @@ class SyncProcess:
         self._entity_hub = None
         self._folder_ids_by_ftrack_id = None
         self._task_ids_by_ftrack_id = None
+        self._has_valid_entity_types = None
 
         # Caches from ftrack
         self._ft_cust_attr_types_by_id = None
@@ -393,6 +394,10 @@ class SyncProcess:
             }
         return self._ft_task_type_name_by_id
 
+    @property
+    def has_valid_entity_types(self):
+        return self._has_valid_entity_types
+
     def initial_event_processing(self):
         """First processing of data on event.
 
@@ -407,6 +412,7 @@ class SyncProcess:
         self._project_changed_autosync = False
         self._trigger_project_sync = False
 
+        self._has_valid_entity_types = True
         self._split_event_entity_info()
 
         # If project was removed then skip rest of event processing
@@ -414,6 +420,7 @@ class SyncProcess:
             self._ft_project_removed
             or not self._found_actions
         ):
+            self._has_valid_entity_types = False
             return
 
         self._chek_enabled_auto_sync()
@@ -424,6 +431,7 @@ class SyncProcess:
 
         if not self._found_actions:
             self.log.debug("Skipping. Nothing to update.")
+            self._has_valid_entity_types = False
             return
 
         # NOTE This if first part of code which should query entity from ftrack
@@ -1574,6 +1582,9 @@ class AutoSyncFromFtrack(BaseEventHandler):
                     event=sync_process.event,
                     selection=selection
                 )
+
+        if not sync_process.has_valid_entity_types:
+            return
 
         if sync_process.ft_project is None:
             self.log.warning(
