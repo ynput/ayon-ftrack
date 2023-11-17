@@ -22,13 +22,13 @@ class PrepareProjectServer(ServerAction):
     """Prepare project attributes in Anatomy."""
 
     default_preset_name = "__default__"
-    identifier = "prepare.project.server"
+    identifier = "ayon.prepare.project.server"
     label = "AYON Admin"
     variant = "- Prepare Project for AYON"
     description = "Set basic attributes on the project"
     icon = get_service_ftrack_icon_url("AYONAdmin.svg")
 
-    role_list = ["Pypeclub", "Administrator", "Project Manager"]
+    role_list = ["Administrator", "Project Manager"]
 
     settings_key = "prepare_project"
 

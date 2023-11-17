@@ -6,7 +6,7 @@ from ayon_ftrack.lib import get_ftrack_icon_url
 class JobKiller(LocalAction):
     """Kill jobs that are marked as running."""
 
-    identifier = "job.killer"
+    identifier = "ayon.job.killer"
     label = "AYON Admin"
     variant = "- Job Killer"
     description = "Killing selected running jobs"

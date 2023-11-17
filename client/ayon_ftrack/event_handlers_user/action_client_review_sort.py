@@ -43,7 +43,7 @@ task_name_sort_kwargs = {task_name_kwarg_key: task_name_sorter}
 
 
 class ClientReviewSort(LocalAction):
-    identifier = "client.review.sort"
+    identifier = "ayon.client.review.sort"
     label = "Sort Review"
     icon = get_ftrack_icon_url("SortReview.svg")
 

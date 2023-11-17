@@ -4,8 +4,8 @@ from ftrack_common.event_handlers import ServerAction
 class PrivateProjectDetectionAction(ServerAction):
     """Action helps to identify if does not have access to project."""
 
-    identifier = "server.missing.perm.private.project"
-    label = "Missing permissions"
+    identifier = "ayon.server.missing.perm.private.project"
+    label = "Missing permissions (AYON)"
     description = (
         "Main ftrack event server does not have access to this project."
     )

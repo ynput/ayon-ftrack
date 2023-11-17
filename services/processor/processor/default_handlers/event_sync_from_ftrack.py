@@ -97,6 +97,7 @@ class SyncProcess:
         self._entity_hub = None
         self._folder_ids_by_ftrack_id = None
         self._task_ids_by_ftrack_id = None
+        self._has_valid_entity_types = None
 
         # Caches from ftrack
         self._ft_cust_attr_types_by_id = None
@@ -187,7 +188,7 @@ class SyncProcess:
 
         if self._ft_project_id is UNKNOWN_VALUE:
             found_id = None
-            for ent_info in self.event["data"]["entities"]:
+            for ent_info in self.event["data"].get("entities", []):
                 if found_id is not None:
                     break
                 parents = ent_info.get("parents") or []
@@ -393,6 +394,10 @@ class SyncProcess:
             }
         return self._ft_task_type_name_by_id
 
+    @property
+    def has_valid_entity_types(self):
+        return self._has_valid_entity_types
+
     def initial_event_processing(self):
         """First processing of data on event.
 
@@ -407,6 +412,7 @@ class SyncProcess:
         self._project_changed_autosync = False
         self._trigger_project_sync = False
 
+        self._has_valid_entity_types = True
         self._split_event_entity_info()
 
         # If project was removed then skip rest of event processing
@@ -414,6 +420,7 @@ class SyncProcess:
             self._ft_project_removed
             or not self._found_actions
         ):
+            self._has_valid_entity_types = False
             return
 
         self._chek_enabled_auto_sync()
@@ -424,6 +431,7 @@ class SyncProcess:
 
         if not self._found_actions:
             self.log.debug("Skipping. Nothing to update.")
+            self._has_valid_entity_types = False
             return
 
         # NOTE This if first part of code which should query entity from ftrack
@@ -1532,7 +1540,7 @@ class AutoSyncFromFtrack(BaseEventHandler):
             It separates changes into add|remove|update.
             All task changes are handled together by refresh from Ftrack.
         Args:
-            session (object): session to Ftrack
+            session (ftrack_api.Session): session to Ftrack
             event (dictionary): event content
 
         Returns:
@@ -1547,6 +1555,7 @@ class AutoSyncFromFtrack(BaseEventHandler):
         sync_process = SyncProcess(
             self.process_session, event, self.log
         )
+
         sync_process.initial_event_processing()
         if sync_process.project_changed_autosync:
             username = self._get_username(
@@ -1574,18 +1583,30 @@ class AutoSyncFromFtrack(BaseEventHandler):
                     selection=selection
                 )
 
+        if not sync_process.has_valid_entity_types:
+            return
+
         if sync_process.ft_project is None:
             self.log.warning(
-                f"Project was not found. Skipping."
-                "\nEvent data: {event['data']}\n"
+                "Project was not found. Skipping."
+                f"\nEvent data: {event['data']}\n"
             )
+            return
+
+        project = get_project(sync_process.project_name)
+        if project is None:
+            self.log.debug(
+                f"Project '{sync_process.project_name}' was not"
+                " found in AYON. Skipping."
+            )
+            return
 
         if not sync_process.is_event_valid:
             self.log.debug(
-                f"Project has disabled autosync {sync_process.project_name}."
-                " Skipping."
+                f"Project '{sync_process.project_name}' has disabled"
+                " autosync. Skipping."
             )
-            return True
+            return
 
         sync_process.process_event_data()
 

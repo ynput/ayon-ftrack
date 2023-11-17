@@ -51,7 +51,7 @@ class CreateProjectFolders(LocalAction):
     type exist in Ftrack.
     """
 
-    identifier = "create.project.structure"
+    identifier = "ayon.create.project.structure"
     label = "Create Project Structure"
     description = "Creates folder structure"
     role_list = ["Pypeclub", "Administrator", "Project Manager"]

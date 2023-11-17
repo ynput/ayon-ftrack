@@ -17,7 +17,7 @@ class SyncFromFtrackAction(ServerAction):
     description = "Synchronize project hierarchy based on ftrack"
     icon = get_service_ftrack_icon_url("AYONAdmin.svg")
 
-    role_list = ["Pypeclub", "Administrator", "Project Manager"]
+    role_list = ["Administrator", "Project Manager"]
 
     settings_key = "sync_from_ftrack"
 

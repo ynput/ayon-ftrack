@@ -26,7 +26,7 @@ class PrepareProjectLocal(LocalAction):
 
     # Key to store info about trigerring create folder structure
     create_project_structure_key = "create_folder_structure"
-    create_project_structure_identifier = "create.project.structure"
+    create_project_structure_identifier = "ayon.create.project.structure"
     item_splitter = {"type": "label", "value": "---"}
     _keys_order = (
         "fps",

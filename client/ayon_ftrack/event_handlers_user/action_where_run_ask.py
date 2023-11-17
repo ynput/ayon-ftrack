@@ -8,8 +8,8 @@ from ayon_ftrack.common import get_host_ip, LocalAction
 class ActionWhereIRun(LocalAction):
     """Show where same user has running AYON instances."""
 
-    identifier = "ask.where.i.run"
-    show_identifier = "show.where.i.run"
+    identifier = "ayon.ask.where.i.run"
+    show_identifier = "ayon.show.where.i.run"
     label = "AYON Admin"
     variant = "- Where I run"
     description = "Show PC info where user have running AYON"

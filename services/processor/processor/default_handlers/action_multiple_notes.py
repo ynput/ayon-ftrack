@@ -8,8 +8,8 @@ class MultipleNotesServer(ServerAction):
     who triggered the action. It is possible to define note category of note.
     """
 
-    identifier = "multiple.notes.server"
-    label = "Multiple Notes (Server)"
+    identifier = "ayon.multiple.notes.server"
+    label = "Multiple Notes (Server - AYON)"
     description = "Add same note to multiple Asset Versions"
 
     _none_category = "__NONE__"

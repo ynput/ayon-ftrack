@@ -15,7 +15,7 @@ class BatchTasksAction(LocalAction):
      '''
     label = "Batch Task Create"
     variant = None
-    identifier = "batch-tasks"
+    identifier = "ayon.batch-tasks"
     description = None
     icon = get_ftrack_icon_url("BatchTasks.svg")
 

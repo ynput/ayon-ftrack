@@ -8,7 +8,7 @@ from openpype.lib import run_detached_process
 
 
 class ComponentOpen(LocalAction):
-    identifier = "component.open"
+    identifier = "ayon.component.open"
     label = "Open File"
     icon = get_ftrack_icon_url("ComponentOpen.svg")
 

@@ -2,6 +2,7 @@ import collections
 import copy
 from typing import Any
 
+import ayon_api
 import ftrack_api
 
 from ftrack_common import (
@@ -140,6 +141,12 @@ class PushHierValuesToNonHierEvent(BaseEventHandler):
         project_name: str = self.get_project_name_from_event(
             session, event, project_id
         )
+        if ayon_api.get_project(project_name) is None:
+            self.log.debug(
+                f"Project '{project_name}' not found in AYON. Skipping"
+            )
+            return set(), set()
+
         # Load settings
         project_settings: dict[str, Any] = (
             self.get_project_settings_from_event(event, project_name)

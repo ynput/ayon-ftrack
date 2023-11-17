@@ -3,7 +3,7 @@ from ayon_ftrack.lib import get_ftrack_icon_url
 
 
 class MultipleNotes(LocalAction):
-    identifier = "multiple.notes"
+    identifier = "ayon.multiple.notes"
     label = "Multiple Notes"
     description = "Add same note to multiple entities"
     icon = get_ftrack_icon_url("MultipleNotes.svg")
