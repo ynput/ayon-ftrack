@@ -1,5 +1,14 @@
+import collections
 import logging
+
 import pyblish.api
+import ayon_api
+
+from ayon_ftrack.common import FTRACK_ID_ATTRIB
+try:
+    from openpype.client import get_asset_name_identifier
+except ImportError:
+    get_asset_name_identifier = None
 
 
 class CollectFtrackApi(pyblish.api.ContextPlugin):
@@ -25,7 +34,7 @@ class CollectFtrackApi(pyblish.api.ContextPlugin):
 
         # Collect task
         project_name = context.data["projectName"]
-        asset_name = context.data["asset"]
+        folder_path = context.data["asset"]
         task_name = context.data["task"]
 
         # Find project entity
@@ -46,39 +55,24 @@ class CollectFtrackApi(pyblish.api.ContextPlugin):
 
         self.log.debug("Project found: {0}".format(project_entity))
 
-        asset_entity = None
-        if asset_name:
+        context_ftrack_entity = None
+        if folder_path:
             # Find asset entity
-            entity_query = (
-                'TypedContext where project_id is "{0}"'
-                ' and name is "{1}"'
-            ).format(project_entity["id"], asset_name)
-            self.log.debug("Asset entity query: < {0} >".format(entity_query))
-            asset_entities = []
-            for entity in session.query(entity_query).all():
-                # Skip tasks
-                if entity.entity_type.lower() != "task":
-                    asset_entities.append(entity)
-
-            if len(asset_entities) == 0:
+            entities_by_path = self.find_ftrack_entities(
+                session, project_entity, [folder_path]
+            )
+            context_ftrack_entity = entities_by_path[folder_path]
+            if context_ftrack_entity is None:
                 raise AssertionError((
-                    "Entity with name \"{0}\" not found"
-                    " in Ftrack project \"{1}\"."
-                ).format(asset_name, project_name))
+                    "Entity with path \"{}\" not found"
+                    " in Ftrack project \"{}\"."
+                ).format(folder_path, project_name))
 
-            elif len(asset_entities) > 1:
-                raise AssertionError((
-                    "Found more than one entity with name \"{0}\""
-                    " in Ftrack project \"{1}\"."
-                ).format(asset_name, project_name))
-
-            asset_entity = asset_entities[0]
-
-        self.log.debug("Asset found: {0}".format(asset_entity))
+        self.log.debug("Asset found: {}".format(context_ftrack_entity))
 
         task_entity = None
         # Find task entity if task is set
-        if not asset_entity:
+        if not context_ftrack_entity:
             self.log.warning(
                 "Asset entity is not set. Skipping query of task entity."
             )
@@ -86,9 +80,9 @@ class CollectFtrackApi(pyblish.api.ContextPlugin):
             self.log.warning("Task name is not set.")
         else:
             task_query = (
-                'Task where name is "{0}" and parent_id is "{1}"'
-            ).format(task_name, asset_entity["id"])
-            self.log.debug("Task entity query: < {0} >".format(task_query))
+                'Task where name is "{}" and parent_id is "{}"'
+            ).format(task_name, context_ftrack_entity["id"])
+            self.log.debug("Task entity query: < {} >".format(task_query))
             task_entity = session.query(task_query).first()
             if not task_entity:
                 self.log.warning(
@@ -102,47 +96,57 @@ class CollectFtrackApi(pyblish.api.ContextPlugin):
         context.data["ftrackSession"] = session
         context.data["ftrackPythonModule"] = ftrack_api
         context.data["ftrackProject"] = project_entity
-        context.data["ftrackEntity"] = asset_entity
+        context.data["ftrackEntity"] = context_ftrack_entity
         context.data["ftrackTask"] = task_entity
 
-        self.per_instance_process(context, asset_entity, task_entity)
+        self.per_instance_process(
+            context, context_ftrack_entity, task_entity, folder_path
+        )
 
     def per_instance_process(
-        self, context, context_asset_entity, context_task_entity
+        self,
+        context,
+        context_ftrack_entity,
+        context_task_entity,
+        context_folder_path
     ):
         context_task_name = None
-        context_asset_name = None
-        if context_asset_entity:
-            context_asset_name = context_asset_entity["name"]
-            if context_task_entity:
-                context_task_name = context_task_entity["name"]
-        instance_by_asset_and_task = {}
+        if context_ftrack_entity and context_task_entity:
+            context_task_name = context_task_entity["name"]
+
+        instance_by_folder_and_task = {}
+        filtered_instances = []
         for instance in context:
+            if not instance.data.get("publish", True):
+                continue
+            filtered_instances.append(instance)
             self.log.debug(
                 "Checking entities of instance \"{}\"".format(str(instance))
             )
-            instance_asset_name = instance.data.get("asset")
+            instance_folder_path = instance.data.get("asset")
             instance_task_name = instance.data.get("task")
 
-            if not instance_asset_name and not instance_task_name:
+            folder_path = None
+            task_name = None
+            if not instance_folder_path and not instance_task_name:
                 self.log.debug("Instance does not have set context keys.")
-                instance.data["ftrackEntity"] = context_asset_entity
+                instance.data["ftrackEntity"] = context_ftrack_entity
                 instance.data["ftrackTask"] = context_task_entity
                 continue
 
-            elif instance_asset_name and instance_task_name:
+            elif instance_folder_path and instance_task_name:
                 if (
-                    instance_asset_name == context_asset_name
+                    instance_folder_path == context_folder_path
                     and instance_task_name == context_task_name
                 ):
                     self.log.debug((
                         "Instance's context is same as in publish context."
                         " Asset: {} | Task: {}"
-                    ).format(context_asset_name, context_task_name))
-                    instance.data["ftrackEntity"] = context_asset_entity
+                    ).format(context_folder_path, context_task_name))
+                    instance.data["ftrackEntity"] = context_ftrack_entity
                     instance.data["ftrackTask"] = context_task_entity
                     continue
-                asset_name = instance_asset_name
+                folder_path = instance_folder_path
                 task_name = instance_task_name
 
             elif instance_task_name:
@@ -151,63 +155,50 @@ class CollectFtrackApi(pyblish.api.ContextPlugin):
                         "Instance's context task is same as in publish"
                         " context. Task: {}"
                     ).format(context_task_name))
-                    instance.data["ftrackEntity"] = context_asset_entity
+                    instance.data["ftrackEntity"] = context_ftrack_entity
                     instance.data["ftrackTask"] = context_task_entity
                     continue
 
-                asset_name = context_asset_name
+                folder_path = context_folder_path
                 task_name = instance_task_name
 
-            elif instance_asset_name:
-                if instance_asset_name == context_asset_name:
+            elif instance_folder_path:
+                if instance_folder_path == context_folder_path:
                     self.log.debug((
                         "Instance's context asset is same as in publish"
-                        " context. Asset: {}"
-                    ).format(context_asset_name))
-                    instance.data["ftrackEntity"] = context_asset_entity
+                        " context. Folder: {}"
+                    ).format(context_folder_path))
+                    instance.data["ftrackEntity"] = context_ftrack_entity
                     instance.data["ftrackTask"] = context_task_entity
                     continue
 
                 # Do not use context's task name
                 task_name = instance_task_name
-                asset_name = instance_asset_name
+                folder_path = instance_folder_path
 
-            if asset_name not in instance_by_asset_and_task:
-                instance_by_asset_and_task[asset_name] = {}
+            instance_by_task = instance_by_folder_and_task.setdefault(
+                folder_path, {})
+            task_instances = (instance_by_task.setdefault(task_name, []))
+            task_instances.append(instance)
 
-            if task_name not in instance_by_asset_and_task[asset_name]:
-                instance_by_asset_and_task[asset_name][task_name] = []
-            instance_by_asset_and_task[asset_name][task_name].append(instance)
-
-        if not instance_by_asset_and_task:
+        if not instance_by_folder_and_task:
             return
 
         session = context.data["ftrackSession"]
         project_entity = context.data["ftrackProject"]
-        asset_names = set()
-        for asset_name in instance_by_asset_and_task.keys():
-            asset_names.add(asset_name)
+        folder_paths = set(instance_by_folder_and_task.keys())
 
-        joined_asset_names = ",".join([
-            "\"{}\"".format(name)
-            for name in asset_names
-        ])
-        entities = session.query((
-            "TypedContext where project_id is \"{}\" and name in ({})"
-        ).format(project_entity["id"], joined_asset_names)).all()
+        entities_by_path = self.find_ftrack_entities(
+            session, project_entity, folder_paths
+        )
 
-        entities_by_name = {
-            entity["name"]: entity
-            for entity in entities
-        }
-
-        for asset_name, by_task_data in instance_by_asset_and_task.items():
-            entity = entities_by_name.get(asset_name)
+        for folder_path, by_task_data in instance_by_folder_and_task.items():
+            entity = entities_by_path[folder_path]
             task_entity_by_name = {}
             if not entity:
                 self.log.warning((
                     "Didn't find entity with name \"{}\" in Project \"{}\""
-                ).format(asset_name, project_entity["full_name"]))
+                ).format(folder_path, project_entity["full_name"]))
             else:
                 task_entities = session.query((
                     "select id, name from Task where parent_id is \"{}\""
@@ -229,3 +220,128 @@ class CollectFtrackApi(pyblish.api.ContextPlugin):
                         "Instance {} has own ftrack entities"
                         " as has different context. TypedContext: {} Task: {}"
                     ).format(str(instance), str(entity), str(task_entity)))
+
+    def find_ftrack_entities(self, session, project_entity, folder_paths):
+        output = {path: None for path in folder_paths}
+        folder_paths_s = set(output.keys())
+        # Folder paths are not yet used as unique identifier if
+        #   'get_asset_name_identifier' is 'None' so we can query only by name
+        if get_asset_name_identifier is None:
+            folder_paths_s.discard(None)
+            joined_paths = ",".join([
+                '"{}"'.format(p) for p in folder_paths_s
+            ])
+            entities = session.query(
+                (
+                    "TypedContext where project_id is \"{}\" and name in ({})"
+                ).format(project_entity["id"], joined_paths)
+            ).all()
+            for entity in entities:
+                output[entity["name"]] = entity
+            return output
+
+        # We can't use 'assetEntity' and folders must be queried because
+        #   we must be assured that 'ownAttrib' is used to avoid collisions
+        #   because of hierarchical values.
+        folders = ayon_api.get_folders(
+            project_entity["full_name"],
+            folder_paths=folder_paths_s,
+            fields={
+                "path",
+                "attrib.{}".format(FTRACK_ID_ATTRIB),
+            },
+            own_attributes=True
+        )
+        folders_by_path = {
+            folder["path"]: folder
+            for folder in folders
+        }
+
+        folder_path_by_ftrack_id = {}
+        missing_folder_paths = set()
+        for folder_path in folder_paths:
+            folder = folders_by_path.get(folder_path)
+            if folder:
+                ftrack_id = folder["ownAttrib"].get(FTRACK_ID_ATTRIB)
+                if ftrack_id:
+                    folder_path_by_ftrack_id[ftrack_id] = folder_path
+                    continue
+            missing_folder_paths.add(folder_path)
+
+        entities_by_id = {}
+        if folder_path_by_ftrack_id:
+            joined_ftrack_ids = ",".join({
+                '"{}"'.format(ftrack_id)
+                for ftrack_id in folder_path_by_ftrack_id
+            })
+            entities = session.query(
+                "TypedContext where id in ({})".format(joined_ftrack_ids)
+            ).all()
+            entities_by_id = {
+                entity["id"]: entity
+                for entity in entities
+            }
+
+        for ftrack_id, folder_path in folder_path_by_ftrack_id.items():
+            entity = entities_by_id.get(ftrack_id)
+            if entity is None:
+                missing_folder_paths.add(folder_path)
+                continue
+            output[folder_path] = entity
+
+        output.update(self._find_missing_folder_paths(
+            session, project_entity, missing_folder_paths
+        ))
+        return output
+
+    def _find_missing_folder_paths(
+        self, session, project_entity, folder_paths
+    ):
+        output = {}
+        if not folder_paths:
+            return output
+
+        self.log.debug((
+            "Finding ftrack entities by folder paths"
+            " because of missing ftrack id on AYON entity:\n{}"
+        ).format("\n".join(folder_paths)))
+
+        names = set()
+        for folder_path in folder_paths:
+            names |= set(folder_path.split("/"))
+        names.discard("")
+
+        joined_names = ",".join('"{}"'.format(n) for n in names)
+
+        entities = session.query(
+            (
+                "select id, name, parent_id from TypedContext"
+                " where project_id is \"{}\" and name in ({})"
+            ).format(
+                project_entity["id"],
+                joined_names
+            )
+        ).all()
+        entities_by_id = {entity["id"]: entity for entity in entities}
+        entities_by_parent_id = collections.defaultdict(list)
+        for entity in entities:
+            parent_id = entity["parent_id"]
+            entities_by_parent_id[parent_id].append(entity)
+
+        for folder_path in folder_paths:
+            names = folder_path.lstrip("/").split("/")
+            entity_id = project_entity["id"]
+            for name in names:
+                child_id = None
+                for child in entities_by_parent_id[entity_id]:
+                    if child["name"].lower() == name.lower():
+                        child_id = child["id"]
+                        break
+                entity_id = child_id
+                if child_id is None:
+                    break
+            entity = entities_by_id.get(entity_id)
+            if entity is not None:
+                output[folder_path] = entity
+        return output
+
