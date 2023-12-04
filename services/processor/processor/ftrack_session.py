@@ -31,12 +31,12 @@ class ProcessEventHub(ftrack_api.event.hub.EventHub):
     _server_con = None
 
     def get_next_ftrack_event(self):
-         return enroll_event_job(
+        return enroll_event_job(
             source_topic="ftrack.leech",
             target_topic="ftrack.proc",
             sender=get_service_addon_name(),
             description="Event processing",
-            sequential=True
+            sequential=True,
         )
 
     def finish_job(self, job):
