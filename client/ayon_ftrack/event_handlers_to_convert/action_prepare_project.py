@@ -20,7 +20,7 @@ class PrepareProjectLocal(LocalAction):
     description = "Set basic attributes on the project"
     icon = get_ftrack_icon_url("PrepareProject.svg")
 
-    role_list = ["Pypeclub", "Administrator", "Project Manager"]
+    role_list = ["Administrator", "Project Manager"]
 
     settings_key = "prepare_project"
 

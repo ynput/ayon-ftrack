@@ -54,7 +54,7 @@ class CreateProjectFolders(LocalAction):
     identifier = "ayon.create.project.structure"
     label = "Create Project Structure"
     description = "Creates folder structure"
-    role_list = ["Pypeclub", "Administrator", "Project Manager"]
+    role_list = ["Administrator", "Project Manager"]
     icon = get_ftrack_icon_url("CreateProjectFolders.svg")
 
     pattern_array = re.compile(r"\[.*\]")

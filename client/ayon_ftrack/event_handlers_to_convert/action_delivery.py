@@ -31,7 +31,7 @@ class Delivery(LocalAction):
     identifier = "delivery.action"
     label = "Delivery"
     description = "Deliver data to client"
-    role_list = ["Pypeclub", "Administrator", "Project manager"]
+    role_list = ["Administrator", "Project manager"]
     icon = get_ftrack_icon_url("Delivery.svg")
     settings_key = "delivery_action"
 

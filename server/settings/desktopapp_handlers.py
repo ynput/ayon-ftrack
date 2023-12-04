@@ -130,14 +130,12 @@ DEFAULT_DESKTOP_HANDLERS_SETTINGS = {
     },
     "create_update_attributes": {
         "role_list": [
-            "Pypeclub",
             "Administrator"
         ]
     },
     "prepare_project": {
         "enabled": True,
         "role_list": [
-            "Pypeclub",
             "Administrator",
             "Project manager"
         ],
@@ -146,7 +144,6 @@ DEFAULT_DESKTOP_HANDLERS_SETTINGS = {
     "clean_hierarchical_attr": {
         "enabled": True,
         "role_list": [
-            "Pypeclub",
             "Administrator",
             "Project manager"
         ]
@@ -154,7 +151,6 @@ DEFAULT_DESKTOP_HANDLERS_SETTINGS = {
     "delete_asset_subset": {
         "enabled": True,
         "role_list": [
-            "Pypeclub",
             "Administrator",
             "Project Manager"
         ]
@@ -162,7 +158,6 @@ DEFAULT_DESKTOP_HANDLERS_SETTINGS = {
     "delete_old_versions": {
         "enabled": True,
         "role_list": [
-            "Pypeclub",
             "Project Manager",
             "Administrator"
         ]
@@ -170,7 +165,6 @@ DEFAULT_DESKTOP_HANDLERS_SETTINGS = {
     "delivery_action": {
         "enabled": True,
         "role_list": [
-            "Pypeclub",
             "Project Manager",
             "Administrator"
         ]
@@ -178,7 +172,6 @@ DEFAULT_DESKTOP_HANDLERS_SETTINGS = {
     "job_killer": {
         "enabled": True,
         "role_list": [
-            "Pypeclub",
             "Administrator"
         ]
     },
