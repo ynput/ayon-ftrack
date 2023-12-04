@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ftrack-leecher"
-version = "0.2.5"
+version = "0.2.6-dev.1"
 description = ""
 authors = ["Martastain <martas@imm.cz>"]
 
