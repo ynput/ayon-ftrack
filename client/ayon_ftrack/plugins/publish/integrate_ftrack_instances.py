@@ -401,55 +401,48 @@ class IntegrateFtrackInstance(pyblish.api.InstancePlugin):
         data item, it can sync with that item.
 
         Args:
-            review_representation (dict): Review representation
-            thumbnail_data_items (list): List of thumbnail data items
-            are_multiple_synced_thumbnails (bool): If there are multiple synced
-                thumbnails
+            review_representation (dict[str, Any]): Review representation.
+            thumbnail_data_items (list[dict[str, Any]]): List of thumbnail
+                data items.
+            are_multiple_synced_thumbnails (bool): If there are multiple
+                synced thumbnails.
 
         Returns:
-            dict: Thumbnail data item or empty dict
+            Union[dict[str, Any], None]: Thumbnail data item or None
         """
+
+        if not thumbnail_data_items:
+            return None
+
+        if not are_multiple_synced_thumbnails:
+            return thumbnail_data_items[0]
+
         output_name = review_representation.get("outputName")
         tags = review_representation.get("tags", [])
-        matching_thumbnail_item = {}
         for thumb_item in thumbnail_data_items:
             if (
-                are_multiple_synced_thumbnails
-                and (
-                    thumb_item["sync_key"] == output_name
-                    # intermediate files can have preset name in tags
-                    # this is usually aligned with `outputName` distributed
-                    # during thumbnail creation in `need_thumbnail` tagging
-                    # workflow
-                    or thumb_item["sync_key"] in tags
-                )
+                thumb_item["sync_key"] == output_name
+                # intermediate files can have preset name in tags
+                # this is usually aligned with `outputName` distributed
+                # during thumbnail creation in `need_thumbnail` tagging
+                # workflow
+                or thumb_item["sync_key"] in tags
             ):
                 # return only synchronized thumbnail if multiple
-                matching_thumbnail_item = thumb_item
-                break
-            elif not are_multiple_synced_thumbnails:
-                # return any first found thumbnail since we need thumbnail
-                # but dont care which one
-                matching_thumbnail_item = thumb_item
-                break
+                return thumb_item
 
-        if not matching_thumbnail_item:
-            # WARNING: this can only happen if multiple thumbnails
-            # workflow is broken, since it found multiple matching outputName
-            # in representation but they do not align with any thumbnail item
-            self.log.warning(
-                "No matching thumbnail item found for output name "
-                "'{}'".format(output_name)
-            )
-            if not thumbnail_data_items:
-                self.log.warning(
-                    "No thumbnail data items found"
-                )
-                return {}
+        # WARNING: this can only happen if multiple thumbnails
+        # workflow is broken, since it found multiple matching outputName
+        # in representation but they do not align with any thumbnail item
+        self.log.warning((
+            "No matching thumbnail item found for output name '{}'"
+        ).format(output_name))
+        if thumbnail_data_items:
             # as fallback return first thumbnail item
             return thumbnail_data_items[0]
 
-        return matching_thumbnail_item
+        self.log.warning("No thumbnail data items found")
+        return None
 
     def _make_extended_component_name(
             self, component_item, repre, iteration_index):
