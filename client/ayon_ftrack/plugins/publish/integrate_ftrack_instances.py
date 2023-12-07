@@ -600,7 +600,9 @@ class IntegrateFtrackInstance(pyblish.api.InstancePlugin):
 
             stream_width = tmp_width
             stream_height = tmp_height
-
+            self.log.debug("FPS from stream is {} and duration is {}".format(
+                input_framerate, stream_duration
+            ))
             frame_out = float(stream_duration) * stream_fps
             break
 
