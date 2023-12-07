@@ -152,10 +152,6 @@ class IntegrateFtrackInstance(pyblish.api.InstancePlugin):
                 # include all other representations
                 other_representations.append(repre)
 
-        # Prepare ftrack locations
-        unmanaged_location_name = "ftrack.unmanaged"
-        ftrack_server_location_name = "ftrack.server"
-
         # check if any outputName keys are in review_representations
         # also check if any outputName keys are in thumbnail_representations
         synced_multiple_output_names = []
@@ -165,20 +161,23 @@ class IntegrateFtrackInstance(pyblish.api.InstancePlugin):
                 continue
             for thumb_repre in thumbnail_representations:
                 thumb_output_name = thumb_repre.get("outputName")
-                if not thumb_output_name:
-                    continue
                 if (
-                    thumb_output_name == review_output_name
+                    thumb_output_name
+                    and thumb_output_name == review_output_name
                     # output name can be added also as tags during intermediate
                     # files creation
                     or thumb_output_name in review_repre.get("tags", [])
                 ):
-                    synced_multiple_output_names.append(
-                        thumb_repre["outputName"])
+                    synced_multiple_output_names.append(thumb_output_name)
+
         self.log.debug("Multiple output names: {}".format(
             synced_multiple_output_names
         ))
         multiple_synced_thumbnails = len(synced_multiple_output_names) > 1
+
+        # Prepare ftrack locations
+        unmanaged_location_name = "ftrack.unmanaged"
+        ftrack_server_location_name = "ftrack.server"
 
         # Components data
         component_list = []
@@ -195,7 +194,7 @@ class IntegrateFtrackInstance(pyblish.api.InstancePlugin):
                 only_published=False
             )
             if not repre_path:
-                self.log.warning(
+                self.log.debug(
                     "Published path is not set or source was removed."
                 )
                 continue
@@ -206,7 +205,8 @@ class IntegrateFtrackInstance(pyblish.api.InstancePlugin):
                 "component_path": repre_path,
                 "component_data": {
                     "name": (
-                        "thumbnail" if review_representations
+                        "thumbnail"
+                        if review_representations
                         else "ftrackreview-image"
                     ),
                     "metadata": self._prepare_image_component_metadata(
@@ -245,8 +245,9 @@ class IntegrateFtrackInstance(pyblish.api.InstancePlugin):
         extended_asset_name = None
         for index, repre in enumerate(review_representations):
             if not self._is_repre_video(repre) and has_movie_review:
-                self.log.debug("Movie repre has priority "
-                               "from {}".format(repre))
+                self.log.debug(
+                    "Movie repre has priority from {}".format(repre)
+                )
                 continue
 
             repre_path = get_publish_repre_path(instance, repre, False)
@@ -260,13 +261,13 @@ class IntegrateFtrackInstance(pyblish.api.InstancePlugin):
             review_item = copy.deepcopy(base_component_item)
 
             # get first or synchronize thumbnail item
-            sync_thumbnail_item = None
-            sync_thumbnail_item_src = None
             sync_thumbnail_data = self._get_matching_thumbnail_item(
                 repre,
                 thumbnail_data_items,
                 multiple_synced_thumbnails
             )
+            sync_thumbnail_item = None
+            sync_thumbnail_item_src = None
             if sync_thumbnail_data:
                 sync_thumbnail_item = sync_thumbnail_data.get("item")
                 sync_thumbnail_item_src = sync_thumbnail_data.get(
@@ -336,7 +337,6 @@ class IntegrateFtrackInstance(pyblish.api.InstancePlugin):
 
             # Add item to component list
             component_list.append(review_item)
-
 
             if self.upload_reviewable_with_origin_name:
                 origin_name_component = copy.deepcopy(review_item)
@@ -445,7 +445,8 @@ class IntegrateFtrackInstance(pyblish.api.InstancePlugin):
         return None
 
     def _make_extended_component_name(
-            self, component_item, repre, iteration_index):
+        self, component_item, repre, iteration_index
+    ):
         """ Returns the extended component name
 
         Name is based on the asset name and representation name.
@@ -457,8 +458,8 @@ class IntegrateFtrackInstance(pyblish.api.InstancePlugin):
 
         Returns:
             str: The extended component name.
-
         """
+
         # reset extended if no need for extended asset name
         if self.keep_first_subset_name_for_review and iteration_index == 0:
             return
@@ -470,21 +471,23 @@ class IntegrateFtrackInstance(pyblish.api.InstancePlugin):
         )
 
     def _create_src_component(
-            self, instance, repre, component_item, location):
+        self, instance, repre, component_item, location
+    ):
         """Create src component for thumbnail.
 
         This will replicate the input component and change its name to
         have suffix "_src".
 
         Args:
-            instance (pyblish.api.Instance): Instance
-            repre (dict): Representation
-            component_item (dict): Component item
-            location (str): Location name
+            instance (pyblish.api.Instance): Pyblish instance.
+            repre (dict[str, Any]): Representation.
+            component_item (dict[str, Any]): Component item.
+            location (str): Location name.
 
         Returns:
-            dict: Component item
+            dict[str, Any]: Component item
         """
+
         # Make sure thumbnail is disabled
         component_item["thumbnail"] = False
         # Set location
@@ -526,12 +529,10 @@ class IntegrateFtrackInstance(pyblish.api.InstancePlugin):
         self, instance, repre, component_path, is_review=None
     ):
         if self._is_repre_video(repre):
-            return self._prepare_video_component_metadata(instance, repre,
-                                                          component_path,
-                                                          is_review)
-        else:
-            return self._prepare_image_component_metadata(repre,
-                                                          component_path)
+            return self._prepare_video_component_metadata(
+                instance, repre, component_path, is_review
+            )
+        return self._prepare_image_component_metadata(repre, component_path)
 
     def _prepare_video_component_metadata(
         self, instance, repre, component_path, is_review=None
