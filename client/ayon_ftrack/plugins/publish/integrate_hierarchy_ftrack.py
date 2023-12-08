@@ -242,12 +242,12 @@ class IntegrateHierarchyToFtrack(pyblish.api.ContextPlugin):
         import_queue = collections.deque()
         for entity_name, entity_data in hierarchy_context.items():
             import_queue.append(
-                (entity_name, entity_data, None)
+                (entity_name, entity_data, None, "")
             )
 
         while import_queue:
             item = import_queue.popleft()
-            entity_name, entity_data, parent = item
+            entity_name, entity_data, parent, parent_path = item
 
             entity_type = entity_data["entity_type"]
             self.log.debug(entity_data)
@@ -269,9 +269,7 @@ class IntegrateHierarchyToFtrack(pyblish.api.ContextPlugin):
             if get_asset_name_identifier is None:
                 entity_path = entity["name"]
             else:
-                link_names = [item["name"] for item in entity["link"]]
-                link_names.pop(0)
-                entity_path = "/" + "/".join(link_names)
+                entity_path = "{}/{}".format(parent_path, entity_name)
 
             # CUSTOM ATTRIBUTES
             custom_attributes = entity_data.get('custom_attributes', {})
@@ -413,7 +411,7 @@ class IntegrateHierarchyToFtrack(pyblish.api.ContextPlugin):
 
             for entity_name, entity_data in children.items():
                 import_queue.append(
-                    (entity_name, entity_data, entity)
+                    (entity_name, entity_data, entity, entity_path)
                 )
 
     def create_links(self, project_name, entity_data, entity):
