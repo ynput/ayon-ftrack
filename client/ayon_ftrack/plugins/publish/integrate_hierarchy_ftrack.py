@@ -249,6 +249,10 @@ class IntegrateHierarchyToFtrack(pyblish.api.ContextPlugin):
             item = import_queue.popleft()
             entity_name, entity_data, parent, parent_path = item
 
+            # Entity name did sometimes contain entity path in OpenPype 3.17.7
+            # TODO remove this split when we're sure the version is not used
+            entity_name = entity_name.split("/")[-1]
+
             entity_type = entity_data["entity_type"]
             self.log.debug(entity_data)
 
