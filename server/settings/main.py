@@ -73,15 +73,15 @@ class FtrackSettings(BaseSettingsModel):
         title="Ftrack server url",
         scope=["studio"],
     )
-
-    service_event_handlers: FtrackServiceHandlers = Field(
-        default_factory=FtrackServiceHandlers,
-        title="Server Actions/Events",
-    )
     service_settings: FtrackServiceSettings = Field(
         default_factory=FtrackServiceSettings,
         title="Service settings",
         scope=["studio"],
+    )
+
+    service_event_handlers: FtrackServiceHandlers = Field(
+        default_factory=FtrackServiceHandlers,
+        title="Server Actions/Events",
     )
     post_launch_hook: PostLaunchHookSettings = Field(
         default_factory=PostLaunchHookSettings,
