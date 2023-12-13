@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ftrack-leecher"
-version = "0.2.6-dev.1"
+version = "0.2.6"
 description = ""
 authors = ["Ynput s.r.o. <info@ynput.io>"]
 

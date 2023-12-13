@@ -2,10 +2,10 @@ name: ayon-ftrack-services
 services:
   processor:
     container_name: processor
-    image: ynput/ayon-ftrack-processor:0.2.6-dev.1
+    image: ynput/ayon-ftrack-processor:0.2.6
     restart: unless-stopped
     environment:
       - "AYON_SERVER_URL=${AYON_SERVER_URL}"
       - "AYON_API_KEY=${AYON_API_KEY}"
       - "AYON_ADDON_NAME=ftrack"
-      - "AYON_ADDON_VERSION=0.2.6-dev.1"
+      - "AYON_ADDON_VERSION=0.2.6"
