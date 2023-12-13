@@ -2,11 +2,11 @@
 name = "ftrack-leecher"
 version = "0.2.6-dev.1"
 description = ""
-authors = ["Martastain <martas@imm.cz>"]
+authors = ["Ynput s.r.o. <info@ynput.io>"]
 
 [tool.poetry.dependencies]
 python = ">=3.9,<3.10"
-ayon-python-api = ">=0.5.4"
+ayon-python-api = "1.0.0rc3"
 ftrack-python-api = "2.3.3"
 
 [tool.poetry.dev-dependencies]
