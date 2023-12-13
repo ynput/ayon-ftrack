@@ -41,7 +41,7 @@ class IntegrateHierarchyToFtrack(pyblish.api.ContextPlugin):
     """
 
     order = pyblish.api.IntegratorOrder - 0.04
-    label = 'Integrate Hierarchy To Ftrack'
+    label = "Integrate Hierarchy To Ftrack"
     families = ["shot"]
     hosts = [
         "hiero",
@@ -242,12 +242,16 @@ class IntegrateHierarchyToFtrack(pyblish.api.ContextPlugin):
         import_queue = collections.deque()
         for entity_name, entity_data in hierarchy_context.items():
             import_queue.append(
-                (entity_name, entity_data, None)
+                (entity_name, entity_data, None, "")
             )
 
         while import_queue:
             item = import_queue.popleft()
-            entity_name, entity_data, parent = item
+            entity_name, entity_data, parent, parent_path = item
+
+            # Entity name did sometimes contain entity path in OpenPype 3.17.7
+            # TODO remove this split when we're sure the version is not used
+            entity_name = entity_name.split("/")[-1]
 
             entity_type = entity_data["entity_type"]
             self.log.debug(entity_data)
@@ -269,12 +273,10 @@ class IntegrateHierarchyToFtrack(pyblish.api.ContextPlugin):
             if get_asset_name_identifier is None:
                 entity_path = entity["name"]
             else:
-                link_names = [item["name"] for item in entity["link"]]
-                link_names.pop(0)
-                entity_path = "/" + "/".join(link_names)
+                entity_path = "{}/{}".format(parent_path, entity_name)
 
             # CUSTOM ATTRIBUTES
-            custom_attributes = entity_data.get('custom_attributes', {})
+            custom_attributes = entity_data.get("custom_attributes", {})
             instances = []
             for instance in context:
                 instance_asset_name = instance.data.get("asset")
@@ -299,7 +301,7 @@ class IntegrateHierarchyToFtrack(pyblish.api.ContextPlugin):
                             "Missing custom attribute in ftrack with name '{}'"
                         ).format(key))
 
-                    entity['custom_attributes'][key] = cust_attr_value
+                    entity["custom_attributes"][key] = cust_attr_value
                     continue
 
                 attr_id = hier_attr["id"]
@@ -354,10 +356,10 @@ class IntegrateHierarchyToFtrack(pyblish.api.ContextPlugin):
                     instances_by_task_name[task_name.lower()].append(instance)
 
             ftrack_status_by_task_id = context.data["ftrackStatusByTaskId"]
-            tasks = entity_data.get('tasks', [])
+            tasks = entity_data.get("tasks", [])
             existing_tasks = []
             tasks_to_create = []
-            for child in entity['children']:
+            for child in entity["children"]:
                 if child.entity_type.lower() == "task":
                     task_name_low = child["name"].lower()
                     existing_tasks.append(task_name_low)
@@ -413,7 +415,7 @@ class IntegrateHierarchyToFtrack(pyblish.api.ContextPlugin):
 
             for entity_name, entity_data in children.items():
                 import_queue.append(
-                    (entity_name, entity_data, entity)
+                    (entity_name, entity_data, entity, entity_path)
                 )
 
     def create_links(self, project_name, entity_data, entity):
@@ -449,12 +451,12 @@ class IntegrateHierarchyToFtrack(pyblish.api.ContextPlugin):
 
     def get_all_task_types(self, project):
         tasks = {}
-        proj_template = project['project_schema']
-        temp_task_types = proj_template['_task_type_schema']['types']
+        proj_template = project["project_schema"]
+        temp_task_types = proj_template["_task_type_schema"]["types"]
 
         for type in temp_task_types:
-            if type['name'] not in tasks:
-                tasks[type['name']] = type
+            if type["name"] not in tasks:
+                tasks[type["name"]] = type
 
         return tasks
 
