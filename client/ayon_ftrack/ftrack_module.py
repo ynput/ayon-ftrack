@@ -3,7 +3,7 @@ import os
 import click
 
 from openpype.modules import (
-    OpenPypeModule,
+    AYONAddon,
     ITrayModule,
     IPluginPaths,
 )
@@ -14,7 +14,7 @@ _URL_NOT_SET = object()
 
 
 class FtrackModule(
-    OpenPypeModule,
+    AYONAddon,
     ITrayModule,
     IPluginPaths,
 ):
