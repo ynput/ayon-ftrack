@@ -329,6 +329,27 @@ class Delivery(LocalAction):
             self.log.debug(debug_msg)
 
             anatomy_data = copy.deepcopy(repre["context"])
+
+            if "product" not in anatomy_data:
+                product_value = {}
+
+                product_name = anatomy_data.get("subset")
+                if product_name is not None:
+                    product_value["name"] = product_name
+
+                product_type = anatomy_data.get("family")
+                if product_type is not None:
+                    product_value["type"] = product_type
+
+                anatomy_data["product"] = product_value
+
+            if "folder" not in anatomy_data:
+                folder_value = {}
+                folder_name = anatomy_data.get("asset")
+                if folder_name is not None:
+                    folder_value["name"] = folder_name
+                anatomy_data["folder"] = folder_value
+
             repre_report_items = check_destination_path(
                 repre["id"],
                 anatomy,
