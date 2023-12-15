@@ -78,17 +78,17 @@ class Delivery(LocalAction):
 
         # Prepare anatomy data
         anatomy = Anatomy(project_name)
-        delivery_templates = []
         first = None
         delivery_templates = anatomy.templates.get("delivery") or {}
         default_keys = {
             "frame", "version", "frame_padding", "version_padding"
         }
+        delivery_templates_items = []
         for key, template in delivery_templates.items():
             if key in default_keys:
                 continue
             # Use only keys with `{root}` or `{root[*]}` in value
-            delivery_templates.append({
+            delivery_templates_items.append({
                 "label": key,
                 "value": key
             })
@@ -97,7 +97,7 @@ class Delivery(LocalAction):
 
         skipped = False
         # Add message if there are any common components
-        if not repre_names or not delivery_templates:
+        if not repre_names or not delivery_templates_items:
             skipped = True
             items.append({
                 "type": "label",
@@ -127,7 +127,7 @@ class Delivery(LocalAction):
                 })
 
         # Add message if delivery anatomies are not set
-        if not delivery_templates:
+        if not delivery_templates_items:
             items.append({
                 "type": "label",
                 "value": (
@@ -193,7 +193,7 @@ class Delivery(LocalAction):
         items.append({
             "type": "enumerator",
             "name": "__delivery_template__",
-            "data": delivery_templates,
+            "data": delivery_templates_items,
             "value": first
         })
 
