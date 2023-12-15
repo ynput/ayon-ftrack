@@ -9,7 +9,6 @@ from ayon_api import (
     get_folders,
     get_products,
     get_versions,
-    get_representations,
 )
 
 from ayon_ftrack.common import (
@@ -20,6 +19,7 @@ from ayon_ftrack.common import (
 )
 from ayon_ftrack.lib import get_ftrack_icon_url
 
+from openpype.client import get_representations
 from openpype.lib.dateutils import get_datetime_data
 from openpype.pipeline import Anatomy
 from openpype.pipeline.load import get_representation_path_with_anatomy
@@ -323,7 +323,7 @@ class Delivery(LocalAction):
         datetime_data = get_datetime_data()
         for repre in repres_to_deliver:
             source_path = repre.get("data", {}).get("path")
-            debug_msg = "Processing representation {}".format(repre["id"])
+            debug_msg = "Processing representation {}".format(repre["_id"])
             if source_path:
                 debug_msg += " with published path {}.".format(source_path)
             self.log.debug(debug_msg)
@@ -351,7 +351,7 @@ class Delivery(LocalAction):
                 anatomy_data["folder"] = folder_value
 
             repre_report_items = check_destination_path(
-                repre["id"],
+                repre["_id"],
                 anatomy,
                 anatomy_data,
                 datetime_data,
