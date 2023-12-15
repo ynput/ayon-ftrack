@@ -714,7 +714,7 @@ class Delivery(LocalAction):
 
             folder_id = product_entity["folderId"]
             product_name = product_entity["name"]
-            version = version_entity["name"]
+            version = version_entity["version"]
 
             folder_values = version_docs_by_parent_id.setdefault(folder_id, {})
             product_values = folder_values.setdefault(product_name, {})
@@ -746,6 +746,7 @@ class Delivery(LocalAction):
             version_entity = version_entities_by_version.get(version)
             if version_entity:
                 filtered_versions.append(version_entity)
+
         return filtered_versions
 
 
