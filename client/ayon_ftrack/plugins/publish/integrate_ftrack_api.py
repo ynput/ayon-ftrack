@@ -67,6 +67,7 @@ class IntegrateFtrackApi(pyblish.api.InstancePlugin):
 
     def get_instance_entities(self, instance, context):
         parent_entity = None
+        task_entity = None
         # If instance has set "ftrackEntity" or "ftrackTask" then use them from
         #   instance. Even if they are set to None. If they are set to None it
         #   has a reason. (like has different context)
