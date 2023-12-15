@@ -1,4 +1,4 @@
-from .ftrack_module import (
+from .ftrack_addon import (
     FtrackAddon,
     FTRACK_ADDON_DIR,
 
