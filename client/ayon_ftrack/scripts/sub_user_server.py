@@ -37,11 +37,8 @@ def main(args):
             auto_connect_event_hub=True, sock=sock, Eventhub=SocketBaseEventHub
         )
         manager = ModulesManager()
-        ftrack_module = manager.modules_by_name["ftrack"]
-        ftrack_module.user_event_handlers_paths
-        server = FtrackServer(
-            ftrack_module.user_event_handlers_paths
-        )
+        addon = manager.modules_by_name["ftrack"]
+        server = FtrackServer(addon.user_event_handlers_paths)
         log.debug("Launching User Ftrack Server")
         server.run_server(session=session)
         return 0

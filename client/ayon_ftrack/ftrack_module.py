@@ -9,11 +9,11 @@ from openpype.modules import (
 )
 from openpype.lib import Logger
 
-FTRACK_MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
+FTRACK_ADDON_DIR = os.path.dirname(os.path.abspath(__file__))
 _URL_NOT_SET = object()
 
 
-class FtrackModule(
+class FtrackAddon(
     AYONAddon,
     ITrayModule,
     IPluginPaths,
@@ -82,13 +82,13 @@ class FtrackModule(
     def get_plugin_paths(self):
         """Ftrack plugin paths."""
         return {
-            "publish": [os.path.join(FTRACK_MODULE_DIR, "plugins", "publish")]
+            "publish": [os.path.join(FTRACK_ADDON_DIR, "plugins", "publish")]
         }
 
     def get_launch_hook_paths(self):
         """Implementation for applications launch hooks."""
 
-        return os.path.join(FTRACK_MODULE_DIR, "launch_hooks")
+        return os.path.join(FTRACK_ADDON_DIR, "launch_hooks")
 
     def modify_application_launch_arguments(self, application, env):
         if not application.use_python_2:
@@ -97,7 +97,7 @@ class FtrackModule(
         self.log.info("Adding Ftrack Python 2 packages to PYTHONPATH.")
 
         # Prepare vendor dir path
-        python_2_vendor = os.path.join(FTRACK_MODULE_DIR, "python2_vendor")
+        python_2_vendor = os.path.join(FTRACK_ADDON_DIR, "python2_vendor")
 
         # Add Python 2 modules
         python_paths = [
@@ -283,6 +283,6 @@ def resolve_ftrack_url(url, logger=None):
     return ftrack_url
 
 
-@click.group(FtrackModule.name, help="Ftrack module related commands.")
+@click.group(FtrackAddon.name, help="Ftrack module related commands.")
 def cli_main():
     pass

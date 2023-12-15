@@ -8,7 +8,7 @@ from qtpy import QtCore, QtWidgets, QtGui
 
 from openpype import resources
 from openpype.lib import Logger
-from ayon_ftrack import resolve_ftrack_url, FTRACK_MODULE_DIR
+from ayon_ftrack import resolve_ftrack_url, FTRACK_ADDON_DIR
 from ayon_ftrack.lib import credentials
 from . import login_dialog
 from .user_server import SocketThread
@@ -130,7 +130,7 @@ class FtrackTrayWrapper:
         thread_name = "ActionServerThread"
         thread_port = 10021
         subprocess_path = (
-            "{}/scripts/sub_user_server.py".format(FTRACK_MODULE_DIR)
+            "{}/scripts/sub_user_server.py".format(FTRACK_ADDON_DIR)
         )
         if self.thread_socket_server is not None:
             self.thread_socket_server.stop()
