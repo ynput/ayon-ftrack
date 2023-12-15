@@ -3,19 +3,23 @@ import copy
 import json
 import collections
 
+from ayon_api import (
+    get_attributes_for_type,
+    get_project,
+    get_folders,
+    get_products,
+    get_versions,
+    get_representations,
+)
+
 from ayon_ftrack.common import (
     LocalAction,
     query_custom_attribute_values,
     CUST_ATTR_KEY_SERVER_ID,
+    FTRACK_ID_ATTRIB,
 )
 from ayon_ftrack.lib import get_ftrack_icon_url
-from openpype.client import (
-    get_project,
-    get_assets,
-    get_subsets,
-    get_versions,
-    get_representations
-)
+
 from openpype.lib.dateutils import get_datetime_data
 from openpype.pipeline import Anatomy
 from openpype.pipeline.load import get_representation_path_with_anatomy
@@ -47,7 +51,7 @@ class Delivery(LocalAction):
         return is_valid
 
     def interface(self, session, entities, event):
-        if event["data"].get("values", {}):
+        if event["data"].get("values"):
             return
 
         title = "Delivery data to Client"
@@ -57,13 +61,11 @@ class Delivery(LocalAction):
 
         project_entity = self.get_project_from_entity(entities[0])
         project_name = project_entity["full_name"]
-        project_doc = get_project(project_name, fields=["name"])
-        if not project_doc:
+        project_entity = get_project(project_name, fields=["name"])
+        if not project_entity:
             return {
                 "success": False,
-                "message": (
-                    "Didn't found project \"{}\" in avalon."
-                ).format(project_name)
+                "message": f"Project \"{project_name}\" not found in AYON."
             }
 
         repre_names = self._get_repre_names(project_name, session, entities)
@@ -76,21 +78,26 @@ class Delivery(LocalAction):
 
         # Prepare anatomy data
         anatomy = Anatomy(project_name)
-        new_anatomies = []
+        delivery_templates = []
         first = None
-        for key, template in (anatomy.templates.get("delivery") or {}).items():
+        delivery_templates = anatomy.templates.get("delivery") or {}
+        default_keys = {
+            "frame", "version", "frame_padding", "version_padding"
+        }
+        for key, template in delivery_templates.items():
+            if key in default_keys:
+                continue
             # Use only keys with `{root}` or `{root[*]}` in value
-            if isinstance(template, str) and "{root" in template:
-                new_anatomies.append({
-                    "label": key,
-                    "value": key
-                })
-                if first is None:
-                    first = key
+            delivery_templates.append({
+                "label": key,
+                "value": key
+            })
+            if first is None:
+                first = key
 
         skipped = False
         # Add message if there are any common components
-        if not repre_names or not new_anatomies:
+        if not repre_names or not delivery_templates:
             skipped = True
             items.append({
                 "type": "label",
@@ -120,7 +127,7 @@ class Delivery(LocalAction):
                 })
 
         # Add message if delivery anatomies are not set
-        if not new_anatomies:
+        if not delivery_templates:
             items.append({
                 "type": "label",
                 "value": (
@@ -185,8 +192,8 @@ class Delivery(LocalAction):
 
         items.append({
             "type": "enumerator",
-            "name": "__new_anatomies__",
-            "data": new_anatomies,
+            "name": "__delivery_template__",
+            "data": delivery_templates,
             "value": first
         })
 
@@ -195,266 +202,23 @@ class Delivery(LocalAction):
             "title": title
         }
 
-    def _get_repre_names(self, project_name, session, entities):
-        version_ids = self._get_interest_version_ids(
-            project_name, session, entities
-        )
-        if not version_ids:
-            return []
-        repre_docs = get_representations(
-            project_name,
-            version_ids=version_ids,
-            fields=["name"]
-        )
-        repre_names = {repre_doc["name"] for repre_doc in repre_docs}
-        return list(sorted(repre_names))
-
-    def _get_interest_version_ids(self, project_name, session, entities):
-        # Extract AssetVersion entities
-        asset_versions = self._extract_asset_versions(session, entities)
-        # Prepare Asset ids
-        asset_ids = {
-            asset_version["asset_id"]
-            for asset_version in asset_versions
-        }
-        # Query Asset entities
-        assets = session.query((
-            "select id, name, context_id from Asset where id in ({})"
-        ).format(self.join_query_keys(asset_ids))).all()
-        assets_by_id = {
-            asset["id"]: asset
-            for asset in assets
-        }
-        parent_ids = set()
-        subset_names = set()
-        version_nums = set()
-        for asset_version in asset_versions:
-            asset_id = asset_version["asset_id"]
-            asset = assets_by_id[asset_id]
-
-            parent_ids.add(asset["context_id"])
-            subset_names.add(asset["name"])
-            version_nums.add(asset_version["version"])
-
-        asset_docs_by_ftrack_id = self._get_asset_docs(
-            project_name, session, parent_ids
-        )
-        subset_docs = self._get_subset_docs(
-            project_name,
-            asset_docs_by_ftrack_id,
-            subset_names,
-            asset_versions,
-            assets_by_id
-        )
-        version_docs = self._get_version_docs(
-            project_name,
-            asset_docs_by_ftrack_id,
-            subset_docs,
-            version_nums,
-            asset_versions,
-            assets_by_id
-        )
-
-        return [version_doc["_id"] for version_doc in version_docs]
-
-    def _extract_asset_versions(self, session, entities):
-        asset_version_ids = set()
-        review_session_ids = set()
-        for entity in entities:
-            entity_type_low = entity.entity_type.lower()
-            if entity_type_low == "assetversion":
-                asset_version_ids.add(entity["id"])
-            elif entity_type_low == "reviewsession":
-                review_session_ids.add(entity["id"])
-
-        for version_id in self._get_asset_version_ids_from_review_sessions(
-            session, review_session_ids
-        ):
-            asset_version_ids.add(version_id)
-
-        asset_versions = session.query((
-            "select id, version, asset_id from AssetVersion where id in ({})"
-        ).format(self.join_query_keys(asset_version_ids))).all()
-
-        return asset_versions
-
-    def _get_asset_version_ids_from_review_sessions(
-        self, session, review_session_ids
-    ):
-        if not review_session_ids:
-            return set()
-        review_session_objects = session.query((
-            "select version_id from ReviewSessionObject"
-            " where review_session_id in ({})"
-        ).format(self.join_query_keys(review_session_ids))).all()
-
-        return {
-            review_session_object["version_id"]
-            for review_session_object in review_session_objects
-        }
-
-    def _get_version_docs(
-        self,
-        project_name,
-        asset_docs_by_ftrack_id,
-        subset_docs,
-        version_nums,
-        asset_versions,
-        assets_by_id
-    ):
-        subset_docs_by_id = {
-            subset_doc["_id"]: subset_doc
-            for subset_doc in subset_docs
-        }
-        version_docs = list(get_versions(
-            project_name,
-            subset_ids=subset_docs_by_id.keys(),
-            versions=version_nums
-        ))
-        version_docs_by_parent_id = collections.defaultdict(dict)
-        for version_doc in version_docs:
-            subset_doc = subset_docs_by_id[version_doc["parent"]]
-
-            asset_id = subset_doc["parent"]
-            subset_name = subset_doc["name"]
-            version = version_doc["name"]
-            if version_docs_by_parent_id[asset_id].get(subset_name) is None:
-                version_docs_by_parent_id[asset_id][subset_name] = {}
-
-            version_docs_by_parent_id[asset_id][subset_name][version] = (
-                version_doc
-            )
-
-        filtered_versions = []
-        for asset_version in asset_versions:
-            asset_id = asset_version["asset_id"]
-            asset = assets_by_id[asset_id]
-            parent_id = asset["context_id"]
-            asset_doc = asset_docs_by_ftrack_id.get(parent_id)
-            if not asset_doc:
-                continue
-
-            subsets_by_name = version_docs_by_parent_id.get(asset_doc["_id"])
-            if not subsets_by_name:
-                continue
-
-            subset_name = asset["name"]
-            version_docs_by_version = subsets_by_name.get(subset_name)
-            if not version_docs_by_version:
-                continue
-
-            version = asset_version["version"]
-            version_doc = version_docs_by_version.get(version)
-            if version_doc:
-                filtered_versions.append(version_doc)
-        return filtered_versions
-
-    def _get_subset_docs(
-        self,
-        project_name,
-        asset_docs_by_ftrack_id,
-        subset_names,
-        asset_versions,
-        assets_by_id
-    ):
-        asset_doc_ids = [
-            asset_doc["_id"]
-            for asset_doc in asset_docs_by_ftrack_id.values()
-        ]
-        subset_docs = list(get_subsets(
-            project_name,
-            asset_ids=asset_doc_ids,
-            subset_names=subset_names
-        ))
-        subset_docs_by_parent_id = collections.defaultdict(dict)
-        for subset_doc in subset_docs:
-            asset_id = subset_doc["parent"]
-            subset_name = subset_doc["name"]
-            subset_docs_by_parent_id[asset_id][subset_name] = subset_doc
-
-        filtered_subsets = []
-        for asset_version in asset_versions:
-            asset_id = asset_version["asset_id"]
-            asset = assets_by_id[asset_id]
-
-            parent_id = asset["context_id"]
-            asset_doc = asset_docs_by_ftrack_id.get(parent_id)
-            if not asset_doc:
-                continue
-
-            subsets_by_name = subset_docs_by_parent_id.get(asset_doc["_id"])
-            if not subsets_by_name:
-                continue
-
-            subset_name = asset["name"]
-            subset_doc = subsets_by_name.get(subset_name)
-            if subset_doc:
-                filtered_subsets.append(subset_doc)
-        return filtered_subsets
-
-    def _get_asset_docs(self, project_name, session, parent_ids):
-        asset_docs = list(get_assets(
-            project_name, fields=["_id", "name", "data.ftrackId"]
-        ))
-
-        asset_docs_by_id = {}
-        asset_docs_by_name = {}
-        asset_docs_by_ftrack_id = {}
-        for asset_doc in asset_docs:
-            asset_id = str(asset_doc["_id"])
-            asset_name = asset_doc["name"]
-            ftrack_id = asset_doc["data"].get("ftrackId")
-
-            asset_docs_by_id[asset_id] = asset_doc
-            asset_docs_by_name[asset_name] = asset_doc
-            if ftrack_id:
-                asset_docs_by_ftrack_id[ftrack_id] = asset_doc
-
-        attr_def = session.query((
-            "select id from CustomAttributeConfiguration where key is \"{}\""
-        ).format(CUST_ATTR_KEY_SERVER_ID)).first()
-        if attr_def is None:
-            return asset_docs_by_ftrack_id
-
-        avalon_mongo_id_values = query_custom_attribute_values(
-            session, [attr_def["id"]], parent_ids
-        )
-        missing_ids = set(parent_ids)
-        for item in avalon_mongo_id_values:
-            if not item["value"]:
-                continue
-            asset_id = item["value"]
-            entity_id = item["entity_id"]
-            asset_doc = asset_docs_by_id.get(asset_id)
-            if asset_doc:
-                asset_docs_by_ftrack_id[entity_id] = asset_doc
-                missing_ids.remove(entity_id)
-
-        entity_ids_by_name = {}
-        if missing_ids:
-            not_found_entities = session.query((
-                "select id, name from TypedContext where id in ({})"
-            ).format(self.join_query_keys(missing_ids))).all()
-            entity_ids_by_name = {
-                entity["name"]: entity["id"]
-                for entity in not_found_entities
-            }
-
-        for asset_name, entity_id in entity_ids_by_name.items():
-            asset_doc = asset_docs_by_name.get(asset_name)
-            if asset_doc:
-                asset_docs_by_ftrack_id[entity_id] = asset_doc
-
-        return asset_docs_by_ftrack_id
-
     def launch(self, session, entities, event):
-        if "values" not in event["data"]:
+        values = event["data"].get("values")
+        if not values:
             return {
                 "success": True,
                 "message": "Nothing to do"
             }
 
-        values = event["data"]["values"]
+        if FTRACK_ID_ATTRIB not in get_attributes_for_type("folder"):
+            return {
+                "success": False,
+                "message": (
+                    f"AYON server does not have '{FTRACK_ID_ATTRIB}'"
+                    " attribute available."
+                )
+            }
+
         skipped = values.pop("__skipped__")
         if skipped:
             return {
@@ -523,13 +287,13 @@ class Delivery(LocalAction):
         values = event["data"]["values"]
 
         location_path = values.pop("__location_path__")
-        anatomy_name = values.pop("__new_anatomies__")
+        anatomy_name = values.pop("__delivery_template__")
         project_name = values.pop("__project_name__")
 
-        repre_names = []
+        repre_names = set()
         for key, value in values.items():
             if value is True:
-                repre_names.append(key)
+                repre_names.add(key)
 
         if not repre_names:
             return {
@@ -559,24 +323,26 @@ class Delivery(LocalAction):
         datetime_data = get_datetime_data()
         for repre in repres_to_deliver:
             source_path = repre.get("data", {}).get("path")
-            debug_msg = "Processing representation {}".format(repre["_id"])
+            debug_msg = "Processing representation {}".format(repre["id"])
             if source_path:
                 debug_msg += " with published path {}.".format(source_path)
             self.log.debug(debug_msg)
 
             anatomy_data = copy.deepcopy(repre["context"])
-            repre_report_items = check_destination_path(repre["_id"],
-                                                        anatomy,
-                                                        anatomy_data,
-                                                        datetime_data,
-                                                        anatomy_name)
+            repre_report_items = check_destination_path(
+                repre["id"],
+                anatomy,
+                anatomy_data,
+                datetime_data,
+                anatomy_name
+            )
 
             if repre_report_items:
                 report_items.update(repre_report_items)
                 continue
 
             # Get source repre path
-            frame = repre['context'].get('frame')
+            frame = repre["context"].get("frame")
 
             if frame:
                 repre["context"]["frame"] = len(str(frame)) * "#"
@@ -602,45 +368,388 @@ class Delivery(LocalAction):
         return self.report(report_items)
 
     def report(self, report_items):
-        """Returns dict with final status of delivery (succes, fail etc.)."""
-        items = []
+        """Returns dict with final status of delivery (success, fail etc.).
 
-        for msg, _items in report_items.items():
-            if not _items:
+        Args:
+            report_items (dict[str, Union[str, list[str]]]: Dict with report
+                items to be shown to user.
+
+        Returns:
+            dict[str, Any]: Dict with final status of delivery.
+        """
+
+        all_items = []
+
+        for msg, items in report_items.items():
+            if not items:
                 continue
 
-            if items:
-                items.append({"type": "label", "value": "---"})
+            if all_items:
+                all_items.append({"type": "label", "value": "---"})
 
-            items.append({
+            all_items.append({
                 "type": "label",
                 "value": "# {}".format(msg)
             })
-            if not isinstance(_items, (list, tuple)):
-                _items = [_items]
-            __items = []
-            for item in _items:
-                __items.append(str(item))
+            if not isinstance(items, (list, tuple)):
+                items = [items]
 
-            items.append({
+            all_items.append({
                 "type": "label",
-                "value": '<p>{}</p>'.format("<br>".join(__items))
+                "value": "<p>{}</p>".format(
+                    "<br>".join([str(item) for item in items])
+                )
             })
 
-        if not items:
+        if not all_items:
             return {
                 "success": True,
                 "message": "Delivery Finished"
             }
 
         return {
-            "items": items,
+            "items": all_items,
             "title": "Delivery report",
             "success": False
         }
 
+    def _get_repre_names(self, project_name, session, entities):
+        """
+
+        Args:
+            project_name (str): Project name.
+            session (ftrack_api.Session): Ftrack session.
+            entities (list[ftrack_api.entity.base.Entity]): List of entities.
+
+        Returns:
+            list[str]: List of representation names.
+        """
+
+        version_ids = self._get_interest_version_ids(
+            project_name, session, entities
+        )
+        if not version_ids:
+            return []
+        repre_entities = get_representations(
+            project_name,
+            version_ids=version_ids,
+            fields=["name"]
+        )
+        repre_names = {
+            repre_entity["name"]
+            for repre_entity in repre_entities
+        }
+        return list(sorted(repre_names))
+
+    def _get_interest_version_ids(self, project_name, session, entities):
+        """
+    
+        Args:
+            project_name (str): Project name.
+            session (ftrack_api.Session): Ftrack session.
+            entities (list[ftrack_api.entity.base.Entity]): List of entities.
+
+        Returns:
+            set[str]: Set of AYON version ids.
+        """
+
+        # Extract AssetVersion entities
+        asset_versions = self._extract_asset_versions(session, entities)
+        # Prepare Asset ids
+        asset_ids = {
+            asset_version["asset_id"]
+            for asset_version in asset_versions
+        }
+        # Query Asset entities
+        assets = session.query((
+            "select id, name, context_id from Asset where id in ({})"
+        ).format(self.join_query_keys(asset_ids))).all()
+        assets_by_id = {
+            asset["id"]: asset
+            for asset in assets
+        }
+        parent_ids = set()
+        product_names = set()
+        version_nums = set()
+        for asset_version in asset_versions:
+            asset_id = asset_version["asset_id"]
+            asset = assets_by_id[asset_id]
+
+            parent_ids.add(asset["context_id"])
+            product_names.add(asset["name"])
+            version_nums.add(asset_version["version"])
+
+        folders_by_ftrack_id = self._get_folder_entities(
+            project_name, session, parent_ids
+        )
+        product_entities = self._get_product_entities(
+            project_name,
+            folders_by_ftrack_id,
+            product_names,
+            asset_versions,
+            assets_by_id
+        )
+        version_entities = self._get_version_entities(
+            project_name,
+            folders_by_ftrack_id,
+            product_entities,
+            version_nums,
+            asset_versions,
+            assets_by_id
+        )
+
+        return {version_entity["id"] for version_entity in version_entities}
+
+    def _extract_asset_versions(self, session, entities):
+        asset_version_ids = set()
+        review_session_ids = set()
+        for entity in entities:
+            entity_type_low = entity.entity_type.lower()
+            if entity_type_low == "assetversion":
+                asset_version_ids.add(entity["id"])
+            elif entity_type_low == "reviewsession":
+                review_session_ids.add(entity["id"])
+
+        for version_id in self._get_asset_version_ids_from_review_sessions(
+            session, review_session_ids
+        ):
+            asset_version_ids.add(version_id)
+
+        asset_versions = session.query((
+            "select id, version, asset_id from AssetVersion where id in ({})"
+        ).format(self.join_query_keys(asset_version_ids))).all()
+
+        return asset_versions
+
+    def _get_asset_version_ids_from_review_sessions(
+        self, session, review_session_ids
+    ):
+        if not review_session_ids:
+            return set()
+        review_session_objects = session.query((
+            "select version_id from ReviewSessionObject"
+            " where review_session_id in ({})"
+        ).format(self.join_query_keys(review_session_ids))).all()
+
+        return {
+            review_session_object["version_id"]
+            for review_session_object in review_session_objects
+        }
+
+    def _get_folder_entities(self, project_name, session, parent_ids):
+        """
+
+        Args:
+            project_name (str): Project name.
+            session (ftrack_api.Session): Ftrack session.
+            parent_ids (set[str]): Set of ftrack ids parents to Asset.
+
+        Returns:
+            dict[str, dict[str, Any]]: Folder entities by ftrack id.
+        """
+
+        folder_entities = list(get_folders(
+            project_name, fields={
+                "id",
+                "path",
+                f"attrib.{FTRACK_ID_ATTRIB}"
+            }
+        ))
+
+        folders_by_id = {}
+        folders_by_path = {}
+        folders_by_ftrack_id = {}
+        for folder_entity in folder_entities:
+            folder_id = folder_entity["id"]
+            folder_path = folder_entity["path"]
+            ftrack_id = folder_entity["attrib"].get(FTRACK_ID_ATTRIB)
+
+            folders_by_id[folder_id] = folder_entity
+            folders_by_path[folder_path] = folder_entity
+            if ftrack_id:
+                folders_by_ftrack_id[ftrack_id] = folder_entity
+
+        attr_def = session.query((
+            "select id from CustomAttributeConfiguration where key is \"{}\""
+        ).format(CUST_ATTR_KEY_SERVER_ID)).first()
+        if attr_def is None:
+            return folders_by_ftrack_id
+
+        ayon_id_values = query_custom_attribute_values(
+            session, [attr_def["id"]], parent_ids
+        )
+        missing_ids = set(parent_ids)
+        for item in ayon_id_values:
+            if not item["value"]:
+                continue
+            folder_id = item["value"]
+            entity_id = item["entity_id"]
+            folder_entity = folders_by_id.get(folder_id)
+            if folder_entity:
+                folders_by_ftrack_id[entity_id] = folder_entity
+                missing_ids.remove(entity_id)
+
+        entity_ids_by_path = {}
+        if missing_ids:
+            not_found_entities = session.query((
+                "select id, link from TypedContext where id in ({})"
+            ).format(self.join_query_keys(missing_ids))).all()
+            for ftrack_entity in not_found_entities:
+                # TODO use 'slugify_name' function
+                link_names = [item["name"] for item in ftrack_entity["link"]]
+                # Change project name to empty string
+                link_names[0] = ""
+                entity_path = "/".join(link_names)
+                entity_ids_by_path[entity_path] = ftrack_entity["id"]
+
+        for entity_path, ftrack_id in entity_ids_by_path.items():
+            folder_entity = folders_by_path.get(entity_path)
+            if folder_entity:
+                folders_by_ftrack_id[ftrack_id] = folder_entity
+
+        return folders_by_ftrack_id
+
+    def _get_product_entities(
+        self,
+        project_name,
+        folders_by_ftrack_id,
+        product_names,
+        asset_versions,
+        assets_by_id
+    ):
+        """
+
+        Args:
+            project_name (str): Project name.
+            folders_by_ftrack_id (dict[str, dict[str, Any]]): Folder entities
+                by ftrack id.
+            product_names (set[str]): Set of product names.
+            asset_versions (list[dict[str, Any]]): Ftrack AssetVersion
+                entities.
+            assets_by_id (dict[str, dict[str, Any]]): Ftrack Asset entities
+                by id.
+
+        Returns:
+            list[dict[str, Any]]: Product entities.
+        """
+
+        output = []
+        if not folders_by_ftrack_id:
+            return output
+
+        folder_ids = {
+            folder["id"]
+            for folder in folders_by_ftrack_id.values()
+        }
+        product_entities = list(get_products(
+            project_name,
+            folder_ids=folder_ids,
+            product_names=product_names
+        ))
+        products_by_folder_id = {}
+        for product in product_entities:
+            folder_id = product["folderId"]
+            product_name = product["name"]
+            products_by_name = products_by_folder_id.setdefault(folder_id, {})
+            products_by_name[product_name] = product
+
+        for asset_version in asset_versions:
+            asset_id = asset_version["asset_id"]
+            asset = assets_by_id[asset_id]
+
+            parent_id = asset["context_id"]
+            folder = folders_by_ftrack_id.get(parent_id)
+            if not folder:
+                continue
+
+            products_by_name = products_by_folder_id.get(folder["id"])
+            if not products_by_name:
+                continue
+
+            subset_name = asset["name"]
+            subset_doc = products_by_name.get(subset_name)
+            if subset_doc:
+                output.append(subset_doc)
+        return output
+
+    def _get_version_entities(
+        self,
+        project_name,
+        folders_by_ftrack_id,
+        product_entities,
+        version_nums,
+        asset_versions,
+        assets_by_id
+    ):
+        """
+
+        Args:
+            project_name (str): Project name.
+            folders_by_ftrack_id (dict[str, dict[str, Any]]): Folder entities
+                by ftrack id.
+            product_entities (list[dict[str, Any]]): Product entities.
+            version_nums (set[str]): Set of version numbers.
+            asset_versions (list[dict[str, Any]]): Ftrack AssetVersion
+                entities.
+            assets_by_id (dict[str, dict[str, Any]]): Ftrack Asset entities
+                by id.
+
+        Returns:
+            list[dict[str, Any]]: Set of AYON version ids.
+        """
+
+        product_entities_by_id = {
+            product_entity["id"]: product_entity
+            for product_entity in product_entities
+        }
+        version_entities = list(get_versions(
+            project_name,
+            product_ids=product_entities_by_id.keys(),
+            versions=version_nums
+        ))
+        version_docs_by_parent_id = {}
+        for version_entity in version_entities:
+            product_id = version_entity["productId"]
+            product_entity = product_entities_by_id[product_id]
+
+            folder_id = product_entity["folderId"]
+            product_name = product_entity["name"]
+            version = version_entity["name"]
+
+            folder_values = version_docs_by_parent_id.setdefault(folder_id, {})
+            product_values = folder_values.setdefault(product_name, {})
+            product_values[version] = version_entity
+
+        filtered_versions = []
+        for asset_version in asset_versions:
+            asset_id = asset_version["asset_id"]
+            version = asset_version["version"]
+
+            asset = assets_by_id[asset_id]
+            parent_id = asset["context_id"]
+            product_name = asset["name"]
+
+            folder_entity = folders_by_ftrack_id.get(parent_id)
+            if not folder_entity:
+                continue
+
+            product_values = version_docs_by_parent_id.get(
+                folder_entity["id"]
+            )
+            if not product_values:
+                continue
+
+            version_entities_by_version = product_values.get(product_name)
+            if not version_entities_by_version:
+                continue
+
+            version_entity = version_entities_by_version.get(version)
+            if version_entity:
+                filtered_versions.append(version_entity)
+        return filtered_versions
+
 
 def register(session):
-    '''Register plugin. Called when used as an plugin.'''
+    """Register plugin. Called when used as a plugin."""
 
     Delivery(session).register()
