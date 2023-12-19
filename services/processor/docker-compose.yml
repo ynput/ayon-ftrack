@@ -2,7 +2,7 @@ name: ayon-ftrack-services
 services:
   processor:
     container_name: processor
-    image: ynput/ayon-ftrack-processor:1.0.0-dev.1
+    image: ynput/ayon-ftrack-processor:1.0.1-dev.1
     restart: unless-stopped
     environment:
       - "AYON_SERVER_URL=${AYON_SERVER_URL}"
