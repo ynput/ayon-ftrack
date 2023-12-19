@@ -1,33 +1,65 @@
+import json
+import copy
 import collections
-import uuid
-from datetime import datetime
 
-from bson.objectid import ObjectId
+from ayon_api import (
+    get_project,
+    get_folders,
+    get_products,
+    send_batch_operations,
+)
 
 from ayon_ftrack.common import create_chunks, LocalAction
 from ayon_ftrack.lib import get_ftrack_icon_url
-from openpype.client import get_assets, get_subsets
 
 
-class DeleteAssetSubset(LocalAction):
-    identifier = "delete.folder.subset"
-    label = "Delete Folder/Subsets"
-    description = "Removes from AYON and from ftrack with all children"
+class AyonData:
+    def __init__(
+        self,
+        project_name,
+        folders_by_id,
+        folders_by_path,
+        folders_by_parent_id,
+        not_found_paths,
+        selected_folder_ids,
+        folder_ids_to_delete,
+    ):
+        self.project_name = project_name
+        self.folders_by_id = folders_by_id
+        self.folders_by_path = folders_by_path
+        self.folders_by_parent_id = folders_by_parent_id
+        self.not_found_paths = not_found_paths
+        self.selected_folder_ids = selected_folder_ids
+        self.folder_ids_to_delete = folder_ids_to_delete
+
+
+class DeleteEntitiesAction(LocalAction):
+    identifier = "delete.ayon.entities"
+    label = "Delete Folders/Products"
+    description = (
+        "Remove entities from AYON and from ftrack with all children"
+    )
     icon = get_ftrack_icon_url("DeleteAsset.svg")
 
-    settings_key = "delete_asset_subset"
-
-    splitter = {"type": "label", "value": "---"}
-    action_data_by_id = {}
-    folder_prefix = "folder:"
-    subset_prefix = "subset:"
+    settings_key = "delete_ayon_entities"
 
     def discover(self, session, entities, event):
-        """ Validation """
-        task_ids = []
+        """
+
+        Args:
+            session (ftrack_api.Session): Ftrack session processing event.
+            entities (list[ftrack_api.entity.base.Entity]): List of entities
+                selected in Ftrack.
+            event (ftrack_api.event.base.Event): Event data.
+
+        Returns:
+            bool: True if action is valid for given selection.
+        """
+
+        task_ids = set()
         for ent_info in event["data"]["selection"]:
             if ent_info.get("entityType") == "task":
-                task_ids.append(ent_info["entityId"])
+                task_ids.add(ent_info["entityId"])
 
         is_valid = False
         for entity in entities:
@@ -38,652 +70,850 @@ class DeleteAssetSubset(LocalAction):
                 is_valid = True
                 break
 
-        if is_valid:
-            is_valid = self.valid_roles(session, entities, event)
-        return is_valid
+        if not is_valid:
+            return False
+        return self.valid_roles(session, entities, event)
 
-    def _launch(self, event):
-        try:
-            entities = self._translate_event(event)
-            if "values" not in event["data"]:
-                self.dbcon.install()
-                return self._interface(self.session, entities, event)
+    def launch(self, session, entities, event):
+        values = event["data"].get("values")
+        if not values:
+            return self._first_interface(session, entities, event)
 
-            confirmation = self.confirm_delete(entities, event)
-            if confirmation:
-                return confirmation
-
-            self.dbcon.install()
-            response = self.launch(
-                self.session, entities, event
+        # Entity type interface should be showed to select which entities
+        #   should be deleted
+        if not self._waits_for_confirmation(event):
+            self.show_message(event, "Preparing data...", True)
+            project_selected, ftrack_ids = self._filter_selection_from_event(
+                entities, event
             )
-        finally:
-            self.dbcon.uninstall()
+            if project_selected:
+                msg = (
+                    "It is not possible to use this action on project entity."
+                )
+                self.show_message(event, msg, True)
 
-        return self._handle_result(response)
+            if values.get("entity_type") == "folders":
+                return self._interface_folders(
+                    session, entities, event, ftrack_ids
+                )
+            return self._interface_products(
+                session, entities, event, ftrack_ids
+            )
 
-    def interface(self, session, entities, event):
-        self.show_message(event, "Preparing data...", True)
-        items = []
-        title = "Choose items to delete"
+        # Confirmation fails (misspelled 'delete' etc.)
+        if not self._is_confirmed(event):
+            return self._prepare_delete_interface(event)
+        # User confirmed deletion
+        project_selected, ftrack_ids = self._filter_selection_from_event(
+            entities, event
+        )
+        if values.get("entity_type") == "folders":
+            return self._delete_folders(session, entities, event, ftrack_ids)
+        return self._delete_products(session, entities, event, ftrack_ids)
 
-        # Filter selection and get ftrack ids
-        selection = event["data"].get("selection") or []
-        ftrack_ids = []
+    def _event_values_to_hidden(self, values):
+        """Take event values and convert them to hidden items.
+
+        Args:
+            values (dict[str, Any]): Ftrack event values.
+
+        Returns:
+            list[dict[str, Any]]: List of hidden items.
+        """
+
+        return [
+            {
+                "type": "hidden",
+                "name": key,
+                "value": value
+            }
+            for key, value in values.items()
+        ]
+
+    def _waits_for_confirmation(self, event):
+        """Check if action waits for confirmation.
+
+        Args:
+            event (ftrack_api.event.base.Event): Event data.
+
+        Returns:
+            bool: True if action waits for confirmation.
+        """
+
+        values = event["data"].get("values")
+        if values:
+            return "delete_confirm_value" in values
+        return False
+
+    def _is_confirmed(self, event):
+        values = event["data"].get("values")
+        if values is None:
+            return False
+
+        confirm_value = values.get("delete_confirm_value") or ""
+        expected_value = values.get("delete_confirm_expected")
+        return confirm_value.lower() == expected_value
+
+    def _prepare_delete_interface(self, event, post_items=None):
+        # Create copy of values to be able to create hidden items
+        values = copy.deepcopy(event["data"]["values"])
+        attempt = values.pop("delete_attempt_count", 0) + 1
+
+        # Make sure post items is iterable
+        if post_items is None:
+            post_items = json.loads(values.pop("post_items"))
+
+        post_item_names = {
+            post_item.get("name")
+            for post_item in post_items
+        }
+        post_item_names.discard(None)
+
+        for key in {
+            "delete_confirm_value",
+            "delete_confirm_expected",
+        } | post_item_names:
+            values.pop(key, None)
+
+        if values["action_type"] == "delete":
+            submit_button_label = "Delete"
+            expected_value = "delete"
+        else:
+            submit_button_label = "Archive"
+            expected_value = "archive"
+
+        items = [
+            {
+                "type": "label",
+                "value": f"# Please enter '{expected_value}' to confirm #"
+            }
+        ]
+        if attempt > 3:
+            additional_info = (
+                "Read the instructions carefully please."
+                f" You've failed {attempt - 1}"
+                f" times to enter '{expected_value}'."
+            )
+            if attempt > 4:
+                additional_info += "<br/>(Can I hear the grass grow?)"
+            items.append({
+                "type": "label",
+                "value": additional_info
+            })
+
+        items.extend([
+            {
+                "name": "delete_confirm_value",
+                "type": "text",
+                "value": "",
+                "empty_text": f"Type {expected_value} here...",
+            },
+            {
+                "type": "hidden",
+                "name": "delete_confirm_expected",
+                "value": expected_value,
+            },
+            {
+                "type": "hidden",
+                "name": "delete_attempt_count",
+                "value": attempt,
+            },
+            {
+                "type": "hidden",
+                "name": "post_items",
+                "value": json.dumps(post_items),
+            }
+        ])
+        items.extend(self._event_values_to_hidden(values))
+        items.extend(post_items)
+
+        return {
+            "items": items,
+            "title": f"Confirm {expected_value} action",
+            "submit_button_label": submit_button_label,
+        }
+
+    def _filter_selection_from_event(self, entities, event):
+        """
+
+        Args:
+            entities (list[ftrack_api.entity.base.Entity]): List of entities
+                selected in Ftrack.
+            event (ftrack_api.event.base.Event): Event data.
+
+        Returns:
+            tuple[bool, set[str]]: Project is selected and set of selected
+                ftrack ids.
+        """
+
         project_in_selection = False
+        ftrack_ids = set()
+        selection = event["data"].get("selection")
+        if not selection:
+            return project_in_selection, ftrack_ids
+
         for entity in selection:
             entity_type = (entity.get("entityType") or "").lower()
-            if entity_type != "task":
-                if entity_type == "show":
-                    project_in_selection = True
-                continue
+            if entity_type == "show":
+                project_in_selection = True
 
-            ftrack_id = entity.get("entityId")
-            if ftrack_id:
-                ftrack_ids.append(ftrack_id)
-
-        if project_in_selection:
-            msg = "It is not possible to use this action on project entity."
-            self.show_message(event, msg, True)
+            elif entity_type == "task":
+                ftrack_id = entity.get("entityId")
+                if ftrack_id:
+                    ftrack_ids.add(ftrack_id)
 
         # Filter event even more (skip task entities)
-        # - task entities are not relevant for avalon
-        entity_mapping = {}
+        # - task entities are not relevant for AYON delete
         for entity in entities:
             ftrack_id = entity["id"]
-            if ftrack_id not in ftrack_ids:
-                continue
+            if (
+                ftrack_id in ftrack_ids
+                and entity.entity_type.lower() == "task"
+            ):
+                ftrack_ids.discard(ftrack_id)
 
-            if entity.entity_type.lower() == "task":
-                ftrack_ids.remove(ftrack_id)
+        return project_in_selection, ftrack_ids
 
-            entity_mapping[ftrack_id] = entity
+    def _get_ayon_data_from_selection(self, session, entities, ftrack_ids):
+        """Get folders from selection.
 
-        if not ftrack_ids:
-            # It is bug if this happens!
-            return {
-                "success": False,
-                "message": "Invalid selection for this action (Bug)"
-            }
+        Args:
+            session (ftrack_api.Session): Ftrack session processing event.
+            entities (list[ftrack_api.entity.base.Entity]): List of entities
+                selected in Ftrack.
+            ftrack_ids (set[str]): Selected ftrack ids.
+
+        Returns:
+            AyonData: Folders data.
+        """
+
+        filtered_entities = [
+            entity
+            for entity in entities
+            if entity["id"] in ftrack_ids
+        ]
 
         project = self.get_project_from_entity(entities[0], session)
         project_name = project["full_name"]
 
-        asset_docs = list(get_assets(
+        folder_entities = list(get_folders(
             project_name,
-            fields=["_id", "name", "data.ftrackId", "data.parents"]
+            fields={"id", "path", "parentId"}
         ))
-        selected_av_entities = []
-        found_ftrack_ids = set()
-        asset_docs_by_name = collections.defaultdict(list)
-        for asset_doc in asset_docs:
-            ftrack_id = asset_doc["data"].get("ftrackId")
-            if ftrack_id:
-                found_ftrack_ids.add(ftrack_id)
-                if ftrack_id in entity_mapping:
-                    selected_av_entities.append(asset_doc)
-
-            asset_name = asset_doc["name"]
-            asset_docs_by_name[asset_name].append(asset_doc)
-
-        found_without_ftrack_id = {}
-        for ftrack_id, entity in entity_mapping.items():
-            if ftrack_id in found_ftrack_ids:
-                continue
-
-            av_ents_by_name = asset_docs_by_name[entity["name"]]
-            if not av_ents_by_name:
-                continue
-
-            ent_path_items = [ent["name"] for ent in entity["link"]]
-            end_index = len(ent_path_items) - 1
-            parents = ent_path_items[1:end_index:]
-            # TODO we should say to user that
-            # few of them are missing in avalon
-            for av_ent in av_ents_by_name:
-                if av_ent["data"]["parents"] != parents:
-                    continue
-
-                # TODO we should say to user that found entity
-                # with same name does not match same ftrack id?
-                if "ftrackId" not in av_ent["data"]:
-                    selected_av_entities.append(av_ent)
-                    found_without_ftrack_id[str(av_ent["_id"])] = ftrack_id
-                    break
-
-        if not selected_av_entities:
-            return {
-                "success": True,
-                "message": (
-                    "Didn't found entities in avalon."
-                    " You can use Ftrack's Delete button for the selection."
-                )
-            }
-
-        # Remove cached action older than 2 minutes
-        old_action_ids = []
-        for action_id, data in self.action_data_by_id.items():
-            created_at = data.get("created_at")
-            if not created_at:
-                old_action_ids.append(action_id)
-                continue
-            cur_time = datetime.now()
-            existing_in_sec = (created_at - cur_time).total_seconds()
-            if existing_in_sec > 60 * 2:
-                old_action_ids.append(action_id)
-
-        for action_id in old_action_ids:
-            self.action_data_by_id.pop(action_id, None)
-
-        # Store data for action id
-        action_id = str(uuid.uuid1())
-        self.action_data_by_id[action_id] = {
-            "attempt": 1,
-            "created_at": datetime.now(),
-            "project_name": project_name,
-            "subset_ids_by_name": {},
-            "subset_ids_by_parent": {},
-            "without_ftrack_id": found_without_ftrack_id
-        }
-
-        id_item = {
-            "type": "hidden",
-            "name": "action_id",
-            "value": action_id
-        }
-
-        items.append(id_item)
-        asset_ids = [ent["_id"] for ent in selected_av_entities]
-        subsets_for_selection = get_subsets(project_name, asset_ids=asset_ids)
-
-        asset_ending = ""
-        if len(selected_av_entities) > 1:
-            asset_ending = "s"
-
-        asset_title = {
-            "type": "label",
-            "value": "# Delete asset{}:".format(asset_ending)
-        }
-        asset_note = {
-            "type": "label",
-            "value": (
-                "<p><i>NOTE: Action will delete checked entities"
-                " in Ftrack and Avalon with all children entities and"
-                " published content.</i></p>"
+        folders_by_id = {}
+        folders_by_path = {}
+        folders_by_parent_id = collections.defaultdict(list)
+        for folder_entity in folder_entities:
+            folders_by_id[folder_entity["id"]] = folder_entity
+            folders_by_path[folder_entity["path"]] = folder_entity
+            folders_by_parent_id[folder_entity["parentId"]].append(
+                folder_entity
             )
-        }
 
-        items.append(asset_title)
-        items.append(asset_note)
+        not_found_paths = set()
+        selected_folder_ids = set()
+        for entity in filtered_entities:
+            # TODO use slugify name
+            ent_path_items = [ent["name"] for ent in entity["link"]]
+            # Replace project name with empty string
+            ent_path_items[0] = ""
+            path = "/".join(ent_path_items)
 
-        asset_items = collections.defaultdict(list)
-        for asset in selected_av_entities:
-            ent_path_items = [project_name]
-            ent_path_items.extend(asset.get("data", {}).get("parents") or [])
-            ent_path_to_parent = "/".join(ent_path_items) + "/"
-            asset_items[ent_path_to_parent].append(asset)
+            folder_entity = folders_by_path.get(path)
+            if folder_entity:
+                selected_folder_ids.add(folder_entity["id"])
+            else:
+                not_found_paths.add(path)
 
-        for asset_parent_path, assets in sorted(asset_items.items()):
-            items.append({
-                "type": "label",
-                "value": "## <b>- {}</b>".format(asset_parent_path)
-            })
-            for asset in assets:
-                items.append({
-                    "label": asset["name"],
-                    "name": "{}{}".format(
-                        self.folder_prefix, str(asset["_id"])
-                    ),
-                    "type": 'boolean',
-                    "value": False
-                })
+        folder_ids_queue = collections.deque(selected_folder_ids)
+        folder_ids_to_delete = set()
+        while folder_ids_queue:
+            folder_id = folder_ids_queue.popleft()
+            folder_ids_to_delete.add(folder_id)
+            for folder_entity in folders_by_parent_id[folder_id]:
+                folder_ids_queue.append(folder_entity["id"])
 
-        subset_ids_by_name = collections.defaultdict(list)
-        subset_ids_by_parent = collections.defaultdict(list)
-        for subset in subsets_for_selection:
-            subset_id = subset["_id"]
-            name = subset["name"]
-            parent_id = subset["parent"]
-            subset_ids_by_name[name].append(subset_id)
-            subset_ids_by_parent[parent_id].append(subset_id)
-
-        if not subset_ids_by_name:
-            return {
-                "items": items,
-                "title": title
-            }
-
-        subset_ending = ""
-        if len(subset_ids_by_name.keys()) > 1:
-            subset_ending = "s"
-
-        subset_title = {
-            "type": "label",
-            "value": "# Subset{} to delete:".format(subset_ending)
-        }
-        subset_note = {
-            "type": "label",
-            "value": (
-                "<p><i>WARNING: Subset{} will be removed"
-                " for all <b>selected</b> entities.</i></p>"
-            ).format(subset_ending)
-        }
-
-        items.append(self.splitter)
-        items.append(subset_title)
-        items.append(subset_note)
-
-        for name in subset_ids_by_name:
-            items.append({
-                "label": "<b>{}</b>".format(name),
-                "name": "{}{}".format(self.subset_prefix, name),
-                "type": "boolean",
-                "value": False
-            })
-
-        self.action_data_by_id[action_id]["subset_ids_by_parent"] = (
-            subset_ids_by_parent
-        )
-        self.action_data_by_id[action_id]["subset_ids_by_name"] = (
-            subset_ids_by_name
+        return AyonData(
+            project_name,
+            folders_by_id,
+            folders_by_path,
+            folders_by_parent_id,
+            not_found_paths,
+            selected_folder_ids,
+            folder_ids_to_delete,
         )
 
-        return {
-            "items": items,
-            "title": title
-        }
+    def _interface_folders(self, session, entities, event, ftrack_ids):
+        """Interface for folder entities.
 
-    def confirm_delete(self, entities, event):
+        Args:
+            session (ftrack_api.Session): Ftrack session processing event.
+            entities (list[ftrack_api.entity.base.Entity]): List of entities
+                selected in Ftrack.
+            event (ftrack_api.event.base.Event): Event data.
+            ftrack_ids (set[str]): Selected ftrack ids.
+
+        Returns:
+            dict[str, Any]: Interface data.
+        """
+
+        ayon_data = self._get_ayon_data_from_selection(
+            session, entities, ftrack_ids
+        )
+        # TODO prepare main label
+        count = len(ayon_data.folder_ids_to_delete)
+        main_label = (
+            f"You're going to delete {count} folders with all children from"
+            f" ftrack and AYON. <b>This action cannot be undone</b>."
+        )
+        return self._prepare_delete_interface(
+            event,
+            [
+                {"type": "label", "value": "---"},
+                {"type": "label", "value": main_label},
+            ]
+        )
+
+    def _interface_products_selection(
+        self, session, entities, event, ftrack_ids
+    ):
+        """
+
+        Args:
+            session (ftrack_api.Session): Ftrack session processing event.
+            entities (list[ftrack_api.entity.base.Entity]): List of entities
+                selected in Ftrack.
+            event (ftrack_api.event.base.Event): Event data.
+            ftrack_ids (set[str]): Selected ftrack ids.
+
+        Returns:
+            Union[dict[str, Any], None]: Interface data.
+        """
+
+        ayon_data = self._get_ayon_data_from_selection(
+            session, entities, ftrack_ids
+        )
         values = event["data"]["values"]
-        action_id = values.get("action_id")
-        spec_data = self.action_data_by_id.get(action_id)
-        if not spec_data:
-            # it is a bug if this happens!
-            return {
-                "success": False,
-                "message": "Something bad has happened. Please try again."
-            }
-
-        # Process Delete confirmation
-        delete_key = values.get("delete_key")
-        if delete_key:
-            delete_key = delete_key.lower().strip()
-            # Go to launch part if user entered `delete`
-            if delete_key == "delete":
-                return
-            # Skip whole process if user didn't enter any text
-            elif delete_key == "":
-                self.action_data_by_id.pop(action_id, None)
-                return {
-                    "success": True,
-                    "message": "Deleting cancelled (delete entry was empty)"
-                }
-            # Get data to show again
-            to_delete = spec_data["to_delete"]
-
+        if values["entity_type"] == "products_all":
+            folder_ids = set(ayon_data.folder_ids_to_delete)
         else:
-            to_delete = collections.defaultdict(list)
-            for key, value in values.items():
-                if not value:
-                    continue
-                if key.startswith(self.folder_prefix):
-                    _key = key.replace(self.folder_prefix, "")
-                    to_delete["assets"].append(_key)
+            folder_ids = set(ayon_data.selected_folder_ids)
+        products = get_products(
+            ayon_data.project_name,
+            folder_ids=folder_ids,
+            fields={"name"}
+        )
+        counts_by_product_name = {}
+        for product in products:
+            product_name = product["name"]
+            counts_by_product_name.setdefault(product_name, 0)
+            counts_by_product_name[product_name] += 1
 
-                elif key.startswith(self.subset_prefix):
-                    _key = key.replace(self.subset_prefix, "")
-                    to_delete["subsets"].append(_key)
+        if not counts_by_product_name:
+            self.show_interface(
+                items=[{
+                    "type": "label",
+                    "value": "No products found for selected entities."
+                }],
+                title="No products to delete found",
+                submit_btn_label="Close",
+                event=event,
+            )
+            return None
 
-            self.action_data_by_id[action_id]["to_delete"] = to_delete
+        product_names = list(sorted(counts_by_product_name.keys()))
+        product_name_items = [
+            {"label": product_name, "value": product_name}
+            for product_name in product_names
+        ]
+        items = [
+            {
+                "type": "label",
+                "value": "## Products to delete ##",
+            },
+            {
+                "type": "label",
+                "value": "Uncheck product names you want to keep.",
+            },
+            {
+                "type": "hidden",
+                "name": "counts_by_product_name",
+                "value": json.dumps(counts_by_product_name),
+            },
+            {
+                "type": "enumerator",
+                "multi_select": True,
+                "name": "product_names",
+                "data": product_name_items,
+                "value": product_names
+            },
+        ]
+        items.extend(self._event_values_to_hidden(values))
+        return {
+            "title": "Choose product names to delete",
+            "submit_button_label": "Confirm action",
+            "items": items,
+        }
 
-        asset_to_delete = len(to_delete.get("assets") or []) > 0
-        subset_to_delete = len(to_delete.get("subsets") or []) > 0
+    def _interface_products(self, session, entities, event, ftrack_ids):
+        """Interface for product entities.
 
-        if not asset_to_delete and not subset_to_delete:
-            self.action_data_by_id.pop(action_id, None)
+        Args:
+            session (ftrack_api.Session): Ftrack session processing event.
+            entities (list[ftrack_api.entity.base.Entity]): List of entities
+                selected in Ftrack.
+            event (ftrack_api.event.base.Event): Event data.
+        """
+
+        values = event["data"]["values"]
+        # Ask which product names should be removed first
+        if "counts_by_product_name" not in values:
+            return self._interface_products_selection(
+                session, entities, event, ftrack_ids
+            )
+
+        counts_by_product_name = json.loads(values.pop(
+            "counts_by_product_name"
+        ))
+        product_names_to_delete = values.pop("product_names")
+        if not product_names_to_delete:
             return {
                 "success": True,
                 "message": "Nothing was selected to delete"
             }
 
-        attempt = spec_data["attempt"]
-        if attempt > 3:
-            self.action_data_by_id.pop(action_id, None)
+        all_count = 0
+        for product_name in product_names_to_delete:
+            all_count += counts_by_product_name[product_name]
+
+        # TODO prepare main label
+        main_label = (
+            f"You're going to delete {all_count} products with all versions"
+            " from ftrack and AYON. <b>This action cannot be undone</b>."
+        )
+        return self._prepare_delete_interface(
+            event,
+            [
+                {"type": "label", "value": "---"},
+                {"type": "label", "value": main_label},
+                {
+                    "type": "hidden",
+                    "name": "product_names",
+                    "value": json.dumps(product_names_to_delete),
+                },
+            ]
+        )
+
+    def _first_interface(self, session, entities, event):
+        """First interface asks for action type and entity type.
+
+        Action type is to choose if entities in AYON should be deactived
+            or deleted.
+        Entity type is to choose if user wants to work with folders
+            or products.
+
+        Args:
+            session (ftrack_api.Session): Ftrack session processing event.
+            entities (list[ftrack_api.entity.base.Entity]): List of entities
+                selected in Ftrack.
+            event (ftrack_api.event.base.Event): Event data.
+
+        Returns:
+            dict[str, Any]: Interface data.
+        """
+
+        # Check if project exists in AYON
+        project = self.get_project_from_entity(entities[0], session)
+        project_name = project["full_name"]
+        if not get_project(project_name):
             return {
                 "success": False,
-                "message": "You didn't enter \"DELETE\" properly 3 times!"
+                "message": f"Project '{project_name}' not found in AYON."
             }
 
-        self.action_data_by_id[action_id]["attempt"] += 1
-
-        title = "Confirmation of deleting"
-
-        if asset_to_delete:
-            asset_len = len(to_delete["assets"])
-            asset_ending = ""
-            if asset_len > 1:
-                asset_ending = "s"
-            title += " {} Asset{}".format(asset_len, asset_ending)
-            if subset_to_delete:
-                title += " and"
-
-        if subset_to_delete:
-            sub_len = len(to_delete["subsets"])
-            type_ending = ""
-            sub_ending = ""
-            if sub_len == 1:
-                subset_ids_by_name = spec_data["subset_ids_by_name"]
-                if len(subset_ids_by_name[to_delete["subsets"][0]]) > 1:
-                    sub_ending = "s"
-
-            elif sub_len > 1:
-                type_ending = "s"
-                sub_ending = "s"
-
-            title += " {} type{} of subset{}".format(
-                sub_len, type_ending, sub_ending
-            )
-
-        items = []
-
-        id_item = {"type": "hidden", "name": "action_id", "value": action_id}
-        delete_label = {
-            'type': 'label',
-            'value': '# Please enter "DELETE" to confirm #'
-        }
-        delete_item = {
-            "name": "delete_key",
-            "type": "text",
-            "value": "",
-            "empty_text": "Type Delete here..."
-        }
-
-        items.append(id_item)
-        items.append(delete_label)
-        items.append(delete_item)
+        # Validate selection
+        project_selected, ftrack_ids = self._filter_selection_from_event(
+            entities, event
+        )
+        if not ftrack_ids:
+            return {
+                "success": False,
+                "message": "Invalid selection for this action."
+            }
 
         return {
-            "items": items,
-            "title": title
+            "title": "Choose action",
+            "submit_button_label": "Confirm action",
+            "items": [
+                {
+                    "type": "label",
+                    "value": (
+                        "This action will delete entities from Ftrack"
+                        " and archive or delete them from AYON."
+                        "<br/><br/>NOTE: Does not remove files on disk."
+                    )
+                },
+                {"type": "label", "value": "---"},
+                {
+                    "type": "enumerator",
+                    "name": "entity_type",
+                    "label": "Entity type:",
+                    "value": "folders",
+                    "data": [
+                        {
+                            "label": "Folders",
+                            "value": "folders"
+                        },
+                        {
+                            "label": "Products (Selected folders only)",
+                            "value": "products_selection"
+                        },
+                        {
+                            "label": "Products (Selected + children folders)",
+                            "value": "products_all"
+                        },
+                    ]
+                },
+                {
+                    "type": "enumerator",
+                    "name": "action_type",
+                    "label": "Action in AYON:",
+                    "value": "archive",
+                    "data": [
+                        {
+                            "label": "Archive",
+                            "value": "archive"
+                        },
+                        {
+                            "label": "Delete",
+                            "value": "delete"
+                        }
+                    ]
+                },
+                {"type": "label", "value": "---"},
+                {
+                    "type": "label",
+                    "value": (
+                        "- Option <b>'Archive in AYON'</b> only hide"
+                        " selected entities in AYON UI without actually"
+                        " deleting them."
+                    )
+                },
+                {
+                    "type": "label",
+                    "value": (
+                        "- Option <b>'Delete in AYON'</b> will delete"
+                        " selected entities from AYON with all children."
+                        "<br/><b>WARNING: There is no way back.</b>"
+                    )
+                },
+            ],
         }
 
-    def launch(self, session, entities, event):
-        self.show_message(event, "Processing...", True)
-        values = event["data"]["values"]
-        action_id = values.get("action_id")
-        spec_data = self.action_data_by_id.get(action_id)
-        if not spec_data:
-            # it is a bug if this happens!
-            return {
-                "success": False,
-                "message": "Something bad has happened. Please try again."
-            }
+    def _query_ftrack_entities(self, session, ftrack_ids, fields=None):
+        """Query ftrack hierarchy entities with all children.
 
-        report_messages = collections.defaultdict(list)
+        Args:
+            session (ftrack_api.Session): Ftrack session processing event.
+            ftrack_ids (set[str]): Selected ftrack ids.
+            fields (Optional[Iterable[str]]): Fields to query.
 
-        project_name = spec_data["project_name"]
-        to_delete = spec_data["to_delete"]
+        Returns:
+            list[ftrack_api.entity.base.Entity]: List of ftrack entities.
+        """
 
-        assets_to_delete = to_delete.get("assets") or []
-        subsets_to_delete = to_delete.get("subsets") or []
+        if not fields:
+            fields = {"id", "parent_id", "object_type_id"}
 
-        # Convert asset ids to ObjectId obj
-        assets_to_delete = [
-            ObjectId(asset_id)
-            for asset_id in assets_to_delete
-            if asset_id
-        ]
+        joined_fields = ", ".join(fields)
 
-        subset_ids_by_parent = spec_data["subset_ids_by_parent"]
-        subset_ids_by_name = spec_data["subset_ids_by_name"]
-
-        subset_ids_to_archive = []
-        asset_ids_to_archive = []
-        ftrack_ids_to_delete = []
-        if len(assets_to_delete) > 0:
-            map_av_ftrack_id = spec_data["without_ftrack_id"]
-            # Prepare data when deleting whole avalon asset
-            avalon_assets = get_assets(
-                project_name,
-                fields=["_id", "data.visualParent", "data.ftrackId"]
-            )
-            avalon_assets_by_parent = collections.defaultdict(list)
-            for asset in avalon_assets:
-                asset_id = asset["_id"]
-                parent_id = asset["data"]["visualParent"]
-                avalon_assets_by_parent[parent_id].append(asset)
-                if asset_id in assets_to_delete:
-                    ftrack_id = map_av_ftrack_id.get(str(asset_id))
-                    if not ftrack_id:
-                        ftrack_id = asset["data"].get("ftrackId")
-
-                    if ftrack_id:
-                        ftrack_ids_to_delete.append(ftrack_id)
-
-            children_queue = collections.deque()
-            for mongo_id in assets_to_delete:
-                children_queue.append(mongo_id)
-
-            while children_queue:
-                mongo_id = children_queue.popleft()
-                if mongo_id in asset_ids_to_archive:
-                    continue
-
-                asset_ids_to_archive.append(mongo_id)
-                for subset_id in subset_ids_by_parent.get(mongo_id, []):
-                    if subset_id not in subset_ids_to_archive:
-                        subset_ids_to_archive.append(subset_id)
-
-                children = avalon_assets_by_parent.get(mongo_id)
-                if not children:
-                    continue
-
-                for child in children:
-                    child_id = child["_id"]
-                    if child_id not in asset_ids_to_archive:
-                        children_queue.append(child_id)
-
-        # Prepare names of assets in ftrack and ids of subsets in mongo
-        asset_names_to_delete = []
-        if len(subsets_to_delete) > 0:
-            for name in subsets_to_delete:
-                asset_names_to_delete.append(name)
-                for subset_id in subset_ids_by_name[name]:
-                    if subset_id in subset_ids_to_archive:
-                        continue
-                    subset_ids_to_archive.append(subset_id)
-
-        # Get ftrack ids of entities where will be delete only asset
-        not_deleted_entities_id = []
-        ftrack_id_name_map = {}
-        if asset_names_to_delete:
-            for entity in entities:
-                ftrack_id = entity["id"]
-                ftrack_id_name_map[ftrack_id] = entity["name"]
-                if ftrack_id not in ftrack_ids_to_delete:
-                    not_deleted_entities_id.append(ftrack_id)
-
-        mongo_proc_txt = "MongoProcessing: "
-        ftrack_proc_txt = "Ftrack processing: "
-        if asset_ids_to_archive:
-            self.log.debug("{}Archivation of assets <{}>".format(
-                mongo_proc_txt,
-                ", ".join([str(id) for id in asset_ids_to_archive])
-            ))
-            self.dbcon.update_many(
-                {
-                    "_id": {"$in": asset_ids_to_archive},
-                    "type": "asset"
-                },
-                {"$set": {"type": "archived_asset"}}
-            )
-
-        if subset_ids_to_archive:
-            self.log.debug("{}Archivation of subsets <{}>".format(
-                mongo_proc_txt,
-                ", ".join([str(id) for id in subset_ids_to_archive])
-            ))
-            self.dbcon.update_many(
-                {
-                    "_id": {"$in": subset_ids_to_archive},
-                    "type": "subset"
-                },
-                {"$set": {"type": "archived_subset"}}
-            )
-
-        if ftrack_ids_to_delete:
-            self.log.debug("{}Deleting Ftrack Entities <{}>".format(
-                ftrack_proc_txt, ", ".join(ftrack_ids_to_delete)
-            ))
-
-            entities_by_link_len = self._prepare_entities_before_delete(
-                ftrack_ids_to_delete, session
-            )
-            for link_len in sorted(entities_by_link_len.keys(), reverse=True):
-                for entity in entities_by_link_len[link_len]:
-                    session.delete(entity)
-
-                try:
-                    session.commit()
-                except Exception:
-                    ent_path = "/".join(
-                        [ent["name"] for ent in entity["link"]]
-                    )
-                    msg = "Failed to delete entity"
-                    report_messages[msg].append(ent_path)
-                    session.rollback()
-                    self.log.warning(
-                        "{} <{}>".format(msg, ent_path),
-                        exc_info=True
-                    )
-
-        if not_deleted_entities_id and asset_names_to_delete:
-            joined_not_deleted = ",".join([
-                "\"{}\"".format(ftrack_id)
-                for ftrack_id in not_deleted_entities_id
-            ])
-            joined_asset_names = ",".join([
-                "\"{}\"".format(name)
-                for name in asset_names_to_delete
-            ])
-            # Find assets of selected entities with names of checked subsets
-            assets = session.query((
-                "select id from Asset where"
-                " context_id in ({}) and name in ({})"
-            ).format(joined_not_deleted, joined_asset_names)).all()
-
-            self.log.debug("{}Deleting Ftrack Assets <{}>".format(
-                ftrack_proc_txt,
-                ", ".join([asset["id"] for asset in assets])
-            ))
-            for asset in assets:
-                session.delete(asset)
-                try:
-                    session.commit()
-                except Exception:
-                    session.rollback()
-                    msg = "Failed to delete asset"
-                    report_messages[msg].append(asset["id"])
-                    self.log.warning(
-                        "Asset: {} <{}>".format(asset["name"], asset["id"]),
-                        exc_info=True
-                    )
-
-        return self.report_handle(report_messages, project_name, event)
-
-    def _prepare_entities_before_delete(self, ftrack_ids_to_delete, session):
-        """Filter children entities to avoid CircularDependencyError."""
-        joined_ids_to_delete = ", ".join(
-            ["\"{}\"".format(id) for id in ftrack_ids_to_delete]
-        )
-        to_delete_entities = session.query(
-            "select id, link from TypedContext where id in ({})".format(
-                joined_ids_to_delete
-            )
+        joined_ids = self.join_query_keys(ftrack_ids)
+        all_entities = session.query(
+            f"select {joined_fields} from TypedContext"
+            f" where id in ({joined_ids})"
         ).all()
-        # Find all children entities and add them to list
-        # - Delete tasks first then their parents and continue
-        parent_ids_to_delete = [
-            entity["id"]
-            for entity in to_delete_entities
-        ]
-        while parent_ids_to_delete:
-            joined_parent_ids_to_delete = ",".join([
-                "\"{}\"".format(ftrack_id)
-                for ftrack_id in parent_ids_to_delete
-            ])
-            _to_delete = session.query((
-                "select id, link from TypedContext where parent_id in ({})"
-            ).format(joined_parent_ids_to_delete)).all()
-            parent_ids_to_delete = []
-            for entity in _to_delete:
-                parent_ids_to_delete.append(entity["id"])
-                to_delete_entities.append(entity)
-
-        # Unset 'task_id' from AssetVersion entities
-        # - when task is deleted the asset version is not marked for deletion
-        task_ids = set(
-            entity["id"]
-            for entity in to_delete_entities
-            if entity.entity_type.lower() == "task"
-        )
-        for chunk in create_chunks(task_ids):
-            asset_versions = session.query((
-                "select id, task_id from AssetVersion where task_id in ({})"
-            ).format(self.join_query_keys(chunk))).all()
-            for asset_version in asset_versions:
-                asset_version["task_id"] = None
-            session.commit()
-
-        entities_by_link_len = collections.defaultdict(list)
-        for entity in to_delete_entities:
-            entities_by_link_len[len(entity["link"])].append(entity)
-
-        return entities_by_link_len
-
-    def report_handle(self, report_messages, project_name, event):
-        if not report_messages:
-            return {
-                "success": True,
-                "message": "Deletion was successful!"
-            }
-
-        title = "Delete report ({}):".format(project_name)
-        items = []
-        items.append({
-            "type": "label",
-            "value": "# Deleting was not completely successful"
-        })
-        items.append({
-            "type": "label",
-            "value": "<p><i>Check logs for more information</i></p>"
-        })
-        for msg, _items in report_messages.items():
-            if not _items or not msg:
+        ftrack_ids_queue = collections.deque()
+        ftrack_ids_queue.append(ftrack_ids)
+        while ftrack_ids_queue:
+            ftrack_ids = ftrack_ids_queue.popleft()
+            if not ftrack_ids:
                 continue
 
-            items.append({
-                "type": "label",
-                "value": "# {}".format(msg)
-            })
+            joined_ids = self.join_query_keys(ftrack_ids)
+            entities = session.query(
+                "select id, parent_id, object_type_id from TypedContext"
+                f" where parent_id in ({joined_ids})"
+            ).all()
+            all_entities.extend(entities)
+            new_ftrack_ids = {
+                entity["id"]
+                for entity in entities
+                if entity.entity_type.lower() != "task"
+            }
+            ftrack_ids_queue.append(new_ftrack_ids)
+        return all_entities
 
-            if isinstance(_items, str):
-                _items = [_items]
-            items.append({
-                "type": "label",
-                "value": '<p>{}</p>'.format("<br>".join(_items))
-            })
-            items.append(self.splitter)
+    def _archive_folders_in_ayon(self, ayon_data):
+        """Archive folders in AYON.
 
-        self.show_interface(items, title, event)
+        Args:
+            ayon_data (AyonData): Folders data.
+        """
+
+        operations = [
+            {
+                "type": "update",
+                "entityType": "folder",
+                "entityId": folder_id,
+                "data": {
+                    "active": False
+                }
+            }
+            for folder_id in ayon_data.selected_folder_ids
+        ]
+
+        self.log.debug("Archiving ({}) folders:\n{}".format(
+            len(ayon_data.selected_folder_ids),
+            ", ".join(ayon_data.selected_folder_ids),
+        ))
+        send_batch_operations(ayon_data.project_name, operations)
+
+    def _delete_folders_in_ayon(self, ayon_data):
+        """Delete folders in AYON.
+
+        Args:
+            ayon_data (AyonData): Folders data.
+        """
+
+        project_name = ayon_data.project_name
+        # First find all products and delete them.
+        #   Folders cannot be deleted if they contain products.
+        product_ids = {
+            product["id"]
+            for product in get_products(
+                project_name,
+                folder_ids=ayon_data.folder_ids_to_delete,
+                fields={"id"},
+            )
+        }
+        self.log.debug("Deleting {} products".format(len(product_ids)))
+        for chunk_ids in create_chunks(product_ids):
+            send_batch_operations(
+                project_name,
+                [
+                    {
+                        "type": "delete",
+                        "entityType": "product",
+                        "entityId": product_id,
+                    }
+                    for product_id in chunk_ids
+                ]
+            )
+
+        # Delete folders in correct order from bottom to top.
+        #   This is just to avoid errors AYON.
+        folder_ids_by_parent_id = collections.defaultdict(set)
+        parents_queue = collections.deque()
+        for folder_id in ayon_data.folder_ids_to_delete:
+            parents_queue.append(folder_id)
+            folder_entity = ayon_data.folders_by_id[folder_id]
+            folder_ids_by_parent_id[folder_entity["parentId"]].add(folder_id)
+
+        sorted_folder_ids = []
+        while parents_queue:
+            folder_id = parents_queue.popleft()
+            if folder_ids_by_parent_id[folder_id]:
+                parents_queue.append(folder_id)
+                continue
+
+            sorted_folder_ids.append(folder_id)
+            folder_entity = ayon_data.folders_by_id[folder_id]
+            parent_id = folder_entity["parentId"]
+            if parent_id in folder_ids_by_parent_id:
+                folder_ids_by_parent_id[parent_id].discard(folder_id)
+
+        self.log.debug("Deleting {} folders".format(len(sorted_folder_ids)))
+        for chunk_ids in create_chunks(sorted_folder_ids):
+            send_batch_operations(
+                project_name,
+                [
+                    {
+                        "type": "delete",
+                        "entityType": "folder",
+                        "entityId": folder_id,
+                    }
+                    for folder_id in chunk_ids
+                ]
+            )
+
+    def _delete_folders(self, session, entities, event, ftrack_ids):
+        """Delete folders in AYON and ftrack.
+
+        Args:
+            session (ftrack_api.Session): Ftrack session processing event.
+            entities (list[ftrack_api.entity.base.Entity]): List of entities
+                selected in Ftrack.
+            event (ftrack_api.event.base.Event): Event data.
+            ftrack_ids (set[str]): Selected ftrack ids.
+        """
+
+        values = event["data"]["values"]
+        ayon_data = self._get_ayon_data_from_selection(
+            session, entities, ftrack_ids
+        )
+        if values["action_type"] == "archive":
+            message = "Archiving folders finished."
+            self._archive_folders_in_ayon(ayon_data)
+        else:
+            message = "Delete folders finished."
+            self._delete_folders_in_ayon(ayon_data)
+
+        entities = self._query_ftrack_entities(session, ftrack_ids)
+        task_entities = []
+        entities_by_id = {}
+        for entity in entities:
+            if entity.entity_type.lower() == "task":
+                task_entities.append(entity)
+            else:
+                entities_by_id[entity["id"]] = entity
+
+        for task_entity in task_entities:
+            session.delete(task_entity)
+
+        entity_ids_by_parent_id = collections.defaultdict(set)
+        parents_queue = collections.deque()
+        for entity_id, entity in entities_by_id.items():
+            parents_queue.append(entity_id)
+            entity_ids_by_parent_id[entity["parent_id"]].add(entity_id)
+
+        while parents_queue:
+            entity_id = parents_queue.popleft()
+            entity = entities_by_id[entity_id]
+            if entity_ids_by_parent_id[entity_id]:
+                parents_queue.append(entity_id)
+                continue
+            parent_id = entity["parent_id"]
+
+            session.delete(entity)
+            session.commit()
+
+            if parent_id not in entity_ids_by_parent_id:
+                continue
+            entity_ids_by_parent_id[parent_id].discard(entity_id)
 
         return {
-            "success": False,
-            "message": "Deleting finished. Read report messages."
+            "success": True,
+            "message": message
+        }
+
+    def _handle_products_in_ayon(
+        self, ayon_data, product_names, selection_only, archive
+    ):
+        """Archive products in AYON.
+
+        Args:
+            ayon_data (AyonData): Folders data.
+            product_names (list[str]): List of product names to archive.
+            selection_only (bool): True if only selected folders should be
+                used.
+            archive (bool): True if products should be archived.
+        """
+
+        if selection_only:
+            folder_ids = ayon_data.selected_folder_ids
+        else:
+            folder_ids = ayon_data.folder_ids_to_delete
+        product_ids = {
+            product["id"]
+            for product in get_products(
+                ayon_data.project_name,
+                product_names=product_names,
+                folder_ids=folder_ids,
+                fields={"id"},
+            )
+        }
+        if archive:
+            base_operation = {
+                "type": "update",
+                "entityType": "product",
+                "data": {"active": False}
+            }
+        else:
+            base_operation = {
+                "type": "delete",
+                "entityType": "product",
+            }
+
+        for chunk_ids in create_chunks(product_ids):
+            operations = []
+            for product_id in chunk_ids:
+                operation = copy.deepcopy(base_operation)
+                operation["entityId"] = product_id
+                operations.append(operation)
+
+            send_batch_operations(ayon_data.project_name, operations)
+
+    def _delete_products(self, session, entities, event, ftrack_ids):
+        """Delete or archive products in AYON and ftrack.
+
+        Args:
+            session (ftrack_api.Session): Ftrack session processing event.
+            entities (list[ftrack_api.entity.base.Entity]): List of entities
+                selected in Ftrack.
+            event (ftrack_api.event.base.Event): Event data.
+            ftrack_ids (set[str]): Selected ftrack ids.
+        """
+
+        values = event["data"]["values"]
+        product_names = json.loads(values["product_names"])
+        ayon_data = self._get_ayon_data_from_selection(
+            session, entities, ftrack_ids
+        )
+        selection_only = values["entity_type"] == "products_selection"
+        archive = values["action_type"] == "archive"
+
+        if archive:
+            message = "Archiving products finished."
+        else:
+            message = "Delete products finished."
+
+        self._handle_products_in_ayon(
+            ayon_data, product_names, selection_only, archive
+        )
+
+        ftrack_entities = self._query_ftrack_entities(
+            session, ftrack_ids, {"id"}
+        )
+        all_ftrack_ids = {
+            entity["id"]
+            for entity in ftrack_entities
+        }
+        # Delete assets in ftrack - that should automatically delete all
+        #   their asset versions
+        for chunk in create_chunks(all_ftrack_ids):
+            joined_ids = self.join_query_keys(chunk)
+            for asset in session.query(
+                "select id, name from Asset"
+                f" where context_id in ({joined_ids})"
+            ).all():
+                # NOTE: Asset name may also contain representation name
+                #   '{product[name]}_{representation}', not sure if we should
+                #   try to resolve that here?
+                if asset["name"] in product_names:
+                    session.delete(asset)
+            session.commit()
+
+        return {
+            "success": True,
+            "message": message
         }
 
 
 def register(session):
-    '''Register plugin. Called when used as an plugin.'''
+    """
 
-    DeleteAssetSubset(session).register()
+    Args:
+        session (ftrack_api.Session): Ftrack session.
+    """
+
+    DeleteEntitiesAction(session).register()
