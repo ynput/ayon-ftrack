@@ -1027,7 +1027,13 @@ class SyncProcess:
                 continue
 
             # This will remove the entity
-            self.log.debug(f"Removing entity {entity.path}")
+            path = entity.name
+            if entity.entity_type == "folder":
+                path = entity.path
+            elif entity.entity_type == "task":
+                if entity.parent:
+                    path = f"{entity.parent.path}/{entity.name}"
+            self.log.debug(f"Removing entity {path}")
             entity.parent_id = None
 
     def _process_created_hierarchy_changes(
