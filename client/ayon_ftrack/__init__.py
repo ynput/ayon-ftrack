@@ -1,13 +1,13 @@
-from .ftrack_module import (
-    FtrackModule,
-    FTRACK_MODULE_DIR,
+from .ftrack_addon import (
+    FtrackAddon,
+    FTRACK_ADDON_DIR,
 
     resolve_ftrack_url,
 )
 
 __all__ = (
-    "FtrackModule",
-    "FTRACK_MODULE_DIR",
+    "FtrackAddon",
+    "FTRACK_ADDON_DIR",
 
     "resolve_ftrack_url",
 )
