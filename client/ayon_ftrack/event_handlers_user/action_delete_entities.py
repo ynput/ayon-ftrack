@@ -14,6 +14,20 @@ from ayon_ftrack.lib import get_ftrack_icon_url
 
 
 class AyonData:
+    """Helper structure to hold AYON data.
+
+    Args:
+        project_name (str): Project name.
+        folders_by_id (dict[str, dict[str, Any]]): Folders by id.
+        folders_by_path (dict[str, dict[str, Any]]): Folders by path.
+        folders_by_parent_id (dict[str, list[dict[str, Any]]]): Folders by
+            parent id.
+        not_found_paths (set[str]): Folder paths not found in AYON.
+        selected_folder_ids (set[str]): Selected folder ids.
+        folder_ids_to_delete (set[str]): Folder ids to delete. Contains all
+            folder children of selected folder ids.
+    """
+
     def __init__(
         self,
         project_name,
