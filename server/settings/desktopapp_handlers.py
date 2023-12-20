@@ -86,7 +86,7 @@ class FtrackDesktopAppHandlers(BaseSettingsModel):
         title="Clean hierarchical custom attributes",
         default_factory=SimpleAction
     )
-    delete_asset_subset: SimpleAction = Field(
+    delete_ayon_entities: SimpleAction = Field(
         title="Delete Asset/Subsets",
         default_factory=SimpleAction,
     )
@@ -148,7 +148,7 @@ DEFAULT_DESKTOP_HANDLERS_SETTINGS = {
             "Project manager"
         ]
     },
-    "delete_asset_subset": {
+    "delete_ayon_entities": {
         "enabled": True,
         "role_list": [
             "Administrator",
