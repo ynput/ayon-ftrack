@@ -16,10 +16,14 @@ Run service processes from terminal. It is recommended to use docker images for 
 
 Usage: make [target]
 
+Optional arguments for service targets:
+--variant [variant] (Define settings variant. default: 'production')
+
 Runtime targets:
 	install    Install requirements to currently actie python (recommended to create venv)
 	leecher    Start leecher of ftrack events
 	processor  Main processing logic
+	services   Start both leecher and processor (experimental)
 
 endef
 export HELP_INFO
@@ -28,19 +32,26 @@ help:
 	@echo "$$HELP_INFO"
 
 install:
+		$(shell [[ -d $(CURDIR)/venv ]] || python -m venv $(CURDIR)/venv) && \
 		. $(CURDIR)/venv/bin/activate && python -m pip install -r "$(CURDIR)/requirements.txt"
 
 leecher:
 		export AYON_ADDON_NAME="ftrack" && \
 		export AYON_ADDON_VERSION=$(VERSION) && \
 		. $(CURDIR)/venv/bin/activate && \
-		python "$(CURDIR)/leecher_main.py"
+		python "$(CURDIR)/main.py" --service leecher $@
 
 processor:
 		export AYON_ADDON_NAME="ftrack" && \
 		export AYON_ADDON_VERSION=$(VERSION) && \
 		. $(CURDIR)/venv/bin/activate && \
-		python "$(CURDIR)/processor_main.py"
+		python "$(CURDIR)/main.py" --service processor $@
+
+services:
+		export AYON_ADDON_NAME="ftrack" && \
+		export AYON_ADDON_VERSION=$(VERSION) && \
+		. $(CURDIR)/venv/bin/activate && \
+		python "$(CURDIR)/main.py" --service both $@
 
 info: help
 default: help

@@ -1,12 +1,16 @@
 # Receive first positional argument
-Param([Parameter(Position=0)]$FunctionName)
+$FunctionName=$ARGS[0]
+$arguments=@()
+if ($ARGS.Length -gt 1) {
+    $arguments = $ARGS[1..($ARGS.Length - 1)]
+}
 
 $script_dir_rel = Split-Path -Path $MyInvocation.MyCommand.Definition -Parent
 $script_dir = (Get-Item $script_dir_rel).FullName
 
 $ADDON_VERSION = Invoke-Expression -Command "python -c ""import os;import sys;content={};f=open(r'$($script_dir)/../version.py');exec(f.read(),content);f.close();print(content['__version__'])"""
 
-function defaultfunc {
+function Default-Func {
   Write-Host ""
   Write-Host "*************************"
   Write-Host "AYON ftrack services tool"
@@ -17,27 +21,35 @@ function defaultfunc {
   Write-Host ""
   Write-Host "Usage: start [target]"
   Write-Host ""
+  Write-Host "Optional arguments for service targets:"
+  Write-Host "--variant [variant] (Define settings variant. default: 'production')"
+  Write-Host ""
   Write-Host "Runtime targets:"
   Write-Host "  install    Install requirements to currently actie python (recommended to create venv)"
   Write-Host "  leecher    Start leecher of ftrack events"
   Write-Host "  processor  Main processing logic"
+  Write-Host "  services   Start both leecher and processor (experimental)"
   Write-Host ""
 }
 
-function install {
+function Install-Requirements {
   # TODO Install/verify venv is created
   & python -m pip install -r "$($script_dir)\requirements.txt"
 }
 
-function run_leecher {
-  & python "$($script_dir)\leecher_main.py"
+function Start-Leecher {
+  & python "$($script_dir)\main.py" --service leecher @arguments
 }
 
-function run_processor {
-  & python "$($script_dir)\processor_main.py"
+function Start-Processor {
+  & python "$($script_dir)\main.py" --service processor @arguments
 }
 
-function load-env {
+function Start-Both {
+  & python "$($script_dir)\main.py" --service both @arguments
+}
+
+function Load-Env {
   $env_path = "$($script_dir)/.env"
   if (Test-Path $env_path) {
     Get-Content $env_path | foreach {
@@ -49,23 +61,37 @@ function load-env {
   }
 }
 
+function Activate-Venv {
+  # Make sure venv is created
+  $venv_path = "$($script_dir)\venv"
+  if (-not(Test-Path $venv_path)) {
+    & python -m venv $venv_path
+  }
+  & "$($venv_path)\Scripts\activate.ps1"
+}
+
 function main {
+  if ($null -eq $FunctionName) {
+    Default-Func
+    return
+  }
   $env:AYON_ADDON_NAME = "ftrack"
   $env:AYON_ADDON_VERSION = $ADDON_VERSION
-  load-env
+  Load-Env
+  Activate-Venv
 
-  & "$($script_dir)\venv\Scripts\activate.ps1"
   try {
     if ($FunctionName -eq "install") {
-      install
+      Install-Requirements
     } elseif ($FunctionName -eq "leecher") {
-      run_leecher
+      Start-Leecher
     } elseif ($FunctionName -eq "processor") {
-      run_processor
-    } elseif ($FunctionName -eq $null) {
-      defaultfunc
+      Start-Processor
+    } elseif ($FunctionName -eq "services") {
+      Start-Both
     } else {
       Write-Host "Unknown function ""$FunctionName"""
+      Default-Func
     }
   } finally {
     & deactivate
