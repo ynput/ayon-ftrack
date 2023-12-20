@@ -23,6 +23,7 @@ Runtime targets:
 	install    Install requirements to currently actie python (recommended to create venv)
 	leecher    Start leecher of ftrack events
 	processor  Main processing logic
+	services   Start both leecher and processor (experimental)
 
 endef
 export HELP_INFO
@@ -45,6 +46,12 @@ processor:
 		export AYON_ADDON_VERSION=$(VERSION) && \
 		. $(CURDIR)/venv/bin/activate && \
 		python "$(CURDIR)/main.py" --service processor $@
+
+services:
+        export AYON_ADDON_NAME="ftrack" && \
+		export AYON_ADDON_VERSION=$(VERSION) && \
+		. $(CURDIR)/venv/bin/activate && \
+		python "$(CURDIR)/main.py" --service both $@
 
 info: help
 default: help

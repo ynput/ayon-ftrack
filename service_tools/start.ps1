@@ -45,6 +45,10 @@ function Start-Processor {
   & python "$($script_dir)\main.py" --service processor @arguments
 }
 
+function Start-Both {
+  & python "$($script_dir)\main.py" --service both @arguments
+}
+
 function Load-Env {
   $env_path = "$($script_dir)/.env"
   if (Test-Path $env_path) {
@@ -83,6 +87,8 @@ function main {
       Start-Leecher
     } elseif ($FunctionName -eq "processor") {
       Start-Processor
+    } elseif ($FunctionName -eq "services") {
+      Start-Both
     } else {
       Write-Host "Unknown function ""$FunctionName"""
       Default-Func
