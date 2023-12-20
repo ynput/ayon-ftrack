@@ -1,5 +1,9 @@
 # Receive first positional argument
-Param([Parameter(Position=0)]$FunctionName)
+$FunctionName=$ARGS[0]
+$arguments=@()
+if ($ARGS.Length -gt 1) {
+    $arguments = $ARGS[1..($ARGS.Length - 1)]
+}
 
 $script_dir_rel = Split-Path -Path $MyInvocation.MyCommand.Definition -Parent
 $script_dir = (Get-Item $script_dir_rel).FullName
@@ -17,6 +21,9 @@ function defaultfunc {
   Write-Host ""
   Write-Host "Usage: start [target]"
   Write-Host ""
+  Write-Host "Optional arguments for service targets:"
+  Write-Host "--variant [variant] (Define settings variant. default: 'production')"
+  Write-Host ""
   Write-Host "Runtime targets:"
   Write-Host "  install    Install requirements to currently actie python (recommended to create venv)"
   Write-Host "  leecher    Start leecher of ftrack events"
@@ -30,11 +37,11 @@ function install {
 }
 
 function run_leecher {
-  & python "$($script_dir)\leecher_main.py"
+  & python "$($script_dir)\main.py" --service leecher @arguments
 }
 
 function run_processor {
-  & python "$($script_dir)\processor_main.py"
+  & python "$($script_dir)\main.py" --service processor @arguments
 }
 
 function load-env {
