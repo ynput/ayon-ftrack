@@ -793,6 +793,7 @@ class DeleteEntitiesAction(LocalAction):
 
         for task_entity in task_entities:
             session.delete(task_entity)
+        session.commit()
 
         entity_ids_by_parent_id = collections.defaultdict(set)
         parents_queue = collections.deque()
