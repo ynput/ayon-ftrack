@@ -31,6 +31,7 @@ help:
 	@echo "$$HELP_INFO"
 
 install:
+        $(shell [[ -d $(CURDIR)/venv ]] || python -m venv $(CURDIR)/venv) && \
 		. $(CURDIR)/venv/bin/activate && python -m pip install -r "$(CURDIR)/requirements.txt"
 
 leecher:

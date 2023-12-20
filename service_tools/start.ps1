@@ -56,12 +56,21 @@ function load-env {
   }
 }
 
+function ActivateVenv {
+  # Make sure venv is created
+  $venv_path = "$($script_dir)\venv"
+  if (-not(Test-Path $venv_path)) {
+    & python -m venv $venv_path
+  }
+  & "$($venv_path)\Scripts\activate.ps1"
+}
+
 function main {
   $env:AYON_ADDON_NAME = "ftrack"
   $env:AYON_ADDON_VERSION = $ADDON_VERSION
   load-env
+  ActivateVenv
 
-  & "$($script_dir)\venv\Scripts\activate.ps1"
   try {
     if ($FunctionName -eq "install") {
       install
