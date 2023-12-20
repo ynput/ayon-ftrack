@@ -25,7 +25,7 @@ Contains ftrack integration used in ayon launcher application. Contains publish 
 ## Services
 Currently, there is `leecher` which stores ftrack events and `processor` which is processing them. Separation of these two tasks allow to restart `processor` without loosing any events that happened meanwhile. There can be multiple services running at the same time. The `processer` has nothing to process without runnin `leecher`.
 
-## Create pakcage
+## Create package
 To create a "server-ready" package of the `server` folder, on a terminal, run `python create_package.py`. That will create `./package/ftrack {version}.zip` file that can be uploaded to the server.
 
 ## Services
@@ -44,7 +44,51 @@ Both services have prepared scripts to build and run docker images. There are 2 
 #### Docker compose
 There are also `docker-compose.yml` files that will create a docker stack if you run `docker-compose up -d`. But run `build` command first so the image is available. 
 
-### Start with prepared tools
+### Start with prepared tools (Development & Testing)
 Tools require to have available Python 3.9. Prepared scripts can be found in `./service_tools` directory. There are 2 scripts `start.ps1` for Windows and `Makefile` for Linux. Both scripts are doing the same thing and have same commands.
 
+Make sure you run `make install` (linux) or `./start.ps1 install` before running any other command.
+
 For more information check [README](service_tools/README.md).
+
+## Development & Testing
+Development and testing of this addon is complicated.
+
+### Server
+Server code must be uploaded (like with all other addons). Run `python create_package.py` to create package that can be uploaded to the server.
+
+### Client
+Client code cannot be use directly from repository in dev mode. But it is possible to build only client code to dedicated folder and point dev path there.
+
+To do that run
+```shell
+python create_package.py --client-only -o /my/addon/dir
+```
+
+That will create folder `/my/addon/dir/ftrack` which can be used as path in dev bundle. When developing/testing publish actions or event handlers it is not necessary to restart all processes to take effect.
+
+NOTE: Replace `/my/addon/dir/ftrack` with path of your choice.
+
+### Services
+Services can be tested in 2 ways. One is by running them locally using prepared service tools (see above).
+
+Second is by running them as docker containers. For that you need to have running ASH (AYON service host). Once ASH is running you can run services from AYON web UI. This is recommended approach how to run services in production. But for testing of Pull requests it is required to build the docker image manually instead of using images from docker hub.
+Images must be built for all services.
+
+#### Windows
+```shell
+cd ./services/leecher
+./manage.ps1 build
+
+cd ../processor
+./manage.ps1 build
+```
+
+#### Linux
+```shell
+cd ./services/leecher
+make build
+
+cd ../processor
+make build
+```
