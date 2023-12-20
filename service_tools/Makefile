@@ -32,7 +32,7 @@ help:
 	@echo "$$HELP_INFO"
 
 install:
-        $(shell [[ -d $(CURDIR)/venv ]] || python -m venv $(CURDIR)/venv) && \
+		$(shell [[ -d $(CURDIR)/venv ]] || python -m venv $(CURDIR)/venv) && \
 		. $(CURDIR)/venv/bin/activate && python -m pip install -r "$(CURDIR)/requirements.txt"
 
 leecher:
@@ -48,7 +48,7 @@ processor:
 		python "$(CURDIR)/main.py" --service processor $@
 
 services:
-        export AYON_ADDON_NAME="ftrack" && \
+		export AYON_ADDON_NAME="ftrack" && \
 		export AYON_ADDON_VERSION=$(VERSION) && \
 		. $(CURDIR)/venv/bin/activate && \
 		python "$(CURDIR)/main.py" --service both $@
