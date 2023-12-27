@@ -86,10 +86,6 @@ class FtrackDesktopAppHandlers(BaseSettingsModel):
         title="Clean hierarchical custom attributes",
         default_factory=SimpleAction
     )
-    delete_ayon_entities: SimpleAction = Field(
-        title="Delete Asset/Subsets",
-        default_factory=SimpleAction,
-    )
     delete_old_versions: SimpleAction = Field(
         title="Delete old versions",
         default_factory=SimpleAction,
