@@ -31,9 +31,15 @@ import collections
 import zipfile
 from typing import Optional, Any, Pattern
 
-COMMON_DIR_NAME: str = "ftrack_common"
 ADDON_NAME: str = "ftrack"
-ADDON_CLIENT_DIR: str = "ayon_ftrack"
+ADDON_CLIENT_NAME: str = "ayon_ftrack"
+
+CURRENT_DIR: str = os.path.dirname(os.path.abspath(__file__))
+VERSION_PATH: str = os.path.join(CURRENT_DIR, "version.py")
+SERVER_DIR: str = os.path.join(CURRENT_DIR, "server")
+CLIENT_DIR: str = os.path.join(CURRENT_DIR, "client")
+
+COMMON_DIR: str = os.path.join(CLIENT_DIR, ADDON_CLIENT_NAME, "common")
 
 # Patterns of directories to be skipped for server part of addon
 IGNORE_DIR_PATTERNS: list[Pattern] = [
@@ -163,54 +169,46 @@ def copy_server_content(
     log.info("Copying server content")
 
     server_dir: str = os.path.join(current_dir, "server")
-    common_dir: str = os.path.join(current_dir, COMMON_DIR_NAME)
 
-    filepaths_to_copy: list[tuple[str, str]] = [
-        (
-            os.path.join(current_dir, "version.py"),
-            os.path.join(addon_output_dir, "version.py")
-        ),
-        # Copy constants needed for attributes creation
-        (
-            os.path.join(common_dir, "constants.py"),
-            os.path.join(addon_output_dir, "constants.py")
-        ),
-    ]
+    filepaths_to_copy: list[tuple[str, str]] = []
 
     for path, sub_path in find_files_in_subdir(server_dir):
         filepaths_to_copy.append(
             (path, os.path.join(addon_output_dir, sub_path))
         )
 
+    filepaths_to_copy.extend([
+        # Make sure 'version.py' has same content
+        (
+            VERSION_PATH,
+            os.path.join(addon_output_dir, "version.py")
+        ),
+        # Copy constants needed for attributes creation
+        (
+            os.path.join(COMMON_DIR, "constants.py"),
+            os.path.join(addon_output_dir, "constants.py")
+        ),
+    ])
+
     # Copy files
     for src_path, dst_path in filepaths_to_copy:
         safe_copy_file(src_path, dst_path)
 
 
-def _get_client_dir(current_dir: str):
-    client_dir: str = os.path.join(current_dir, "client")
-    if not os.path.isdir(client_dir):
-        raise RuntimeError("Client directory was not found")
-    return client_dir
-
-
 def _get_client_files_mapping(current_dir: str):
-    client_dir: str = _get_client_dir(current_dir)
-    common_dir: str = os.path.join(current_dir, COMMON_DIR_NAME)
-    version_filepath: str = os.path.join(current_dir, "version.py")
-    addon_subdir_path = os.path.join(client_dir, ADDON_CLIENT_DIR)
-
-    output: list[tuple[str, str]] = []
-    for path, sub_path in find_files_in_subdir(addon_subdir_path):
-        output.append((path, sub_path))
-
-    for path, sub_path in find_files_in_subdir(common_dir):
-        dst_path = "/".join(("common", sub_path))
-        output.append((path, dst_path))
-
-    output.append((
-        version_filepath, "version.py"
-    ))
+    client_code = os.path.join(CLIENT_DIR, ADDON_CLIENT_NAME)
+    output = [
+        (src, os.path.join(ADDON_CLIENT_NAME, dst))
+        for src, dst in find_files_in_subdir(client_code)
+        if dst != "version.py"
+    ]
+    # Make sure 'version.py' has same content
+    output.append(
+        (
+            VERSION_PATH,
+            os.path.join(ADDON_CLIENT_NAME, "version.py")
+        )
+    )
     return output
 
 
@@ -230,7 +228,6 @@ def zip_client_side(
         log (logging.Logger): Logger object.
     """
 
-    client_dir: str = _get_client_dir(current_dir)
     if not zip_basename:
         zip_basename = "client"
     log.info("Preparing client code zip")
@@ -247,10 +244,9 @@ def zip_client_side(
         zip_filepath, "w", zipfile.ZIP_DEFLATED
     ) as zipf:
         for (src_path, dst_path) in files_mapping:
-            full_dst_path = "/".join((ADDON_CLIENT_DIR, dst_path))
-            zipf.write(src_path, full_dst_path)
+            zipf.write(src_path, dst_path)
 
-    shutil.copy(os.path.join(client_dir, "pyproject.toml"), private_dir)
+    shutil.copy(os.path.join(CLIENT_DIR, "pyproject.toml"), private_dir)
 
 
 def create_server_package(
@@ -309,19 +305,18 @@ def copy_client_code(current_dir: str, output_dir: str):
         output_dir (str): Directory path to output client code.
     """
 
-    full_output_dir = os.path.join(output_dir, ADDON_CLIENT_DIR)
-    if os.path.exists(full_output_dir):
-        shutil.rmtree(full_output_dir)
+    if os.path.exists(output_dir):
+        shutil.rmtree(output_dir)
 
-    if os.path.exists(full_output_dir):
+    if os.path.exists(output_dir):
         raise RuntimeError(
-            f"Failed to remove target folder '{full_output_dir}'"
+            f"Failed to remove target folder '{output_dir}'"
         )
 
     os.makedirs(output_dir, exist_ok=True)
     mapping = _get_client_files_mapping(current_dir)
     for (src_path, dst_path) in mapping:
-        full_dst_path = os.path.join(full_output_dir, dst_path)
+        full_dst_path = os.path.join(output_dir, dst_path)
         os.makedirs(os.path.dirname(full_dst_path), exist_ok=True)
         shutil.copy2(src_path, full_dst_path)
 
@@ -351,9 +346,8 @@ def main(
 
     log.info("Start creating package")
 
-    version_filepath: str = os.path.join(current_dir, "version.py")
     version_content: dict[str, Any] = {}
-    with open(version_filepath, "r") as stream:
+    with open(VERSION_PATH, "r") as stream:
         exec(stream.read(), version_content)
     addon_version: str = version_content["__version__"]
 
@@ -373,6 +367,7 @@ def main(
 
     # Skip server zipping
     if not skip_zip:
+        print(addon_output_dir)
         create_server_package(
             output_dir, addon_output_dir, addon_version, log
         )
