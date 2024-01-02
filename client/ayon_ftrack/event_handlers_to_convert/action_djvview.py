@@ -14,7 +14,7 @@ class DJVViewAction(LocalAction):
     description = "DJV View Launcher"
     icon = statics_icon("app_icons", "djvView.png")
 
-    type = 'Application'
+    type = "Application"
 
     allowed_types = [
         "cin", "dpx", "avi", "dv", "gif", "flv", "mkv", "mov", "mpg", "mpeg",
@@ -95,8 +95,8 @@ class DJVViewAction(LocalAction):
 
         if len(versions) < 1:
             return {
-                'success': False,
-                'message': 'There are no Asset Versions to open.'
+                "success": False,
+                "message": "There are no Asset Versions to open."
             }
 
         # TODO sort them (somehow?)
@@ -135,7 +135,7 @@ class DJVViewAction(LocalAction):
         last_available = None
         select_value = None
         for version in versions:
-            for component in version['components']:
+            for component in version["components"]:
                 label = base_label.format(
                     str(version["version"]).zfill(3),
                     version["asset"]["type"]["name"],
@@ -191,12 +191,12 @@ class DJVViewAction(LocalAction):
         """Callback method for DJVView action."""
 
         # Launching application
-        event_data = event["data"]
-        if "values" not in event_data:
+        event_values = event["data"].get("value")
+        if not event_values:
             return
 
-        djv_app_name = event_data["djv_app_name"]
-        app = self.applicaion_manager.applications.get(djv_app_name)
+        djv_app_name = event_values["djv_app_name"]
+        app = self.application_manager.applications.get(djv_app_name)
         executable = None
         if app is not None:
             executable = app.find_executable()
@@ -207,18 +207,21 @@ class DJVViewAction(LocalAction):
                 "message": "Couldn't find DJV executable."
             }
 
-        filpath = os.path.normpath(event_data["values"]["path"])
+        filpath = os.path.normpath(event_values["path"])
 
         cmd = [
             # DJV path
-            executable,
+            str(executable),
             # PATH TO COMPONENT
             filpath
         ]
 
         try:
             # Run DJV with these commands
-            subprocess.Popen(cmd)
+            _process = subprocess.Popen(cmd)
+            # Keep process in memory for some time
+            time.sleep(0.1)
+
         except FileNotFoundError:
             return {
                 "success": False,
