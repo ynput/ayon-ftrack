@@ -2,7 +2,6 @@ import collections
 import copy
 from typing import Any
 
-import ayon_api
 import ftrack_api
 
 from ftrack_common import (

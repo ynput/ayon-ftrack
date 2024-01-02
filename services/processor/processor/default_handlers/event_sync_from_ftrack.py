@@ -8,7 +8,6 @@ import arrow
 import ftrack_api
 
 from ayon_api import (
-    get_project,
     get_folders,
     get_tasks,
     slugify_string,

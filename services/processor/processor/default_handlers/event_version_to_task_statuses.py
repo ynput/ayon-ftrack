@@ -1,5 +1,3 @@
-import ayon_api
-
 from ftrack_common import BaseEventHandler
 
 

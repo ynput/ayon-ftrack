@@ -3,7 +3,6 @@ import copy
 import collections
 
 from ayon_api import (
-    get_project,
     get_folders,
     get_products,
     send_batch_operations,
