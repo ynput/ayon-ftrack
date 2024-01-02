@@ -1599,8 +1599,9 @@ class AutoSyncFromFtrack(BaseEventHandler):
             )
             return
 
-        project = get_project(sync_process.project_name)
-        if project is None:
+        if not self.get_ayon_project_from_event(
+            event, sync_process.project_name
+        ):
             self.log.debug(
                 f"Project '{sync_process.project_name}' was not"
                 " found in AYON. Skipping."
