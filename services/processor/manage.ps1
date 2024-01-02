@@ -36,7 +36,7 @@ function defaultfunc {
 }
 
 function build {
-  & cp -r "$script_dir/../../ftrack_common" .
+  & cp -r "$script_dir/../../client/ayon_ftrack/common/" "$script_dir/ftrack_common"
   try {
     & docker build -t "$IMAGE_FULL_NAME" .
   } finally {
@@ -69,7 +69,7 @@ function load-env {
 
 function dev {
   load-env
-  & cp -r "$script_dir/../../ftrack_common" .
+  & cp -r "$script_dir/../../client/ayon_ftrack/common/" "$script_dir/ftrack_common"
   try {
     & docker run --rm -ti `
       -v "$($script_dir):/service" `
