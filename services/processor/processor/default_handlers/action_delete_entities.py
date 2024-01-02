@@ -9,8 +9,11 @@ from ayon_api import (
     send_batch_operations,
 )
 
-from ayon_ftrack.common import create_chunks, LocalAction
-from ayon_ftrack.lib import get_ftrack_icon_url
+from ftrack_common import (
+    create_chunks,
+    ServerAction,
+    get_service_ftrack_icon_url,
+)
 
 
 class AyonData:
@@ -47,13 +50,13 @@ class AyonData:
         self.folder_ids_to_delete = folder_ids_to_delete
 
 
-class DeleteEntitiesAction(LocalAction):
+class DeleteEntitiesAction(ServerAction):
     identifier = "delete.ayon.entities"
     label = "Delete Folders/Products"
     description = (
         "Remove entities from AYON and from ftrack with all children"
     )
-    icon = get_ftrack_icon_url("DeleteAsset.svg")
+    icon = get_service_ftrack_icon_url("DeleteAsset.svg")
 
     settings_key = "delete_ayon_entities"
 
