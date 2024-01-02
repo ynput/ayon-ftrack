@@ -5,7 +5,7 @@ This project provides three elements for the AYON pipeline:
  * client - The AYON (currently OpenPype) desktop integration.
  * services - Standalone dockerized daemons that act based on events (aka `leecher` and `processors`).
 
-The `ftrack_common` directory contains re-usable code for `server`, `client` and `services`.
+There is a common code that can be re-used for `server`, `client` and `services`. Is located inside client code for developer mode `./client/ayon_ftrack/common/`.
 
 ## Server
 Once loaded into the backend, restart your server to update addons, ftrack addon will care about creation of attributes for entities. Addon must be enabled in Addon versions the plugin itself can be configured from the Project Settings page: `{ayon_url}/projectManager/projectSettings`, where you can specify your Ftrack instance URL.
@@ -58,16 +58,7 @@ Development and testing of this addon is complicated.
 Server code must be uploaded (like with all other addons). Run `python create_package.py` to create package that can be uploaded to the server.
 
 ### Client
-Client code cannot be use directly from repository in dev mode. But it is possible to build only client code to dedicated folder and point dev path there.
-
-To do that run
-```shell
-python create_package.py --client-only -o /my/addon/dir
-```
-
-That will create folder `/my/addon/dir/ftrack` which can be used as path in dev bundle. When developing/testing publish actions or event handlers it is not necessary to restart all processes to take effect.
-
-NOTE: Replace `/my/addon/dir/ftrack` with path of your choice.
+Point dev path to `./client/` folder inside the repository.
 
 ### Services
 Services can be tested in 2 ways. One is by running them locally using prepared service tools (see above).

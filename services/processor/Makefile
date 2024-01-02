@@ -5,7 +5,7 @@ IMAGE := ynput/$(BASE_NAME):$(VERSION)
 BASH_CONTAINER_NAME := $(BASE_NAME)-bash-$(VERSION)
 
 build:
-	cp -r ../../ftrack_common .
+	cp -r ../../client/ayon_ftrack/common/ ./ftrack_common
 	docker build -t $(IMAGE) .
 	rm -rf ftrack_common
 
@@ -13,7 +13,7 @@ clean:
 	docker rmi $(image)
 
 dev:
-	cp -r ../../ftrack_common .
+	cp -r ../../client/ayon_ftrack/common/ ./ftrack_common
 	docker run --rm -ti \
 		-v $(CURDIR):/service \
 		--hostname ftrackproc \
