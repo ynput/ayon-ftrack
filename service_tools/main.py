@@ -70,10 +70,15 @@ def main():
         return run_both()
 
     for path in (
-        os.path.join(ADDON_DIR),
+        os.path.join(ADDON_DIR, "client", "ayon_ftrack"),
         os.path.join(ADDON_DIR, "services", service_name),
+        os.path.join(ADDON_DIR),
     ):
         sys.path.insert(0, path)
+
+    # Fix 'ftrack_common' import
+    import common
+    sys.modules["ftrack_common"] = common
 
     if service_name == "processor":
         from processor import main as service_main
