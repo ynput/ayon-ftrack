@@ -13,31 +13,6 @@ class BaseEventHandler(BaseHandler):
     subscription_topic = "ftrack.update"
     handler_type = "Event"
 
-    def _process(self, event):
-        return self._launch(event)
-
-    def _launch(self, event):
-        """Callback kept for backwards compatibility.
-
-        Will be removed when default
-        """
-
-        self.session.rollback()
-        self.session._local_cache.clear()
-
-        try:
-            self.process(event)
-
-        except Exception as exc:
-            self.session.rollback()
-            self.session._configure_locations()
-            self.log.error(
-                "Event \"{}\" Failed: {}".format(
-                    self.__class__.__name__, str(exc)
-                ),
-                exc_info=True
-            )
-
     def register(self):
         """Register to subscription topic."""
 
@@ -45,23 +20,6 @@ class BaseEventHandler(BaseHandler):
             "topic={}".format(self.subscription_topic),
             self._process,
             priority=self.priority
-        )
-
-    def _translate_event(self, event, session=None):
-        """Receive entity objects based on event.
-
-        Args:
-            event (ftrack_api.Event): Event to process.
-            session (ftrack_api.Session): Connected ftrack session.
-
-        Returns:
-            List[ftrack_api.Entity]: Queried entities based on event data.
-        """
-
-        return self._get_entities(
-            event,
-            session,
-            ignore=["socialfeed", "socialnotification", "team"]
         )
 
     def process(self, event):
@@ -90,3 +48,45 @@ class BaseEventHandler(BaseHandler):
         """
 
         raise NotImplementedError()
+
+    def _process(self, event):
+        return self._launch(event)
+
+    def _launch(self, event):
+        """Callback kept for backwards compatibility.
+
+        Will be removed when default
+        """
+
+        self.session.rollback()
+        self.session._local_cache.clear()
+
+        try:
+            self.process(event)
+
+        except Exception as exc:
+            self.session.rollback()
+            self.session._configure_locations()
+            self.log.error(
+                "Event \"{}\" Failed: {}".format(
+                    self.__class__.__name__, str(exc)
+                ),
+                exc_info=True
+            )
+
+    def _translate_event(self, event, session=None):
+        """Receive entity objects based on event.
+
+        Args:
+            event (ftrack_api.Event): Event to process.
+            session (ftrack_api.Session): Connected ftrack session.
+
+        Returns:
+            List[ftrack_api.Entity]: Queried entities based on event data.
+        """
+
+        return self._get_entities(
+            event,
+            session,
+            ignore=["socialfeed", "socialnotification", "team"]
+        )
