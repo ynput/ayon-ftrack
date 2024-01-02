@@ -2,6 +2,7 @@ import os
 import tempfile
 import json
 import functools
+import copy
 import uuid
 import datetime
 import traceback
@@ -11,7 +12,7 @@ from abc import ABCMeta, abstractmethod
 
 import ftrack_api
 
-from ayon_api import get_bundle_settings, get_project
+from ayon_api import get_addons_settings, get_project
 
 
 class BaseHandler(object, metaclass=ABCMeta):
@@ -448,6 +449,64 @@ class BaseHandler(object, metaclass=ABCMeta):
             "Project where id is {}".format(project_data["id"])
         ).one()
 
+    def get_project_name_from_event(self, session, event, project_id):
+        """Load or query and fill project entity from/to event data.
+
+        Project data are stored by ftrack id because in most cases it is
+        easier to access project id than project name.
+
+        Args:
+            session (ftrack_api.Session): Current session.
+            event (ftrack_api.Event): Processed event by session.
+            project_id (str): Ftrack project id.
+
+        Returns:
+            Union[str, None]: Project name based on entities or None if project
+                cannot be defined.
+        """
+
+        if not project_id:
+            raise ValueError(
+                "Entered `project_id` is not valid. {} ({})".format(
+                    str(project_id), str(type(project_id))
+                )
+            )
+
+        project_id_mapping = event["data"].setdefault("project_id_name", {})
+        if project_id in project_id_mapping:
+            return project_id_mapping[project_id]
+
+        # Get project entity from task and store to event
+        project_entity = session.query((
+            "select full_name from Project where id is \"{}\""
+        ).format(project_id)).first()
+        project_name = None
+        if project_entity:
+            project_name = project_entity["full_name"]
+        project_id_mapping[project_id] = project_name
+        return project_name
+
+    def get_ayon_project_from_event(self, event, project_name):
+        """Get AYON project from event.
+
+        Args:
+            event (ftrack_api.Event): Event which is source of project id.
+            project_name (Union[str, None]): Project name.
+
+        Returns:
+            Union[dict[str, Any], None]: AYON project.
+        """
+
+        ayon_projects = event["data"].setdefault("ayon_projects", {})
+        if project_name in ayon_projects:
+            return ayon_projects[project_name]
+
+        project = None
+        if project_name:
+            project = get_project(project_name)
+        ayon_projects[project_name] = project
+        return project
+
     def get_project_settings_from_event(self, event, project_name):
         """Load or fill AYON's project settings from event data.
 
@@ -459,30 +518,23 @@ class BaseHandler(object, metaclass=ABCMeta):
             project_name (str): Project name.
         """
 
-        project_settings_by_id = event["data"].get("project_settings")
-        if not project_settings_by_id:
-            project_settings_by_id = {}
-            event["data"]["project_settings"] = project_settings_by_id
+        project_settings_by_name = event["data"].setdefault(
+            "project_settings", {}
+        )
+        if project_name in project_settings_by_name:
+            return copy.deepcopy(project_settings_by_name[project_name])
 
-        project_settings = project_settings_by_id.get(project_name)
-        if not project_settings:
-            # NOTE there is no safe way how to get project settings if project
-            #   does not exist on AYON server.
-            # TODO Should we somehow find out if ftrack is enabled for the
-            #   project?
-            # TODO how to find out which bundle should be used?
-            if get_project(project_name):
-                bundle_settings = get_bundle_settings(
-                    project_name=project_name
-                )
-            else:
-                bundle_settings = get_bundle_settings()
-            project_settings = {
-                addon_data["name"]: addon_data["settings"]
-                for addon_data in bundle_settings["addons"]
-            }
-            event["data"]["project_settings"][project_name] = project_settings
-        return project_settings
+        # NOTE there is no safe way how to get project settings if project
+        #   does not exist on AYON server.
+        # TODO Should we somehow find out if ftrack is enabled for the
+        #   project?
+        # TODO how to find out which bundle should be used?
+        project = self.get_ayon_project_from_event(event, project_name)
+        if not project:
+            project_name = None
+        project_settings = get_addons_settings(project_name=project_name)
+        project_settings_by_name[project_name] = project_settings
+        return copy.deepcopy(project_settings)
 
     @staticmethod
     def get_entity_path(entity):
