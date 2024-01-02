@@ -367,7 +367,6 @@ def main(
 
     # Skip server zipping
     if not skip_zip:
-        print(addon_output_dir)
         create_server_package(
             output_dir, addon_output_dir, addon_version, log
         )
