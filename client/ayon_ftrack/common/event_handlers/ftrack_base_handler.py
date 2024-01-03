@@ -449,6 +449,43 @@ class BaseHandler(object, metaclass=ABCMeta):
             "Project where id is {}".format(project_data["id"])
         ).one()
 
+    def get_project_entity_from_event(self, session, event, project_id):
+        """Load or query and fill project entity from/to event data.
+
+        Project data are stored by ftrack id because in most cases it is
+        easier to access project id than project name.
+
+        Args:
+            session (ftrack_api.Session): Current session.
+            event (ftrack_api.Event): Processed event by session.
+            project_id (str): Ftrack project id.
+
+        Returns:
+            Union[str, None]: Project name based on entities or None if project
+                cannot be defined.
+        """
+
+        if not project_id:
+            raise ValueError(
+                "Entered `project_id` is not valid. {} ({})".format(
+                    str(project_id), str(type(project_id))
+                )
+            )
+
+        project_id_mapping = event["data"].setdefault(
+            "project_entity_by_id", {}
+        )
+        if project_id in project_id_mapping:
+            return project_id_mapping[project_id]
+
+        # Get project entity from task and store to event
+        project_entity = session.query((
+            "select full_name from Project where id is \"{}\""
+        ).format(project_id)).first()
+        project_id_mapping[project_id] = project_entity
+
+        return project_entity
+
     def get_project_name_from_event(self, session, event, project_id):
         """Load or query and fill project entity from/to event data.
 
@@ -477,10 +514,9 @@ class BaseHandler(object, metaclass=ABCMeta):
             return project_id_mapping[project_id]
 
         # Get project entity from task and store to event
-        project_entity = session.query((
-            "select full_name from Project where id is \"{}\""
-        ).format(project_id)).first()
-        project_name = None
+        project_entity = self.get_project_entity_from_event(
+            session, event, project_id
+        )
         if project_entity:
             project_name = project_entity["full_name"]
         project_id_mapping[project_id] = project_name
