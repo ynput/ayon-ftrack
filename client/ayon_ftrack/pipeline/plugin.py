@@ -5,14 +5,16 @@ from openpype.pipeline.publish import (
 )
 from ayon_ftrack.common import is_ftrack_enabled_in_settings
 
+SETTINGS_CATEGORY = "ftrack"
+
 
 class FtrackPublishContextPlugin(pyblish.api.ContextPlugin):
-    settings_category = "ftrack"
+    settings_category = SETTINGS_CATEGORY
 
     @classmethod
     def is_ftrack_enabled(cls, project_settings):
         return is_ftrack_enabled_in_settings(
-            project_settings.get("ftrack") or {}
+            project_settings.get(SETTINGS_CATEGORY) or {}
         )
 
     @classmethod
@@ -28,12 +30,12 @@ class FtrackPublishContextPlugin(pyblish.api.ContextPlugin):
 
 
 class FtrackPublishInstancePlugin(pyblish.api.InstancePlugin):
-    settings_category = "ftrack"
+    settings_category = SETTINGS_CATEGORY
 
     @classmethod
     def is_ftrack_enabled(cls, project_settings):
         return is_ftrack_enabled_in_settings(
-            project_settings.get("ftrack") or {}
+            project_settings.get(SETTINGS_CATEGORY) or {}
         )
 
     @classmethod
