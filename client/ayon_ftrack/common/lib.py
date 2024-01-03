@@ -12,6 +12,27 @@ from ayon_api import (
 from .exceptions import InvalidFpsValue
 
 
+def is_ftrack_enabled_in_settings(project_settings):
+    """Check if ftrack is enabled in ftrack project settings.
+
+    Project settings gives option to disable ftrack integration per project.
+    That should disable most of ftrack integration functionality, especially
+    pipeline integration > publish plugins, and some automations like event
+    server handlers.
+
+    Args:
+        project_settings (dict[str, Any]): Ftrack project settings.
+
+    Returns:
+        bool: True if ftrack is enabled in project settings.
+    """
+
+    ftrack_enabled = project_settings.get("ftrack_enabled")
+    if ftrack_enabled is None:
+        return True
+    return ftrack_enabled
+
+
 def join_filter_values(values):
     """Prepare values to be used for filtering in ftrack query.
 
