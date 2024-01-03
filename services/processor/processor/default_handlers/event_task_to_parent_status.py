@@ -1,6 +1,6 @@
 import collections
 
-from ftrack_common import BaseEventHandler
+from ftrack_common import BaseEventHandler, is_ftrack_enabled_in_settings
 
 
 class TaskStatusToParent(BaseEventHandler):
@@ -70,6 +70,12 @@ class TaskStatusToParent(BaseEventHandler):
         project_settings = self.get_project_settings_from_event(
             event, project_name
         )
+        ftrack_settings = project_settings["ftrack"]
+        if not is_ftrack_enabled_in_settings(ftrack_settings):
+            self.log.debug("ftrack is disabled for project \"{}\"".format(
+                project_name
+            ))
+            return
 
         # Prepare loaded settings and check if can be processed
         result = self.prepare_settings(project_settings, project_name)

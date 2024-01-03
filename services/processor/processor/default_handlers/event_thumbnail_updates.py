@@ -1,6 +1,6 @@
 import collections
 
-from ftrack_common import BaseEventHandler
+from ftrack_common import BaseEventHandler, is_ftrack_enabled_in_settings
 
 
 class ThumbnailEvents(BaseEventHandler):
@@ -32,10 +32,15 @@ class ThumbnailEvents(BaseEventHandler):
         project_settings = self.get_project_settings_from_event(
             event, project_name
         )
+        ftrack_settings = project_settings["ftrack"]
+        if not is_ftrack_enabled_in_settings(ftrack_settings):
+            self.log.debug("ftrack is disabled for project \"{}\"".format(
+                project_name
+            ))
+            return
 
         event_settings = (
-            project_settings
-            ["ftrack"]
+            ftrack_settings
             ["service_event_handlers"]
             [self.settings_key]
         )
