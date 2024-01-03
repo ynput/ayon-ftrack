@@ -5,6 +5,7 @@ import time
 import atexit
 
 import arrow
+import ayon_api
 import ftrack_api
 
 from ayon_api import (
@@ -28,6 +29,7 @@ from ftrack_common import (
     CUST_ATTR_AUTO_SYNC,
     FPS_KEYS,
 
+    is_ftrack_enabled_in_settings,
     get_ayon_attr_configs,
     query_custom_attribute_values,
 
@@ -74,7 +76,8 @@ class SyncProcess:
         "default"
     ]
 
-    def __init__(self, session, event, log):
+    def __init__(self, event_handler, session, event, log):
+        self.event_handler = event_handler
         self.event = event
         self.session = session
         self.log = log
@@ -173,7 +176,10 @@ class SyncProcess:
         """
 
         if self._project_name is UNKNOWN_VALUE:
-            self._project_name = self.ft_project["full_name"]
+            project_name = None
+            if self.ft_project is not None:
+                project_name = self.ft_project["full_name"]
+            self._project_name = project_name
         return self._project_name
 
     @property
@@ -422,8 +428,12 @@ class SyncProcess:
             self._has_valid_entity_types = False
             return
 
-        self._chek_enabled_auto_sync()
+        self._check_enabled_auto_sync()
         if self._project_changed_autosync:
+            if not self._project_enabled_validation():
+                # Make sure that sync is not triggered if project is not
+                #   available or disabled
+                self._trigger_project_sync = False
             return
 
         self._filter_update_actions()
@@ -433,26 +443,11 @@ class SyncProcess:
             self._has_valid_entity_types = False
             return
 
-        # NOTE This if first part of code which should query entity from ftrack
-        # Query project and check if can be actually queried and if has
-        #   available custom attribute that is used to identify if project
-        #   should be autosynced.
-        ft_project = self.ft_project
-        if ft_project is None:
-            self.log.error("Failed to query ftrack project. Skipping event")
-            return
-
-        if CUST_ATTR_AUTO_SYNC not in ft_project["custom_attributes"]:
-            # TODO should we sent message to someone?
-            self.log.error((
-                f"Custom attribute \"{CUST_ATTR_AUTO_SYNC}\" is not created"
-                f" or user \"{self.session.api_user}\" used"
-                " for Event server don't have permissions to access it!"
-            ))
+        if not self._project_enabled_validation():
             return
 
         # Skip if auto-sync is not set
-        auto_sync = ft_project["custom_attributes"][CUST_ATTR_AUTO_SYNC]
+        auto_sync = self.ft_project["custom_attributes"][CUST_ATTR_AUTO_SYNC]
         is_event_valid = auto_sync is True
         if is_event_valid:
             # TODO probably should be handled
@@ -499,7 +494,7 @@ class SyncProcess:
         self._entities_by_action = entities_by_action
         self._found_actions = found_actions
 
-    def _chek_enabled_auto_sync(self):
+    def _check_enabled_auto_sync(self):
         updates = self._entities_by_action["update"]
         for ftrack_id, ent_info in updates.items():
             # filter project
@@ -515,6 +510,37 @@ class SyncProcess:
                 self._trigger_project_sync = True
 
             self._project_changed_autosync = True
+
+    def _project_enabled_validation(self):
+        # NOTE This is first part of code which should query entity from
+        #   ftrack.
+        # Query project and check if can be actually queried and if has
+        #   available custom attribute that is used to identify if project
+        #   should be autosynced.
+        ft_project = self.ft_project
+        if ft_project is None:
+            self.log.error("Failed to query ftrack project. Skipping event")
+            return False
+
+        if CUST_ATTR_AUTO_SYNC not in ft_project["custom_attributes"]:
+            # TODO should we sent message to someone?
+            self.log.error((
+                f"Custom attribute \"{CUST_ATTR_AUTO_SYNC}\" is not created"
+                f" or user \"{self.session.api_user}\" used"
+                " for Event server don't have permissions to access it!"
+            ))
+            return False
+
+        project_name = ft_project["full_name"]
+        project_settings = self.event_handler.get_project_settings_from_event(
+            self.event, project_name
+        )
+        if not is_ftrack_enabled_in_settings(project_settings["ftrack"]):
+            self.log.debug(
+                f"ftrack is disabled for project \"{project_name}\""
+            )
+            return False
+        return True
 
     def _filter_update_actions(self):
         updates = self.entities_by_action["update"]
@@ -1558,7 +1584,7 @@ class AutoSyncFromFtrack(BaseEventHandler):
             self.set_process_session(session)
 
         sync_process = SyncProcess(
-            self.process_session, event, self.log
+            self, self.process_session, event, self.log
         )
 
         sync_process.initial_event_processing()
