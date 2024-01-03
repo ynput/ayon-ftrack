@@ -19,8 +19,10 @@ import ayon_api
 
 from openpype.pipeline import KnownPublishError
 
+from ayon_ftrack.pipeline import plugin
 
-class CollectWebpublisherCredentials(pyblish.api.ContextPlugin):
+
+class CollectWebpublisherCredentials(plugin.FtrackPublishContextPlugin):
     """
         Translates uploader's user email to Ftrack username.
 
@@ -31,8 +33,6 @@ class CollectWebpublisherCredentials(pyblish.api.ContextPlugin):
     `representation.context.username`
 
     """
-
-    settings_category = "ftrack"
 
     order = pyblish.api.CollectorOrder + 0.0015
     label = "Collect webpublisher credentials"

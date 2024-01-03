@@ -1,8 +1,10 @@
 import pyblish.api
 from openpype.pipeline.publish import ValidateContentsOrder
 
+from ayon_ftrack.pipeline import plugin
 
-class ValidateFtrackAttributes(pyblish.api.InstancePlugin):
+
+class ValidateFtrackAttributes(plugin.FtrackInstancePlugin):
     """
     This will validate attributes in ftrack against data in scene.
 
@@ -37,7 +39,7 @@ class ValidateFtrackAttributes(pyblish.api.InstancePlugin):
     order = ValidateContentsOrder
     families = ["ftrack"]
     optional = True
-    settings_category = "ftrack"
+
     # Ignore standalone host, because it does not have an Ftrack entity
     # associated.
     hosts = [

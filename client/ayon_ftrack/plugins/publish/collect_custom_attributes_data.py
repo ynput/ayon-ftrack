@@ -10,9 +10,10 @@ Provides:
 import copy
 
 import pyblish.api
+from ayon_ftrack.pipeline import plugin
 
 
-class CollectFtrackCustomAttributeData(pyblish.api.ContextPlugin):
+class CollectFtrackCustomAttributeData(plugin.FtrackContextPlugin):
     """Collect custom attribute values and store them to customData.
 
     Data are stored into each instance in context under
@@ -21,8 +22,6 @@ class CollectFtrackCustomAttributeData(pyblish.api.ContextPlugin):
     Hierarchical attributes are not looked up properly for that functionality
     custom attribute values lookup must be extended.
     """
-
-    settings_category = "ftrack"
 
     order = pyblish.api.CollectorOrder + 0.4992
     label = "Collect Ftrack Custom Attribute Data"

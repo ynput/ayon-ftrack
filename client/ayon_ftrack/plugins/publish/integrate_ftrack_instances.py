@@ -12,8 +12,10 @@ from openpype.lib.transcoding import (
 from openpype.lib.profiles_filtering import filter_profiles
 from openpype.lib.transcoding import VIDEO_EXTENSIONS
 
+from ayon_ftrack.pipeline import plugin
 
-class IntegrateFtrackInstance(pyblish.api.InstancePlugin):
+
+class IntegrateFtrackInstance(plugin.FtrackInstancePlugin):
     """Collect ftrack component data (not integrate yet).
 
     Add ftrack component list to instance.
@@ -22,7 +24,6 @@ class IntegrateFtrackInstance(pyblish.api.InstancePlugin):
     order = pyblish.api.IntegratorOrder + 0.48
     label = "Integrate Ftrack Component"
     families = ["ftrack"]
-    settings_category = "ftrack"
 
     metadata_keys_to_label = {
         "openpype_version": "OpenPype version",

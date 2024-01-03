@@ -1,8 +1,10 @@
 import pyblish.api
 from openpype.lib import filter_profiles
 
+from ayon_ftrack.pipeline import plugin
 
-class IntegrateFtrackFarmStatus(pyblish.api.ContextPlugin):
+
+class IntegrateFtrackFarmStatus(plugin.FtrackContextPlugin):
     """Change task status when should be published on farm.
 
     Instance which has set "farm" key in data to 'True' is considered as will
@@ -11,7 +13,6 @@ class IntegrateFtrackFarmStatus(pyblish.api.ContextPlugin):
 
     order = pyblish.api.IntegratorOrder + 0.48
     label = "Integrate Ftrack Farm Status"
-    settings_category = "ftrack"
     farm_status_profiles = []
 
     def process(self, context):
