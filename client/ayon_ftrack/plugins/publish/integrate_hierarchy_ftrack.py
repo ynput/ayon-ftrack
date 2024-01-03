@@ -17,7 +17,7 @@ except ImportError:
     get_asset_name_identifier = None
 
 
-class IntegrateHierarchyToFtrack(plugin.FtrackContextPlugin):
+class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
     """
     Create entities in ftrack based on collected data from premiere
     Example of entry data:

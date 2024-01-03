@@ -13,7 +13,7 @@ import pyblish.api
 from ayon_ftrack.pipeline import plugin
 
 
-class CollectFtrackCustomAttributeData(plugin.FtrackContextPlugin):
+class CollectFtrackCustomAttributeData(plugin.FtrackPublishContextPlugin):
     """Collect custom attribute values and store them to customData.
 
     Data are stored into each instance in context under

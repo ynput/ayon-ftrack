@@ -15,7 +15,7 @@ from openpype.lib import StringTemplate
 from ayon_ftrack.pipeline import plugin
 
 
-class IntegrateFtrackDescription(plugin.FtrackInstancePlugin):
+class IntegrateFtrackDescription(plugin.FtrackPublishInstancePlugin):
     """Add description to AssetVersions in Ftrack."""
 
     # Must be after integrate asset new

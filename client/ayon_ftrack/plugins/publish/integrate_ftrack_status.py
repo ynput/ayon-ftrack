@@ -7,7 +7,7 @@ from ayon_ftrack.common import create_chunks
 from ayon_ftrack.pipeline import plugin
 
 
-class CollectFtrackTaskStatuses(plugin.FtrackContextPlugin):
+class CollectFtrackTaskStatuses(plugin.FtrackPublishContextPlugin):
     """Collect available task statuses on the project.
 
     This is preparation for integration of task statuses.
@@ -53,7 +53,7 @@ class CollectFtrackTaskStatuses(plugin.FtrackContextPlugin):
         self.log.debug("Collected ftrack task statuses.")
 
 
-class IntegrateFtrackStatusBase(plugin.FtrackInstancePlugin):
+class IntegrateFtrackStatusBase(plugin.FtrackPublishInstancePlugin):
     """Base plugin for status collection.
 
     Requirements:
@@ -317,7 +317,7 @@ class IntegrateFtrackOnFarmStatus(IntegrateFtrackStatusBase):
     settings_key = "ftrack_task_status_on_farm_publish"
 
 
-class IntegrateFtrackTaskStatus(plugin.FtrackContextPlugin):
+class IntegrateFtrackTaskStatus(plugin.FtrackPublishContextPlugin):
     # Use order of Integrate Ftrack Api plugin and offset it before or after
     base_order = pyblish.api.IntegratorOrder + 0.499
     # By default is after Integrate Ftrack Api

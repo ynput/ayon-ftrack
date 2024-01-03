@@ -15,7 +15,7 @@ from openpype.lib.transcoding import VIDEO_EXTENSIONS
 from ayon_ftrack.pipeline import plugin
 
 
-class IntegrateFtrackInstance(plugin.FtrackInstancePlugin):
+class IntegrateFtrackInstance(plugin.FtrackPublishInstancePlugin):
     """Collect ftrack component data (not integrate yet).
 
     Add ftrack component list to instance.

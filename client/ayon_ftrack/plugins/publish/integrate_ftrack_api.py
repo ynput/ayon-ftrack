@@ -20,7 +20,7 @@ from ayon_ftrack.common.constants import FTRACK_ID_ATTRIB
 from ayon_ftrack.pipeline import plugin
 
 
-class IntegrateFtrackApi(plugin.FtrackInstancePlugin):
+class IntegrateFtrackApi(plugin.FtrackPublishInstancePlugin):
     """ Commit components to server. """
 
     order = pyblish.api.IntegratorOrder + 0.499

@@ -4,7 +4,7 @@ from openpype.lib import filter_profiles
 from ayon_ftrack.pipeline import plugin
 
 
-class IntegrateFtrackFarmStatus(plugin.FtrackContextPlugin):
+class IntegrateFtrackFarmStatus(plugin.FtrackPublishContextPlugin):
     """Change task status when should be published on farm.
 
     Instance which has set "farm" key in data to 'True' is considered as will

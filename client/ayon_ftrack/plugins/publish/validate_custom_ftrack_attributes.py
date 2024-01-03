@@ -4,7 +4,7 @@ from openpype.pipeline.publish import ValidateContentsOrder
 from ayon_ftrack.pipeline import plugin
 
 
-class ValidateFtrackAttributes(plugin.FtrackInstancePlugin):
+class ValidateFtrackAttributes(plugin.FtrackPublishInstancePlugin):
     """
     This will validate attributes in ftrack against data in scene.
 

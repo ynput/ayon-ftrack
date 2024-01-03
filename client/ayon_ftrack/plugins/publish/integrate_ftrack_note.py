@@ -18,7 +18,7 @@ from openpype.lib import StringTemplate
 from ayon_ftrack.pipeline import plugin
 
 
-class IntegrateFtrackNote(plugin.FtrackInstancePlugin):
+class IntegrateFtrackNote(plugin.FtrackPublishInstancePlugin):
     """Create comments in Ftrack."""
 
     # Must be after integrate asset new
