@@ -3,7 +3,6 @@ import copy
 import collections
 
 from ayon_api import (
-    get_project,
     get_folders,
     get_products,
     send_batch_operations,
@@ -542,7 +541,8 @@ class DeleteEntitiesAction(ServerAction):
         # Check if project exists in AYON
         project = self.get_project_from_entity(entities[0], session)
         project_name = project["full_name"]
-        if not get_project(project_name):
+        ayon_project = self.get_ayon_project_from_event(event, project_name)
+        if not ayon_project:
             return {
                 "success": False,
                 "message": f"Project '{project_name}' not found in AYON."

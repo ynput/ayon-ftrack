@@ -3,15 +3,15 @@
 import os
 import pyblish.api
 
+from ayon_ftrack.pipeline import plugin
 
-class CollectLocalFtrackCreds(pyblish.api.ContextPlugin):
+
+class CollectLocalFtrackCreds(plugin.FtrackPublishContextPlugin):
     """Collect default Royal Render path."""
 
     order = pyblish.api.CollectorOrder + 0.01
     label = "Collect local ftrack credentials"
     targets = ["rr_control"]
-
-    settings_category = "ftrack"
 
     def process(self, context):
         if (

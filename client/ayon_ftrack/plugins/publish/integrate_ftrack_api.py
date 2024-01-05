@@ -17,16 +17,15 @@ import pyblish.api
 import clique
 
 from ayon_ftrack.common.constants import FTRACK_ID_ATTRIB
+from ayon_ftrack.pipeline import plugin
 
 
-class IntegrateFtrackApi(pyblish.api.InstancePlugin):
+class IntegrateFtrackApi(plugin.FtrackPublishInstancePlugin):
     """ Commit components to server. """
 
     order = pyblish.api.IntegratorOrder + 0.499
     label = "Integrate Ftrack Api"
     families = ["ftrack"]
-
-    settings_category = "ftrack"
 
     def process(self, instance):
         component_list = instance.data.get("ftrackComponentsList")

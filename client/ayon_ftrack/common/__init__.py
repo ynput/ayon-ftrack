@@ -26,6 +26,7 @@ __all__ = (
 
     "InvalidFpsValue",
 
+    "is_ftrack_enabled_in_settings",
     "join_filter_values",
     "create_chunks",
     "convert_to_fps",
@@ -78,6 +79,7 @@ from .exceptions import (
 )
 
 from .lib import (
+    is_ftrack_enabled_in_settings,
     join_filter_values,
     create_chunks,
     convert_to_fps,

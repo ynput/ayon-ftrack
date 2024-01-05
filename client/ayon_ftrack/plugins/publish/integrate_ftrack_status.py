@@ -4,9 +4,10 @@ import pyblish.api
 from openpype.lib import filter_profiles
 
 from ayon_ftrack.common import create_chunks
+from ayon_ftrack.pipeline import plugin
 
 
-class CollectFtrackTaskStatuses(pyblish.api.ContextPlugin):
+class CollectFtrackTaskStatuses(plugin.FtrackPublishContextPlugin):
     """Collect available task statuses on the project.
 
     This is preparation for integration of task statuses.
@@ -25,7 +26,6 @@ class CollectFtrackTaskStatuses(pyblish.api.ContextPlugin):
     # After 'CollectFtrackApi'
     order = pyblish.api.CollectorOrder + 0.4992
     label = "Collect Ftrack Task Statuses"
-    settings_category = "ftrack"
 
     def process(self, context):
         ftrack_session = context.data("ftrackSession")
@@ -53,7 +53,7 @@ class CollectFtrackTaskStatuses(pyblish.api.ContextPlugin):
         self.log.debug("Collected ftrack task statuses.")
 
 
-class IntegrateFtrackStatusBase(pyblish.api.InstancePlugin):
+class IntegrateFtrackStatusBase(plugin.FtrackPublishInstancePlugin):
     """Base plugin for status collection.
 
     Requirements:
@@ -73,6 +73,10 @@ class IntegrateFtrackStatusBase(pyblish.api.InstancePlugin):
 
     @classmethod
     def apply_settings(cls, project_settings):
+        if not cls.is_ftrack_enabled(project_settings):
+            cls.enabled = False
+            return
+
         settings_key = cls.settings_key
         if settings_key is None:
             settings_key = cls.__name__
@@ -313,7 +317,7 @@ class IntegrateFtrackOnFarmStatus(IntegrateFtrackStatusBase):
     settings_key = "ftrack_task_status_on_farm_publish"
 
 
-class IntegrateFtrackTaskStatus(pyblish.api.ContextPlugin):
+class IntegrateFtrackTaskStatus(plugin.FtrackPublishContextPlugin):
     # Use order of Integrate Ftrack Api plugin and offset it before or after
     base_order = pyblish.api.IntegratorOrder + 0.499
     # By default is after Integrate Ftrack Api
@@ -327,6 +331,10 @@ class IntegrateFtrackTaskStatus(pyblish.api.ContextPlugin):
         Args:
             project_settings (dict[str, Any]): Project settings.
         """
+
+        if not cls.is_ftrack_enabled(project_settings):
+            cls.enabled = False
+            return
 
         settings = (
             project_settings["ftrack"]["publish"]["IntegrateFtrackTaskStatus"]

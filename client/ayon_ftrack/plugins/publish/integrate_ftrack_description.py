@@ -12,8 +12,10 @@ import six
 import pyblish.api
 from openpype.lib import StringTemplate
 
+from ayon_ftrack.pipeline import plugin
 
-class IntegrateFtrackDescription(pyblish.api.InstancePlugin):
+
+class IntegrateFtrackDescription(plugin.FtrackPublishInstancePlugin):
     """Add description to AssetVersions in Ftrack."""
 
     # Must be after integrate asset new
@@ -21,7 +23,6 @@ class IntegrateFtrackDescription(pyblish.api.InstancePlugin):
     label = "Integrate Ftrack description"
     families = ["ftrack"]
     optional = True
-    settings_category = "ftrack"
 
     # Can be set in settings:
     # - Allows `intent` and `comment` keys

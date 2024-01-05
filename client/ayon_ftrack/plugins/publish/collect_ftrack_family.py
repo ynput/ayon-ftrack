@@ -9,8 +9,10 @@ import pyblish.api
 
 from openpype.lib import filter_profiles
 
+from ayon_ftrack.pipeline import plugin
 
-class CollectFtrackFamily(pyblish.api.InstancePlugin):
+
+class CollectFtrackFamily(plugin.FtrackPublishInstancePlugin):
     """Adds explicitly 'ftrack' to families to upload instance to FTrack.
 
     Uses selection by combination of hosts/families/tasks names via
@@ -25,8 +27,6 @@ class CollectFtrackFamily(pyblish.api.InstancePlugin):
 
     label = "Collect Ftrack Family"
     order = pyblish.api.CollectorOrder + 0.4990
-
-    settings_category = "ftrack"
 
     profiles = None
 

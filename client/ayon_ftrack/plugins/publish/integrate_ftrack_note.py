@@ -15,8 +15,10 @@ import six
 import pyblish.api
 from openpype.lib import StringTemplate
 
+from ayon_ftrack.pipeline import plugin
 
-class IntegrateFtrackNote(pyblish.api.InstancePlugin):
+
+class IntegrateFtrackNote(plugin.FtrackPublishInstancePlugin):
     """Create comments in Ftrack."""
 
     # Must be after integrate asset new
@@ -24,7 +26,6 @@ class IntegrateFtrackNote(pyblish.api.InstancePlugin):
     label = "Integrate Ftrack note"
     families = ["ftrack"]
     optional = True
-    settings_category = "ftrack"
 
     # Can be set in presets:
     # - Allows only `intent` and `comment` keys

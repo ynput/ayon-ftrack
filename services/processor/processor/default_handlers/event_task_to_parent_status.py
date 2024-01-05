@@ -1,8 +1,6 @@
 import collections
 
-import ayon_api
-
-from ftrack_common import BaseEventHandler
+from ftrack_common import BaseEventHandler, is_ftrack_enabled_in_settings
 
 
 class TaskStatusToParent(BaseEventHandler):
@@ -63,7 +61,8 @@ class TaskStatusToParent(BaseEventHandler):
         project_name = self.get_project_name_from_event(
             session, event, project_id
         )
-        if ayon_api.get_project(project_name) is None:
+
+        if not self.get_ayon_project_from_event(event, project_name):
             self.log.debug("Project not found in AYON. Skipping")
             return
 
@@ -71,6 +70,12 @@ class TaskStatusToParent(BaseEventHandler):
         project_settings = self.get_project_settings_from_event(
             event, project_name
         )
+        ftrack_settings = project_settings["ftrack"]
+        if not is_ftrack_enabled_in_settings(ftrack_settings):
+            self.log.debug("ftrack is disabled for project \"{}\"".format(
+                project_name
+            ))
+            return
 
         # Prepare loaded settings and check if can be processed
         result = self.prepare_settings(project_settings, project_name)

@@ -5,24 +5,23 @@ import pyblish.api
 import ayon_api
 
 from ayon_ftrack.common import FTRACK_ID_ATTRIB
+from ayon_ftrack.pipeline import plugin
 try:
     from openpype.client import get_asset_name_identifier
 except ImportError:
     get_asset_name_identifier = None
 
 
-class CollectFtrackApi(pyblish.api.ContextPlugin):
+class CollectFtrackApi(plugin.FtrackPublishContextPlugin):
     """ Collects an ftrack session and the current task id. """
 
     order = pyblish.api.CollectorOrder + 0.4991
     label = "Collect Ftrack Api"
 
-    settings_category = "ftrack"
-
     def process(self, context):
-        ftrack_log = logging.getLogger('ftrack_api')
+        ftrack_log = logging.getLogger("ftrack_api")
         ftrack_log.setLevel(logging.WARNING)
-        ftrack_log = logging.getLogger('ftrack_api_old')
+        ftrack_log = logging.getLogger("ftrack_api_old")
         ftrack_log.setLevel(logging.WARNING)
 
         # Collect session

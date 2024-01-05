@@ -9,6 +9,7 @@ from openpype.client import get_asset_by_id
 from openpype.lib import filter_profiles
 from openpype.pipeline import KnownPublishError
 from ayon_ftrack.common import get_ayon_attr_configs
+from ayon_ftrack.pipeline import plugin
 
 try:
     from openpype.client import get_asset_name_identifier
@@ -16,7 +17,7 @@ except ImportError:
     get_asset_name_identifier = None
 
 
-class IntegrateHierarchyToFtrack(pyblish.api.ContextPlugin):
+class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
     """
     Create entities in ftrack based on collected data from premiere
     Example of entry data:
@@ -51,7 +52,6 @@ class IntegrateHierarchyToFtrack(pyblish.api.ContextPlugin):
         "traypublisher"
     ]
     optional = False
-    settings_category = "ftrack"
     create_task_status_profiles = []
 
     def process(self, context):
