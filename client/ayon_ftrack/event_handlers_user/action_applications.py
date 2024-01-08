@@ -1,8 +1,12 @@
 import os
+import time
 
-from ayon_api import get_project
-
-from ayon_ftrack.common import BaseAction
+from ayon_ftrack.common import (
+    CUST_ATTR_KEY_SERVER_PATH,
+    is_ftrack_enabled_in_settings,
+    get_folder_path_for_entities,
+    BaseAction,
+)
 from openpype.lib.applications import (
     ApplicationManager,
     ApplicationLaunchFailed,
@@ -21,11 +25,35 @@ class AppplicationsAction(BaseAction):
     _launch_identifier_with_id = None
 
     icon_url = os.environ.get("OPENPYPE_STATICS_SERVER")
+    # 30 seconds
+    cache_lifetime = 30
 
     def __init__(self, *args, **kwargs):
         super(AppplicationsAction, self).__init__(*args, **kwargs)
 
-        self.application_manager = ApplicationManager()
+        self._applications_manager = None
+        self._expire_time = 0
+
+    @property
+    def applications_manager(self):
+        """
+
+        Applications manager is refreshed in regular interval. Interval is
+            defined by 'cache_lifetime' property.
+
+        Returns:
+            ApplicationManager: Application manager instance.
+        """
+
+        current_time = time.time()
+        if self._applications_manager is None:
+            self._applications_manager = ApplicationManager()
+            self._expire_time = current_time
+
+        elif self._expire_time < current_time:
+            self._applications_manager.refresh()
+            self._expire_time = current_time + self.cache_lifetime
+        return self._applications_manager
 
     @property
     def discover_identifier(self):
@@ -107,8 +135,20 @@ class AppplicationsAction(BaseAction):
         # TODO we only need project name
         ft_project = self.get_project_from_entity(entity)
         project_name = ft_project["full_name"]
-        ayon_project_entity = get_project(project_name)
+        ayon_project_entity = self.get_ayon_project_from_event(
+            event, project_name
+        )
         if not ayon_project_entity:
+            return False
+
+        project_settings = self.get_project_settings_from_event(
+            event, project_name
+        )
+        ftrack_settings = project_settings.get("ftrack")
+        if (
+            not ftrack_settings
+            or not is_ftrack_enabled_in_settings(ftrack_settings)
+        ):
             return False
 
         ayon_project_apps = ayon_project_entity["attrib"].get("applications")
@@ -122,7 +162,7 @@ class AppplicationsAction(BaseAction):
 
         items = []
         for app_name in ayon_project_apps:
-            app = self.application_manager.applications.get(app_name)
+            app = self.applications_manager.applications.get(app_name)
             if not app or not app.enabled:
                 continue
 
@@ -197,16 +237,17 @@ class AppplicationsAction(BaseAction):
         entity = entities[0]
 
         task_name = entity["name"]
-        asset_name = entity["parent"]["name"]
+        folder_path = self._get_folder_path(session, entity["parent"])
         project_name = entity["project"]["full_name"]
-        self.log.info((
-            "Ftrack launch app: \"{}\" on Project/Asset/Task: {}/{}/{}"
-        ).format(app_name, project_name, asset_name, task_name))
+        self.log.info(
+            f"Ftrack launch app: \"{app_name}\""
+            f" on {project_name}{folder_path}/{task_name}"
+        )
         try:
-            self.application_manager.launch(
+            self.applications_manager.launch(
                 app_name,
                 project_name=project_name,
-                asset_name=asset_name,
+                asset_name=folder_path,
                 task_name=task_name
             )
 
@@ -238,6 +279,10 @@ class AppplicationsAction(BaseAction):
             "success": True,
             "message": "Launching {0}".format(self.label)
         }
+
+    def _get_folder_path(self, session, entity):
+        entity_id = entity["id"]
+        return get_folder_path_for_entities(session, [entity])[entity_id]
 
 
 def register(session):
