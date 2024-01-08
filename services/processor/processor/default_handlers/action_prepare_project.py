@@ -275,16 +275,35 @@ class PrepareProjectServer(ServerAction):
         event_values = event["data"].get("values")
 
         project_entity = entities[0]
+        result = self._slugify_name_handling(session, event, project_entity)
+        if result is not None:
+            return result
+
+        # Check if project already exists
+        # TODO maybe this should be handled with slugify? Give option to
+        #   change name/code.
+        project_codes = set()
+        project_names = set()
+        for project in ayon_api.get_projects(fields={"name", "code"}):
+            project_codes.add(project["code"])
+            project_names.add(project["name"])
+
         project_name = project_entity["full_name"]
-        syncer = SyncFromFtrack(session, project_name, self.log)
-        if syncer.project_exists_in_ayon():
+        project_code = project_entity["name"]
+        exists_error = None
+        if project_name in project_names:
+            exists_error = f"name '{project_name}'"
+        elif project_code in project_codes:
+            exists_error = f"code '{project_code}'"
+
+        if exists_error:
             return {
-                "message": "Project already exists in Ayon.",
+                "message": f"Project {exists_error} already exists in AYON.",
                 "success": True
             }
 
         self.show_message(event, "Preparing data... Please wait", True)
-        if not event_values:
+        if not event_values or "in_attribute_set" not in event_values:
             return self._first_interface(session, project_entity)
 
         # Exit interface once attributes are confirmed
@@ -293,6 +312,236 @@ class PrepareProjectServer(ServerAction):
 
         # User did not want to modify default attributes
         return self._attributes_interface(event_values)
+
+    def _rename_project_handling(self, session, event, project_entity):
+        """
+
+        Args:
+            session (ftrack_api.Session): Ftrack session.
+            event (ftrack_api.event.base.Event): Event entity.
+            project_entity (ftrack_api.entity.base.Entity): Project entity.
+
+        Returns:
+            Union[None, Dict[str, Any]]: None if both name and code are valid,
+                otherwise returns interface items or ending messages.
+        """
+
+        event_values = event["data"].get("values") or {}
+        action = event_values.get("invalid_name_action")
+        if action is None or action == "skip_prep":
+            return {
+                "success": False,
+                "message": "Project was <b>not</b> prepared in AYON."
+            }
+
+        new_name = event_values.get("new_project_name")
+        new_slugified_name = None
+        if new_name is not None:
+            new_slugified_name = ayon_api.slugify_string(new_name)
+
+        new_code = event_values.get("new_project_code")
+        new_slugified_code = None
+        if new_code is not None:
+            new_slugified_code = ayon_api.slugify_string(new_code)
+
+        name_is_valid = new_slugified_name == new_name
+        code_is_valid = new_slugified_code == new_code
+        if not name_is_valid or not code_is_valid:
+            return self._get_rename_project_items(
+                project_entity,
+                new_slugified_name,
+                new_slugified_code,
+                new_name,
+                new_code,
+            )
+
+        if new_slugified_name is not None:
+            project_entity["full_name"] = new_slugified_name
+        if new_slugified_code is not None:
+            project_entity["name"] = new_slugified_code
+        session.commit()
+        return None
+
+    def _slugify_name_handling(self, session, event, project_entity):
+        """
+
+        Args:
+            session (ftrack_api.Session): Ftrack session.
+            event (ftrack_api.event.base.Event): Event entity.
+            project_entity (ftrack_api.entity.base.Entity): Project entity.
+
+        Returns:
+            Union[None, Dict[str, Any]]: None if both name and code are valid,
+                otherwise returns interface items or ending messages.
+        """
+
+        # TODO validate project code too
+        project_name = project_entity["full_name"]
+        project_code = project_entity["name"]
+        slugified_name = ayon_api.slugify_string(project_name)
+        slugified_code = ayon_api.slugify_string(project_code)
+
+        if slugified_name == project_name:
+            slugified_name = None
+
+        if slugified_code == project_code:
+            slugified_code = None
+
+        # Both name and code are valid
+        if (
+            slugified_name is None
+            and slugified_code is None
+        ):
+            return None
+
+        # Validate user inputs
+        if event["data"].get("values"):
+            return self._rename_project_handling(
+                session, event, project_entity
+            )
+
+        # Show interface to user
+        return self._get_rename_project_items(
+            project_entity,
+            slugified_name,
+            slugified_code,
+        )
+
+    def _get_rename_project_items(
+        self,
+        project_entity,
+        new_name_hint,
+        new_code_hint,
+        new_name=None,
+        new_code=None,
+    ):
+        """
+
+        Args:
+            project_entity (ftrack_api.entity.base.Entity): Project entity.
+            new_name_hint (Union[None, str]): New name hint. Slugified current
+                name to valid value. Or None if name is valid.
+            new_code_hint (Union[None, str]): New code hint. Slugified current
+                name to valid value. Or None if code is valid.
+            new_name (Optional[str]): New name entered by user.
+            new_code (Optional[str]): New code entered by user.
+
+        Returns:
+            dict[str, Any]: Interface items.
+        """
+
+        project_name = project_entity["full_name"]
+        project_code = project_entity["name"]
+        invalid_keys = []
+        if new_name_hint is not None:
+            invalid_keys.append("name")
+        if new_code_hint is not None:
+            invalid_keys.append("code")
+        invalid_keys_s = " and ".join(invalid_keys)
+        ending = "s" if len(invalid_keys) > 1 else ""
+        repeated = new_name is not None or new_code is not None
+
+        intro_message = (
+            f"Project {invalid_keys_s} contain{ending} invalid"
+            " characters. Only alphanumeric characters and underscore"
+            " are allowed (a-Z0-9_)."
+            f"<br/><br/>- Project name: {project_name}"
+            f"<br/>- Project code: {project_code}"
+        )
+        if repeated:
+            intro_message = (
+                f"Entered values are <b>not valid</b>.<br/><br/>"
+            ) + intro_message
+
+        items = [
+            {
+                "type": "label",
+                "value": "# Introduction",
+            },
+            {
+                "type": "label",
+                "value": intro_message,
+            },
+            {"type": "label", "value": "---"},
+            {
+                "type": "label",
+                "value": "# Choose action",
+            },
+            {
+                "type": "enumerator",
+                "label": "Action",
+                "name": "invalid_name_action",
+                "value": "rename" if repeated else "skip_prep",
+                "data": [
+                    {
+                        "label": "Skip project preparation",
+                        "value": "skip_prep",
+                    },
+                    {
+                        "label": "Rename project",
+                        "value": "rename",
+                    },
+                ],
+            },
+            {"type": "label", "value": "---"},
+            {
+                "type": "label",
+                "value": "# Rename",
+            },
+            {
+                "type": "label",
+                "value": (
+                    "Ignore if \"<b>Skip project preparation</b>\" is"
+                    " selected."
+                ),
+            }
+        ]
+
+        if new_name_hint is not None:
+            label = "New project name"
+            if new_name_hint == new_name:
+                label += " (valid)"
+            elif new_name is not None:
+                label += " (invalid)"
+            items.extend([
+                {"type": "label", "value": "---"},
+                {"type": "label", "value": label},
+                {
+                    "type": "text",
+                    "name": "new_project_name",
+                    "value": new_name_hint,
+                }
+            ])
+
+        if new_code_hint is not None:
+            label = "New project code"
+            if new_code_hint == new_code:
+                label += " (valid)"
+            elif new_code is not None:
+                label += " (invalid)"
+
+            items.extend([
+                {"type": "label", "value": "---"},
+                {"type": "label", "value": label},
+                {
+                    "type": "text",
+                    "name": "new_project_code",
+                    "value": new_code_hint,
+                }
+            ])
+        items.append({
+            "type": "label",
+            "value": (
+                "<br/><b>WARNING</b>: Rename action will change the"
+                " project values in ftrack."
+            ),
+        })
+
+        return {
+            "title": f"Invalid project {invalid_keys_s}",
+            "submit_button_label": "Confirm",
+            "items": items,
+        }
 
     def _set_ftrack_attributes(self, session, project_entity, values):
         custom_attrs, hier_custom_attrs = get_ayon_attr_configs(session)
@@ -371,9 +620,10 @@ class PrepareProjectServer(ServerAction):
         project_entity = entities[0]
         project_name = project_entity["full_name"]
         syncer = SyncFromFtrack(session, project_name, self.log)
+        # TODO validate project code too
         if syncer.project_exists_in_ayon():
             return {
-                "message": "Project already exists in Ayon.",
+                "message": "Project already exists in AYON.",
                 "success": True
             }
 
