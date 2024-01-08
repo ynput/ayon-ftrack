@@ -1,8 +1,12 @@
 import os
+import time
 
-from ayon_api import get_project
-
-from ayon_ftrack.common import BaseAction
+from ayon_ftrack.common import (
+    CUST_ATTR_KEY_SERVER_PATH,
+    is_ftrack_enabled_in_settings,
+    get_folder_path_for_entities,
+    BaseAction,
+)
 from openpype.lib.applications import (
     ApplicationManager,
     ApplicationLaunchFailed,
@@ -131,8 +135,20 @@ class AppplicationsAction(BaseAction):
         # TODO we only need project name
         ft_project = self.get_project_from_entity(entity)
         project_name = ft_project["full_name"]
-        ayon_project_entity = get_project(project_name)
+        ayon_project_entity = self.get_ayon_project_from_event(
+            event, project_name
+        )
         if not ayon_project_entity:
+            return False
+
+        project_settings = self.get_project_settings_from_event(
+            event, project_name
+        )
+        ftrack_settings = project_settings.get("ftrack")
+        if (
+            not ftrack_settings
+            or not is_ftrack_enabled_in_settings(ftrack_settings)
+        ):
             return False
 
         ayon_project_apps = ayon_project_entity["attrib"].get("applications")
@@ -221,16 +237,17 @@ class AppplicationsAction(BaseAction):
         entity = entities[0]
 
         task_name = entity["name"]
-        asset_name = entity["parent"]["name"]
+        folder_path = self._get_folder_path(session, entity["parent"])
         project_name = entity["project"]["full_name"]
-        self.log.info((
-            "Ftrack launch app: \"{}\" on Project/Asset/Task: {}/{}/{}"
-        ).format(app_name, project_name, asset_name, task_name))
+        self.log.info(
+            f"Ftrack launch app: \"{app_name}\""
+            f" on {project_name}{folder_path}/{task_name}"
+        )
         try:
             self.applications_manager.launch(
                 app_name,
                 project_name=project_name,
-                asset_name=asset_name,
+                asset_name=folder_path,
                 task_name=task_name
             )
 
@@ -262,6 +279,10 @@ class AppplicationsAction(BaseAction):
             "success": True,
             "message": "Launching {0}".format(self.label)
         }
+
+    def _get_folder_path(self, session, entity):
+        entity_id = entity["id"]
+        return get_folder_path_for_entities(session, [entity])[entity_id]
 
 
 def register(session):
