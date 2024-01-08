@@ -15,6 +15,9 @@ from .exceptions import InvalidFpsValue
 def is_ftrack_enabled_in_settings(project_settings):
     """Check if ftrack is enabled in ftrack project settings.
 
+    This function expect settings for a specific project. It is not checking
+    if ftrack is enabled in general.
+
     Project settings gives option to disable ftrack integration per project.
     That should disable most of ftrack integration functionality, especially
     pipeline integration > publish plugins, and some automations like event
@@ -28,6 +31,8 @@ def is_ftrack_enabled_in_settings(project_settings):
     """
 
     ftrack_enabled = project_settings.get("ftrack_enabled")
+    # If 'ftrack_enabled' is not set, we assume it is enabled.
+    # - this is for backwards compatibility - remove in future
     if ftrack_enabled is None:
         return True
     return ftrack_enabled
