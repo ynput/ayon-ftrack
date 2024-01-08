@@ -2,6 +2,10 @@ import os
 
 import ftrack_api
 
+from ayon_ftrack.common import (
+    is_ftrack_enabled_in_settings,
+)
+
 from openpype.settings import get_project_settings
 from openpype.lib.applications import PostLaunchHook
 try:
@@ -19,16 +23,19 @@ class PostFtrackHook(PostLaunchHook):
 
     def execute(self):
         project_name = self.data.get("project_name")
-        asset_name = self.data.get("asset_name")
+        project_settings = self.data.get("project_settings")
+        folder_path = self.data.get("asset_name")
         task_name = self.data.get("task_name")
 
-        missing_context_keys = set()
+        missing_context_keys = []
         if not project_name:
-            missing_context_keys.add("project_name")
-        if not asset_name:
-            missing_context_keys.add("asset_name")
+            missing_context_keys.append("project_name")
+        if not project_settings:
+            missing_context_keys.append("project_settings")
+        if not folder_path:
+            missing_context_keys.append("asset_name")
         if not task_name:
-            missing_context_keys.add("task_name")
+            missing_context_keys.append("task_name")
 
         if missing_context_keys:
             missing_keys_str = ", ".join([
@@ -37,6 +44,18 @@ class PostFtrackHook(PostLaunchHook):
             self.log.debug("Hook {} skipped. Missing data keys: {}".format(
                 self.__class__.__name__, missing_keys_str
             ))
+            return
+
+        if "ftrack" not in project_settings:
+            self.log.debug(
+                "Missing ftrack settings. Skipping post launch logic."
+            )
+            return
+
+        if not is_ftrack_enabled_in_settings(project_settings["ftrack"]):
+            self.log.debug(
+                f"Ftrack is disabled for project '{project_name}'. Skipping."
+            )
             return
 
         required_keys = ("FTRACK_SERVER", "FTRACK_API_USER", "FTRACK_API_KEY")
