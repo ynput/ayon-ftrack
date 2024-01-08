@@ -26,6 +26,9 @@ __all__ = (
 
     "InvalidFpsValue",
 
+    "import_filepath",
+    "modules_from_path",
+
     "is_ftrack_enabled_in_settings",
     "join_filter_values",
     "create_chunks",
@@ -47,9 +50,6 @@ __all__ = (
     "BaseAction",
     "LocalAction",
     "ServerAction",
-
-    "import_filepath",
-    "modules_from_path",
 
     "FtrackServer",
 )
@@ -78,6 +78,11 @@ from .exceptions import (
     InvalidFpsValue,
 )
 
+from .python_module_tools import (
+    import_filepath,
+    modules_from_path,
+)
+
 from .lib import (
     is_ftrack_enabled_in_settings,
     join_filter_values,
@@ -104,11 +109,6 @@ from .event_handlers import (
     BaseAction,
     LocalAction,
     ServerAction,
-)
-
-from .python_module_tools import (
-    import_filepath,
-    modules_from_path,
 )
 
 from .ftrack_server import FtrackServer
