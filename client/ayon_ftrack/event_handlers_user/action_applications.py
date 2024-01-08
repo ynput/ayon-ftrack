@@ -21,11 +21,35 @@ class AppplicationsAction(BaseAction):
     _launch_identifier_with_id = None
 
     icon_url = os.environ.get("OPENPYPE_STATICS_SERVER")
+    # 30 seconds
+    cache_lifetime = 30
 
     def __init__(self, *args, **kwargs):
         super(AppplicationsAction, self).__init__(*args, **kwargs)
 
-        self.application_manager = ApplicationManager()
+        self._applications_manager = None
+        self._expire_time = 0
+
+    @property
+    def applications_manager(self):
+        """
+
+        Applications manager is refreshed in regular interval. Interval is
+            defined by 'cache_lifetime' property.
+
+        Returns:
+            ApplicationManager: Application manager instance.
+        """
+
+        current_time = time.time()
+        if self._applications_manager is None:
+            self._applications_manager = ApplicationManager()
+            self._expire_time = current_time
+
+        elif self._expire_time < current_time:
+            self._applications_manager.refresh()
+            self._expire_time = current_time + self.cache_lifetime
+        return self._applications_manager
 
     @property
     def discover_identifier(self):
@@ -122,7 +146,7 @@ class AppplicationsAction(BaseAction):
 
         items = []
         for app_name in ayon_project_apps:
-            app = self.application_manager.applications.get(app_name)
+            app = self.applications_manager.applications.get(app_name)
             if not app or not app.enabled:
                 continue
 
@@ -203,7 +227,7 @@ class AppplicationsAction(BaseAction):
             "Ftrack launch app: \"{}\" on Project/Asset/Task: {}/{}/{}"
         ).format(app_name, project_name, asset_name, task_name))
         try:
-            self.application_manager.launch(
+            self.applications_manager.launch(
                 app_name,
                 project_name=project_name,
                 asset_name=asset_name,
