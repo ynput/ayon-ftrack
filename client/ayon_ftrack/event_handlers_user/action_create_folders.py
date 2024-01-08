@@ -151,7 +151,10 @@ class CreateFolders(LocalAction):
             parent_data.update({
                 "asset": parent_entity["name"],
                 "hierarchy": hierarchy,
-                "parent": parent_name
+                "parent": parent_name,
+                "folder": {
+                    "name": parent_entity["name"]
+                }
             })
 
             if not task_entities:
