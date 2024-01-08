@@ -70,10 +70,6 @@ class FillWorkfileAttr(BaseSettingsModel):
 class FtrackDesktopAppHandlers(BaseSettingsModel):
     """Settings for event handlers running in ftrack service."""
 
-    application_launch_statuses: ApplicationLaunchStatuses = Field(
-        title="Application - Status change on launch",
-        default_factory=ApplicationLaunchStatuses,
-    )
     create_update_attributes: CreateUpdateCustomAttributesAction = Field(
         title="Create/Update Custom Attributes",
         default_factory=CreateUpdateCustomAttributesAction,
@@ -109,21 +105,6 @@ class FtrackDesktopAppHandlers(BaseSettingsModel):
 
 
 DEFAULT_DESKTOP_HANDLERS_SETTINGS = {
-    "application_launch_statuses": {
-        "enabled": True,
-        "ignored_statuses": [
-            "In Progress",
-            "Omitted",
-            "On hold",
-            "Approved"
-        ],
-        "status_change": [
-            {
-                "name": "In Progress",
-                "value": []
-            }
-        ]
-    },
     "create_update_attributes": {
         "role_list": [
             "Administrator"
