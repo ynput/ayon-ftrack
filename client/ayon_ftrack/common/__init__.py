@@ -45,6 +45,8 @@ __all__ = (
     "app_definitions_from_app_manager",
     "tool_definitions_from_app_manager",
 
+    "get_folder_path_for_entities",
+
     "BaseHandler",
     "BaseEventHandler",
     "BaseAction",
@@ -101,6 +103,9 @@ from .custom_attributes import (
     default_custom_attributes_definition,
     app_definitions_from_app_manager,
     tool_definitions_from_app_manager,
+)
+from .utils import (
+    get_folder_path_for_entities,
 )
 
 from .event_handlers import (
