@@ -2,7 +2,7 @@ name: ayon-ftrack-services
 services:
   leecher:
     container_name: leecher
-    image: ynput/ayon-ftrack-leecher:1.0.1-dev.1
+    image: ynput/ayon-ftrack-leecher:1.0.1
     restart: unless-stopped
     environment:
       - "AYON_SERVER_URL=${AYON_SERVER_URL}"
