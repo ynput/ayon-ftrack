@@ -30,7 +30,7 @@ def is_ftrack_enabled_in_settings(project_settings):
         bool: True if ftrack is enabled in project settings.
     """
 
-    ftrack_enabled = project_settings.get("ftrack_enabled")
+    ftrack_enabled = project_settings.get("enabled")
     # If 'ftrack_enabled' is not set, we assume it is enabled.
     # - this is for backwards compatibility - remove in future
     if ftrack_enabled is None:
