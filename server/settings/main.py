@@ -68,11 +68,7 @@ class PostLaunchHookSettings(BaseSettingsModel):
 class FtrackSettings(BaseSettingsModel):
     """Ftrack addon settings."""
 
-    ftrack_enabled: bool = Field(
-        True,
-        # TODO think about the label - it is not clear what it does
-        title="Enable ftrack addon"
-    )
+    enabled: bool = Field(True)
     ftrack_server: str = Field(
         "",
         title="Ftrack server url",
@@ -107,7 +103,7 @@ class FtrackSettings(BaseSettingsModel):
 
 
 DEFAULT_VALUES = {
-    "ftrack_enabled": True,
+    "enabled": True,
     "ftrack_server": "",
     "service_event_handlers": DEFAULT_SERVICE_HANDLERS_SETTINGS,
     "service_settings": {
