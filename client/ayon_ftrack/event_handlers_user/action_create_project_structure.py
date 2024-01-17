@@ -106,16 +106,26 @@ class CreateProjectFolders(LocalAction):
     def get_ftrack_paths(self, paths_items):
         all_ftrack_paths = []
         for path_items in paths_items:
+            if not path_items:
+                continue
+
             ftrack_path_items = []
             is_ftrack = False
             for item in reversed(path_items):
-                if item == self.project_root_key:
+                # QUESTION Why this not validated only on first item?
+                if (
+                    item == self.project_root_key
+                    # Cheesy fix for new multi-root definition
+                    or item.startswith("{root")
+                ):
                     continue
+
                 if is_ftrack:
                     ftrack_path_items.append(item)
                 elif re.match(self.pattern_ftrack, item):
                     ftrack_path_items.append(item)
                     is_ftrack = True
+
             ftrack_path_items = list(reversed(ftrack_path_items))
             if ftrack_path_items:
                 all_ftrack_paths.append(ftrack_path_items)
