@@ -60,6 +60,7 @@ class CreateProjectFolders(LocalAction):
     pattern_array = re.compile(r"\[.*\]")
     pattern_ftrack = re.compile(r".*\[[.]*ftrack[.]*")
     pattern_ent_ftrack = re.compile(r"ftrack\.[^.,\],\s,]*")
+    pattern_template = re.compile(r"\{.*\}")
     project_root_key = "__project_root__"
 
     def discover(self, session, entities, event):
@@ -115,14 +116,15 @@ class CreateProjectFolders(LocalAction):
                 # QUESTION Why this not validated only on first item?
                 if (
                     item == self.project_root_key
-                    # Cheesy fix for new multi-root definition
-                    or item.startswith("{root")
+                    # Fix to skip any formatting items (I don't like it!)
+                    # - '{root[work]}' and '{project[name]}'
+                    or self.pattern_template.match(item)
                 ):
                     continue
 
                 if is_ftrack:
                     ftrack_path_items.append(item)
-                elif re.match(self.pattern_ftrack, item):
+                elif self.pattern_ftrack.match(item):
                     ftrack_path_items.append(item)
                     is_ftrack = True
 
@@ -164,14 +166,14 @@ class CreateProjectFolders(LocalAction):
 
     def trigger_creation(self, separation, parent):
         for item, subvalues in separation.items():
-            matches = re.findall(self.pattern_array, item)
+            matches = self.pattern_array.findall(item)
             ent_type = "Folder"
             if len(matches) == 0:
                 name = item
             else:
                 match = matches[0]
                 name = item.replace(match, "")
-                ent_type_match = re.findall(self.pattern_ent_ftrack, match)
+                ent_type_match = self.pattern_ent_ftrack.findall(match)
                 if len(ent_type_match) > 0:
                     ent_type_split = ent_type_match[0].split(".")
                     if len(ent_type_split) == 2:
