@@ -1241,7 +1241,7 @@ class SyncProcess:
             else:
                 new_task_types.append({
                     "name": task_type_name,
-                    "short_name": re.sub(r"\W+", "", task_type_name.lower())
+                    "shortName": re.sub(r"\W+", "", task_type_name.lower())
                 })
 
         project_entity.task_types = new_task_types

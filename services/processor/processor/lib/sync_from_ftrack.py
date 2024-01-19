@@ -396,7 +396,7 @@ class SyncFromFtrack:
             else:
                 new_task_types.append({
                     "name": name,
-                    "short_name": re.sub(r"\W+", "", name.lower())
+                    "shortName": re.sub(r"\W+", "", name.lower())
                 })
 
         project_entity.folder_types = new_folder_types
