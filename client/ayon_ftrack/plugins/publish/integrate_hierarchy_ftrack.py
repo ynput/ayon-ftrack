@@ -58,7 +58,7 @@ class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
         if "hierarchyContext" not in context.data:
             return
 
-        hierarchy_context = self._get_active_assets(context)
+        hierarchy_context = self._get_active_hierarchy(context)
         self.log.debug("__ hierarchy_context: {}".format(hierarchy_context))
 
         session = context.data["ftrackSession"]
@@ -516,38 +516,45 @@ class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
             ftrack_status_by_task_id[task["id"]] = None
         return task
 
-    def _get_active_assets(self, context):
-        """ Returns only asset dictionary.
-            Usually the last part of deep dictionary which
-            is not having any children
-        """
-        def get_pure_hierarchy_data(input_dict):
-            input_dict_copy = deepcopy(input_dict)
-            for key in input_dict.keys():
-                self.log.debug("__ key: {}".format(key))
-                # check if child key is available
-                if input_dict[key].get("childs"):
-                    # loop deeper
-                    input_dict_copy[
-                        key]["childs"] = get_pure_hierarchy_data(
-                            input_dict[key]["childs"])
-                elif key not in active_assets:
-                    input_dict_copy.pop(key, None)
-            return input_dict_copy
+    def _get_active_hierarchy(self, context):
+        """Filter hierarchy context to active folders only."""
 
-        hierarchy_context = context.data["hierarchyContext"]
-
-        active_assets = set()
+        active_folder_paths = set()
         # filter only the active publishing insatnces
         for instance in context:
             if instance.data.get("publish") is False:
                 continue
 
-            asset_name = instance.data.get("asset")
-            if asset_name:
-                active_assets.add(asset_name)
+            folder_path = instance.data.get("asset")
+            if folder_path:
+                active_folder_paths.add(folder_path)
 
         # remove duplicity in list
-        self.log.debug("__ active_assets: {}".format(list(active_assets)))
+        self.log.debug(
+            "Active folders:\n{}".format(
+                "\n".join(sorted(active_folder_paths))
+            )
+        )
 
-        return get_pure_hierarchy_data(hierarchy_context)
+        hierarchy_context = deepcopy(context.data["hierarchyContext"])
+
+        hierarchy_queue = collections.deque()
+        for name, item in hierarchy_context.items():
+            hierarchy_queue.append(
+                (name, item, "/" + name, hierarchy_context)
+            )
+
+        while hierarchy_queue:
+            (name, item, path, parent_item) = hierarchy_queue.popleft()
+            children = item.get("childs")
+            if children:
+                for child_name, child_item in children.items():
+                    child_path = "/".join([path, child_name])
+                    hierarchy_queue.append(
+                        (child_name, child_item, child_path, item)
+                    )
+
+            elif path not in active_folder_paths:
+                parent_item.pop(name, None)
+
+        return hierarchy_context
