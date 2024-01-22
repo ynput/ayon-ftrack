@@ -215,6 +215,8 @@ class DailyListFilterModel(BaseSettingsModel):
 
 
 class DailyListItemModel(BaseSettingsModel):
+    """Create list with AssetVersions by filter criteria."""
+
     _layout = "expanded"
     name_template: str = Field("{yy}{mm}{dd}", title="Name template")
     category: str = Field(
@@ -251,6 +253,8 @@ def default_week_days():
 
 
 class CreateDailyListsModel(BaseSettingsModel):
+    """Create list with AssetVersions by filter criteria."""
+
     _isGroup = True
     enabled: bool = True
     cycle_hour_start: str = Field(
