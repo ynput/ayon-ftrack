@@ -147,30 +147,30 @@ class TransferHierNonHierAttrsAction(BaseSettingsModel):
     )
 
 
-class CreateDailyReviewSession(BaseSettingsModel):
-    _isGroup = True
-    enabled: bool = True
-    review_session_template: str = Field(
-        "",
-        title="ReviewSession name template",
-    )
-    cycle_enabled: bool = Field(
-        False,
-        title="Run automatically every day",
-        section="Automated execution",
-    )
-    cycle_hour_start: str = Field(
-        "00:00:00",
-        title="Create daily review session at",
-        description="This may take affect on next day",
-        widget="time",
-        regex="(?:[01]\d|2[0123]):(?:[012345]\d):(?:[012345]\d)",
-    )
-    role_list: list[str] = Field(
-        section="---",
-        title=ROLES_TITLE,
-        default_factory=list,
-    )
+# class CreateDailyReviewSession(BaseSettingsModel):
+#     _isGroup = True
+#     enabled: bool = True
+#     review_session_template: str = Field(
+#         "",
+#         title="ReviewSession name template",
+#     )
+#     cycle_enabled: bool = Field(
+#         False,
+#         title="Run automatically every day",
+#         section="Automated execution",
+#     )
+#     cycle_hour_start: str = Field(
+#         "00:00:00",
+#         title="Create daily review session at",
+#         description="This may take affect on next day",
+#         widget="time",
+#         regex="(?:[01]\d|2[0123]):(?:[012345]\d):(?:[012345]\d)",
+#     )
+#     role_list: list[str] = Field(
+#         section="---",
+#         title=ROLES_TITLE,
+#         default_factory=list,
+#     )
 
 
 def custom_attribute_type():
@@ -330,10 +330,10 @@ class FtrackServiceHandlers(BaseSettingsModel):
         title="Action to transfer hierarchical attribute values",
         default_factory=TransferHierNonHierAttrsAction,
     )
-    create_daily_review_session: CreateDailyReviewSession = Field(
-        title="Create daily review session",
-        default_factory=CreateDailyReviewSession,
-    )
+    # create_daily_review_session: CreateDailyReviewSession = Field(
+    #     title="Create daily review session",
+    #     default_factory=CreateDailyReviewSession,
+    # )
     create_daily_lists: CreateDailyListsModel = Field(
         title="Create daily lists",
         default_factory=CreateDailyListsModel,
@@ -439,16 +439,16 @@ DEFAULT_SERVICE_HANDLERS_SETTINGS = {
             "Project manager"
         ]
     },
-    "create_daily_review_session": {
-        "enabled": True,
-        "role_list": [
-            "Administrator",
-            "Project Manager"
-        ],
-        "cycle_enabled": False,
-        "cycle_hour_start": "00:00:00",
-        "review_session_template": "{yy}{mm}{dd}"
-    },
+    # "create_daily_review_session": {
+    #     "enabled": True,
+    #     "role_list": [
+    #         "Administrator",
+    #         "Project Manager"
+    #     ],
+    #     "cycle_enabled": False,
+    #     "cycle_hour_start": "00:00:00",
+    #     "review_session_template": "{yy}{mm}{dd}"
+    # },
     "create_daily_lists": {
         "enabled": False,
         "role_list": [
