@@ -147,24 +147,134 @@ class TransferHierNonHierAttrsAction(BaseSettingsModel):
     )
 
 
-class CreateDailyReviewSession(BaseSettingsModel):
-    _isGroup = True
-    enabled: bool = True
-    review_session_template: str = Field(
-        "",
-        title="ReviewSession name template",
+# class CreateDailyReviewSession(BaseSettingsModel):
+#     _isGroup = True
+#     enabled: bool = True
+#     review_session_template: str = Field(
+#         "",
+#         title="ReviewSession name template",
+#     )
+#     cycle_enabled: bool = Field(
+#         False,
+#         title="Run automatically every day",
+#         section="Automated execution",
+#     )
+#     cycle_hour_start: str = Field(
+#         "00:00:00",
+#         title="Create daily review session at",
+#         description="This may take affect on next day",
+#         widget="time",
+#         regex="(?:[01]\d|2[0123]):(?:[012345]\d):(?:[012345]\d)",
+#     )
+#     role_list: list[str] = Field(
+#         section="---",
+#         title=ROLES_TITLE,
+#         default_factory=list,
+#     )
+
+
+def custom_attribute_type():
+    return [
+        {"value": "bool_value", "label": "Boolean"},
+        {"value": "str_value", "label": "String"},
+        {"value": "int_value", "label": "Integer"},
+        {"value": "float_value", "label": "Float"},
+        {"value": "enum_value", "label": "Enumerator"},
+    ]
+
+
+class DailyListCustomAttributesModel(BaseSettingsModel):
+    _layout = "expanded"
+    attr_name: str = Field("", title="Attribute name")
+    attr_type: str = Field(
+        "bool_value",
+        title="Attribute type",
+        enum_resolver=custom_attribute_type,
+        conditionalEnum=True,
+    )
+    bool_value: bool = Field(True, title="Expected value")
+    str_value: str = Field("", title="Expected value")
+    int_value: int = Field(0, title="Expected value")
+    float_value: float = Field(0.0, title="Expected value")
+    enum_value: list[str] = Field(
+        title="Expected value",
+        default_factory=list,
+    )
+
+
+class DailyListFilterModel(BaseSettingsModel):
+    _layout = "expanded"
+    statuses: list[str] = Field(
+        title="Statuses",
+        default_factory=list,
+    )
+    custom_attributes: list[DailyListCustomAttributesModel] = Field(
+        title="Custom attributes",
+        default_factory=list,
+    )
+
+
+class DailyListItemModel(BaseSettingsModel):
+    """Create list with AssetVersions by filter criteria."""
+
+    _layout = "expanded"
+    name_template: str = Field("{yy}{mm}{dd}", title="Name template")
+    category: str = Field(
+        "Dailies",
+        title="List category",
+        enum_resolver=lambda: ["Default", "Clients", "Dailies"],
     )
     cycle_enabled: bool = Field(
         False,
-        title="Run automatically every day",
-        section="Automated execution",
+        title="Run automatically",
     )
+    filters: list[DailyListFilterModel] = Field(
+        title="Asset version filters",
+        default_factory=list,
+    )
+
+
+def week_days():
+    return [
+        {"label": "Monday", "value": "monday"},
+        {"label": "Tuesday", "value": "tuesday"},
+        {"label": "Wednesday", "value": "wednesday"},
+        {"label": "Thursday", "value": "thursday"},
+        {"label": "Friday", "value": "friday"},
+        {"label": "Saturday", "value": "saturday"},
+        {"label": "Sunday", "value": "sunday"},
+    ]
+
+
+def default_week_days():
+    return [
+        "monday", "tuesday", "wednesday", "thursday", "friday"
+    ]
+
+
+class CreateDailyListsModel(BaseSettingsModel):
+    """Create list with AssetVersions by filter criteria."""
+
+    _isGroup = True
+    enabled: bool = True
     cycle_hour_start: str = Field(
         "00:00:00",
-        title="Create daily review session at",
+        title="Create daily lists at",
         description="This may take affect on next day",
         widget="time",
         regex="(?:[01]\d|2[0123]):(?:[012345]\d):(?:[012345]\d)",
+        section="Automated execution",
+        scope=["studio"],
+    )
+    cycle_days: list[str] = Field(
+        title="Days of week",
+        default_factory=default_week_days,
+        enum_resolver=week_days,
+        scope=["studio"],
+    )
+    lists: list[DailyListItemModel] = Field(
+        title="Lists",
+        default_factory=list,
     )
     role_list: list[str] = Field(
         section="---",
@@ -220,9 +330,13 @@ class FtrackServiceHandlers(BaseSettingsModel):
         title="Action to transfer hierarchical attribute values",
         default_factory=TransferHierNonHierAttrsAction,
     )
-    create_daily_review_session: CreateDailyReviewSession = Field(
-        title="Create daily review session",
-        default_factory=CreateDailyReviewSession,
+    # create_daily_review_session: CreateDailyReviewSession = Field(
+    #     title="Create daily review session",
+    #     default_factory=CreateDailyReviewSession,
+    # )
+    create_daily_lists: CreateDailyListsModel = Field(
+        title="Create daily lists",
+        default_factory=CreateDailyListsModel,
     )
 
 
@@ -325,14 +439,44 @@ DEFAULT_SERVICE_HANDLERS_SETTINGS = {
             "Project manager"
         ]
     },
-    "create_daily_review_session": {
-        "enabled": True,
+    # "create_daily_review_session": {
+    #     "enabled": True,
+    #     "role_list": [
+    #         "Administrator",
+    #         "Project Manager"
+    #     ],
+    #     "cycle_enabled": False,
+    #     "cycle_hour_start": "00:00:00",
+    #     "review_session_template": "{yy}{mm}{dd}"
+    # },
+    "create_daily_lists": {
+        "enabled": False,
         "role_list": [
             "Administrator",
             "Project Manager"
         ],
-        "cycle_enabled": False,
         "cycle_hour_start": "00:00:00",
-        "review_session_template": "{yy}{mm}{dd}"
+        "cycle_days": [
+            "monday",
+            "tuesday",
+            "wednesday",
+            "thursday",
+            "friday"
+        ],
+        "lists": [
+            {
+                "name_template": "{yy}{mm}{dd}",
+                "category": "Dailies",
+                "cycle_enabled": True,
+                "filters": [
+                    {
+                        "statuses": [
+                            "Approved"
+                        ],
+                        "custom_attributes": []
+                    }
+                ]
+            }
+        ],
     },
 }
