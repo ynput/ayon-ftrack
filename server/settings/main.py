@@ -47,10 +47,10 @@ class PostLaunchHookMapping(BaseSettingsModel):
 class PostLaunchHookSettings(BaseSettingsModel):
     """Change task status on application launch.
 
-    Changeo of status is based on mapping. Each item in mapping define new
-    status which is used based on current status/es. Special value for current
-    statuses is '__any__', in that case the new status is always used. And if
-    new status name is '__ignore__', the change of status is skipped if current
+    Change of status is based on mapping. Each item in mapping defines new
+    status which is used based on current status(es). Special value for current
+    statuses is `__any__`, in that case the new status is always used. And if
+    new status name is `__ignore__`, the change of status is skipped if current
     status is in current statuses list.
     """
 
