@@ -530,7 +530,11 @@ class IntegrateFtrackInstance(plugin.FtrackPublishInstancePlugin):
     def _prepare_component_metadata(
         self, instance, repre, component_path, is_review=None
     ):
-        """
+        """Return representation file metadata, like width, height, fps.
+
+        This will only return any data for file formats matching a known
+        video or image extension and may pass with only a warning if it
+        was unable to retrieve the metadata from the image of video file.
 
         Args:
             instance (pyblish.api.Instance): Pyblish instance.
