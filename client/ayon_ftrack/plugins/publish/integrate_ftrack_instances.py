@@ -10,7 +10,7 @@ from openpype.lib.transcoding import (
     convert_ffprobe_fps_to_float,
 )
 from openpype.lib.profiles_filtering import filter_profiles
-from openpype.lib.transcoding import VIDEO_EXTENSIONS
+from openpype.lib.transcoding import VIDEO_EXTENSIONS, IMAGE_EXTENSIONS
 
 from ayon_ftrack.pipeline import plugin
 
@@ -530,11 +530,27 @@ class IntegrateFtrackInstance(plugin.FtrackPublishInstancePlugin):
     def _prepare_component_metadata(
         self, instance, repre, component_path, is_review=None
     ):
+        """
+
+        Args:
+            instance (pyblish.api.Instance): Pyblish instance.
+            repre (dict[str, Any]): Representation.
+            component_path (str): Path to a representation file.
+            is_review (Optional[bool]): Component is a review component.
+
+        Returns:
+            dict[str, Any]: Component metadata.
+        """
+
         if self._is_repre_video(repre):
             return self._prepare_video_component_metadata(
                 instance, repre, component_path, is_review
             )
-        return self._prepare_image_component_metadata(repre, component_path)
+        if self._is_repre_image(repre):
+            return self._prepare_image_component_metadata(
+                repre, component_path
+            )
+        return {}
 
     def _prepare_video_component_metadata(
         self, instance, repre, component_path, is_review=None
@@ -702,3 +718,7 @@ class IntegrateFtrackInstance(plugin.FtrackPublishInstancePlugin):
     def _is_repre_video(self, repre):
         repre_ext = ".{}".format(repre["ext"])
         return repre_ext in VIDEO_EXTENSIONS
+
+    def _is_repre_image(self, repre):
+        repre_ext = ".{}".format(repre["ext"])
+        return repre_ext in IMAGE_EXTENSIONS
