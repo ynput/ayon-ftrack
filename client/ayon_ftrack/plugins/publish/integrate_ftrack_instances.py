@@ -575,10 +575,10 @@ class IntegrateFtrackInstance(plugin.FtrackPublishInstancePlugin):
             for stream in streams
             if stream["codec_type"] == "video"
         ]
-        # Skip if there are not video streams
+        # Skip if there are no video streams
         #   - exr is special case which can have issues with reading through
-        #       ffmpegh but we want to set fps for it
-        if not video_streams and extension not in [".exr"]:
+        #       ffmpeg, but we want to set fps for it
+        if not video_streams and extension != ".exr":
             return metadata
 
         stream_width = None
