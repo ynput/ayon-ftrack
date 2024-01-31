@@ -100,10 +100,8 @@ class CreateFolders(LocalAction):
         project_name = project_entity["full_name"]
         project_code = project_entity["name"]
 
-        task_entities = []
-        other_entities = []
-        self.get_all_entities(
-            session, entities, task_entities, other_entities
+        task_entities, other_entities = self.get_all_entities(
+            session, entities
         )
         hierarchy = self.get_entities_hierarchy(
             session, task_entities, other_entities
@@ -204,40 +202,72 @@ class CreateFolders(LocalAction):
             "message": "Successfully created project folders."
         }
 
-    def get_all_entities(
-        self, session, entities, task_entities, other_entities
-    ):
-        if not entities:
-            return
+    def get_all_entities(self, session, entities):
+        """
 
-        no_task_entities = []
-        for entity in entities:
-            if entity.entity_type.lower() == "task":
-                task_entities.append(entity)
-            else:
-                no_task_entities.append(entity)
+        Args:
+            session (ftrack_api.session.Session): Ftrack session.
+            entities (list[ftrack_api.entity.base.Entity]): List of entities.
 
-        if not no_task_entities:
-            return task_entities
+        Returns:
+            tuple[list, list]: Tuple where first item is list of task entities
+                and second item is list of entities that are not task
+                entities. All are entities that were passed in and
+                their children.
+        """
 
-        other_entities.extend(no_task_entities)
+        task_entities = []
+        other_entities = []
 
-        no_task_entity_ids = {entity["id"] for entity in no_task_entities}
-        next_entities = session.query(
-            (
-                "select id, parent_id"
-                " from TypedContext where parent_id in ({})"
-            ).format(self.join_query_keys(no_task_entity_ids))
-        ).all()
+        query_queue = collections.deque()
+        query_queue.append(entities)
+        while query_queue:
+            entities = query_queue.popleft()
+            if not entities:
+                continue
 
-        self.get_all_entities(
-            session, next_entities, task_entities, other_entities
-        )
+            no_task_entities = []
+            for entity in entities:
+                if entity.entity_type.lower() == "task":
+                    task_entities.append(entity)
+                else:
+                    no_task_entities.append(entity)
+
+            if not no_task_entities:
+                continue
+
+            other_entities.extend(no_task_entities)
+
+            no_task_entity_ids = {entity["id"] for entity in no_task_entities}
+            next_entities = session.query(
+                (
+                    "select id, parent_id"
+                    " from TypedContext where parent_id in ({})"
+                ).format(self.join_query_keys(no_task_entity_ids))
+            ).all()
+            query_queue.append(next_entities)
+        return task_entities, other_entities
 
     def get_entities_hierarchy(self, session, task_entities, other_entities):
+        """
+
+        Args:
+            session (ftrack_api.session.Session): Ftrack session.
+            task_entities (list[ftrack_api.entity.base.Entity]): List of task
+                entities.
+            other_entities (list[ftrack_api.entity.base.Entity]): List of
+                entities that are not task entities.
+
+        Returns:
+            list[tuple[ftrack_api.entity.base.Entity, list]]: List of tuples
+                where first item is parent entity and second item is list of
+                task entities that are children of parent entity.
+        """
+
+        output = []
         task_entity_ids = {entity["id"] for entity in task_entities}
         if not task_entity_ids:
-            return []
+            return output
 
         full_task_entities = session.query(
             (
@@ -250,7 +280,6 @@ class CreateFolders(LocalAction):
             parent_id = entity["parent_id"]
             task_entities_by_parent_id[parent_id].append(entity)
 
-        output = []
         if not task_entities_by_parent_id:
             return output
 
