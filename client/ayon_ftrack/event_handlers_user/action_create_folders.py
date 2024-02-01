@@ -283,17 +283,26 @@ class CreateFolders(LocalAction):
         if not task_entities_by_parent_id:
             return output
 
-        other_ids = {entity["id"] for entity in other_entities}
-        other_ids |= set(task_entities_by_parent_id.keys())
+        parent_ids = set(task_entities_by_parent_id.keys())
 
-        parent_entities = session.query(
-            (
-                "select id, name from TypedContext where id in ({})"
-            ).format(self.join_query_keys(other_ids))
-        ).all()
+        other_entities_by_id = {
+            entity["id"]: entity
+            for entity in other_entities
+        }
+        parent_ids -= set(other_entities_by_id.keys())
 
-        for parent_entity in parent_entities:
-            parent_id = parent_entity["id"]
+        if parent_ids:
+            parent_entities = session.query(
+                (
+                    "select id, name from TypedContext where id in ({})"
+                ).format(self.join_query_keys(parent_ids))
+            ).all()
+            other_entities_by_id.update({
+                entity["id"]: entity
+                for entity in parent_entities
+            })
+
+        for parent_id, parent_entity in other_entities_by_id.items():
             output.append((
                 parent_entity,
                 task_entities_by_parent_id[parent_id]
