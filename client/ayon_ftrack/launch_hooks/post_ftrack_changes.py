@@ -114,24 +114,27 @@ class PostFtrackHook(PostLaunchHook):
             )
             return
 
-        actual_status = entity["status"]["name"].lower()
+        current_status = entity["status"]["name"].lower()
         already_tested = set()
         ent_path = "/".join(
             [ent["name"] for ent in entity["link"]]
         )
+
+        statuses = session.query(f"select id, name from Status").all()
+        statuses_by_low_name = {
+            status["name"].lower(): status
+            for status in statuses
+        }
         # TODO refactor
         while True:
             next_status_name = None
             for item in status_mapping:
-                new_status = item["name"]
+                new_status = item["name"].lower()
                 if new_status in already_tested:
                     continue
 
-                from_statuses = item["value"]
-                if (
-                    actual_status in from_statuses
-                    or "__any__" in from_statuses
-                ):
+                from_statuses = item["value"].lower()
+                if from_statuses in (current_status, "__any__"):
                     if new_status != "__ignore__":
                         next_status_name = new_status
                         already_tested.add(new_status)
@@ -141,9 +144,7 @@ class PostFtrackHook(PostLaunchHook):
             if next_status_name is None:
                 break
 
-            status = session.query(
-                f"Status where name is \"{next_status_name}\""
-            ).first()
+            status = statuses_by_low_name.get(next_status_name)
             if status is None:
                 self.log.warning(
                     f"Status '{next_status_name}' not found in ftrack."
