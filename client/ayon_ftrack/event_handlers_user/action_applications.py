@@ -24,7 +24,10 @@ class AppplicationsAction(BaseAction):
     identifier = "ayon_app"
     _launch_identifier_with_id = None
 
-    icon_url = os.environ.get("OPENPYPE_STATICS_SERVER")
+    icon_url = (
+        os.environ.get("AYON_STATICS_SERVER")
+        or os.environ.get("OPENPYPE_STATICS_SERVER")
+    )
     # 30 seconds
     cache_lifetime = 30
 
