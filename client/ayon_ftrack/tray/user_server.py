@@ -233,7 +233,7 @@ class SocketSession(CustomEventHubSession):
 class SocketThread(threading.Thread):
     """Thread that checks suprocess of storer of processor of events"""
 
-    MAX_TIMEOUT = int(os.environ.get("OPENPYPE_FTRACK_SOCKET_TIMEOUT", 45))
+    MAX_TIMEOUT = 45
 
     def __init__(self, name, port, filepath, additional_args=None):
         super(SocketThread, self).__init__()
