@@ -231,9 +231,9 @@ class SocketSession(CustomEventHubSession):
 
 
 class SocketThread(threading.Thread):
-    """Thread that checks suprocess of storer of processor of events"""
+    """Thread that checks subprocess of storer of processor of events"""
 
-    MAX_TIMEOUT = int(os.environ.get("OPENPYPE_FTRACK_SOCKET_TIMEOUT", 45))
+    MAX_TIMEOUT = 45
 
     def __init__(self, name, port, filepath, additional_args=None):
         super(SocketThread, self).__init__()
@@ -278,7 +278,6 @@ class SocketThread(threading.Thread):
         )
 
         env = os.environ.copy()
-        env["OPENPYPE_PROCESS_MONGO_ID"] = str(Logger.mongo_process_id)
         # OpenPype executable (with path to start script if not build)
         args = get_openpype_execute_args(
             # Add `run` command
