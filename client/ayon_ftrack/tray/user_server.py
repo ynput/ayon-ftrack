@@ -231,7 +231,7 @@ class SocketSession(CustomEventHubSession):
 
 
 class SocketThread(threading.Thread):
-    """Thread that checks suprocess of storer of processor of events"""
+    """Thread that checks subprocess of storer of processor of events"""
 
     MAX_TIMEOUT = 45
 
