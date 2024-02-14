@@ -113,13 +113,13 @@ class FtrackAddon(
         # Set new PYTHONPATH to launch context environments
         env["PYTHONPATH"] = os.pathsep.join(python_paths)
 
-    def connect_with_modules(self, enabled_modules):
-        for module in enabled_modules:
-            if not hasattr(module, "get_ftrack_event_handler_paths"):
+    def connect_with_addons(self, enabled_addons):
+        for addon in enabled_addons:
+            if not hasattr(addon, "get_ftrack_event_handler_paths"):
                 continue
 
             try:
-                paths_by_type = module.get_ftrack_event_handler_paths()
+                paths_by_type = addon.get_ftrack_event_handler_paths()
             except Exception:
                 continue
 
@@ -143,6 +143,9 @@ class FtrackAddon(
 
                 if key == "user":
                     self.user_event_handlers_paths.extend(value)
+
+    def connect_with_modules(self, enabled_modules):
+        self.connect_with_addons(enabled_modules)
 
     def create_ftrack_session(self, **session_kwargs):
         import ftrack_api
@@ -283,6 +286,6 @@ def resolve_ftrack_url(url, logger=None):
     return ftrack_url
 
 
-@click.group(FtrackAddon.name, help="Ftrack module related commands.")
+@click.group(FtrackAddon.name, help="Ftrack addon related commands.")
 def cli_main():
     pass
