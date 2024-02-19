@@ -133,7 +133,7 @@ class PostFtrackHook(PostLaunchHook):
                 if new_status in already_tested:
                     continue
 
-                from_statuses = item["value"].lower()
+                from_statuses = [s.lower() for s in item["value"]]
                 if from_statuses in (current_status, "__any__"):
                     if new_status != "__ignore__":
                         next_status_name = new_status
