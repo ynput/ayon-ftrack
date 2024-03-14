@@ -132,6 +132,10 @@ class CreateDailyReviewSessionServerAction(ServerAction):
         self._check_review_session()
 
     def _timer_callback(self):
+        # Stop chorno callback if session is closed
+        if self.session.closed:
+            return
+
         if (
             self._cycle_timer is not None
             and self._last_cyle_time is not None
