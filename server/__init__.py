@@ -5,7 +5,6 @@ from ayon_server.addons import BaseServerAddon, AddonLibrary
 from ayon_server.lib.postgres import Postgres
 
 from .settings import FtrackSettings, DEFAULT_VALUES
-from .version import __version__
 from .constants import (
     FTRACK_ID_ATTRIB,
     FTRACK_PATH_ATTRIB,
@@ -13,14 +12,7 @@ from .constants import (
 
 
 class FtrackAddon(BaseServerAddon):
-    name = "ftrack"
-    title = "Ftrack"
-    version = __version__
     settings_model: Type[FtrackSettings] = FtrackSettings
-    services = {
-        "leecher": {"image": f"ynput/ayon-ftrack-leecher:{__version__}"},
-        "processor": {"image": f"ynput/ayon-ftrack-processor:{__version__}"}
-    }
 
     async def get_default_settings(self):
         settings_model_cls = self.get_settings_model()
