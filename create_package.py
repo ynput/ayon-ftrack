@@ -31,15 +31,22 @@ import collections
 import zipfile
 from typing import Optional, Any, Pattern
 
-ADDON_NAME: str = "ftrack"
-ADDON_CLIENT_NAME: str = "ayon_ftrack"
+import package
+
+ADDON_NAME: str = package.name
+ADDON_VERSION: str = package.version
+ADDON_CLIENT_DIR: str = package.client_dir
+
+CLIENT_VERSION_CONTENT = '''# -*- coding: utf-8 -*-
+"""Package declaring {} addon version."""
+__version__ = "{}"
+'''
 
 CURRENT_DIR: str = os.path.dirname(os.path.abspath(__file__))
-VERSION_PATH: str = os.path.join(CURRENT_DIR, "version.py")
 SERVER_DIR: str = os.path.join(CURRENT_DIR, "server")
 CLIENT_DIR: str = os.path.join(CURRENT_DIR, "client")
 
-COMMON_DIR: str = os.path.join(CLIENT_DIR, ADDON_CLIENT_NAME, "common")
+COMMON_DIR: str = os.path.join(CLIENT_DIR, ADDON_CLIENT_DIR, "common")
 
 # Patterns of directories to be skipped for server part of addon
 IGNORE_DIR_PATTERNS: list[Pattern] = [
@@ -168,48 +175,45 @@ def copy_server_content(
 
     log.info("Copying server content")
 
-    server_dir: str = os.path.join(current_dir, "server")
-
     filepaths_to_copy: list[tuple[str, str]] = []
 
-    for path, sub_path in find_files_in_subdir(server_dir):
+    for path, sub_path in find_files_in_subdir(SERVER_DIR):
         filepaths_to_copy.append(
-            (path, os.path.join(addon_output_dir, sub_path))
+            (path, os.path.join("server", sub_path))
+        )
+
+    public_dir = os.path.join(current_dir, "public")
+    for path, sub_path in find_files_in_subdir(public_dir):
+        filepaths_to_copy.append(
+            (path, os.path.join("public", sub_path))
         )
 
     filepaths_to_copy.extend([
-        # Make sure 'version.py' has same content
-        (
-            VERSION_PATH,
-            os.path.join(addon_output_dir, "version.py")
-        ),
         # Copy constants needed for attributes creation
         (
             os.path.join(COMMON_DIR, "constants.py"),
-            os.path.join(addon_output_dir, "constants.py")
+            os.path.join("server", "constants.py")
         ),
+        (
+            os.path.join(current_dir, "package.py"),
+            os.path.join(addon_output_dir, "package.py")
+        )
     ])
 
     # Copy files
     for src_path, dst_path in filepaths_to_copy:
-        safe_copy_file(src_path, dst_path)
+        safe_copy_file(
+            src_path,
+            os.path.join(addon_output_dir, dst_path)
+        )
 
 
 def _get_client_files_mapping(current_dir: str):
-    client_code = os.path.join(CLIENT_DIR, ADDON_CLIENT_NAME)
-    output = [
-        (src, os.path.join(ADDON_CLIENT_NAME, dst))
+    client_code = os.path.join(CLIENT_DIR, ADDON_CLIENT_DIR)
+    return [
+        (src, os.path.join(ADDON_CLIENT_DIR, dst))
         for src, dst in find_files_in_subdir(client_code)
-        if dst != "version.py"
     ]
-    # Make sure 'version.py' has same content
-    output.append(
-        (
-            VERSION_PATH,
-            os.path.join(ADDON_CLIENT_NAME, "version.py")
-        )
-    )
-    return output
 
 
 def zip_client_side(
@@ -270,28 +274,21 @@ def create_server_package(
     output_path = os.path.join(
         output_dir, f"{ADDON_NAME}-{addon_version}.zip"
     )
-    manifest_data: dict[str, str] = {
-        "addon_name": ADDON_NAME,
-        "addon_version": addon_version
-    }
     with ZipFileLongPaths(output_path, "w", zipfile.ZIP_DEFLATED) as zipf:
-        # Write a manifest to zip
-        zipf.writestr("manifest.json", json.dumps(manifest_data, indent=4))
-
         # Move addon content to zip into 'addon' directory
         addon_output_dir_offset = len(addon_output_dir) + 1
         for root, _, filenames in os.walk(addon_output_dir):
             if not filenames:
                 continue
 
-            dst_root = "addon"
+            dst_root = None
             if root != addon_output_dir:
-                dst_root = os.path.join(
-                    dst_root, root[addon_output_dir_offset:]
-                )
+                dst_root = root[addon_output_dir_offset:]
             for filename in filenames:
                 src_path = os.path.join(root, filename)
-                dst_path = os.path.join(dst_root, filename)
+                dst_path = filename
+                if dst_root:
+                    dst_path = os.path.join(dst_root, dst_path)
                 zipf.write(src_path, dst_path)
 
     log.info(f"Output package can be found: {output_path}")
@@ -333,6 +330,13 @@ def main(
     if not output_dir:
         output_dir = os.path.join(current_dir, "package")
 
+    # Update client version file with version from 'package.py'
+    client_version_file = os.path.join(
+        current_dir, "client", ADDON_CLIENT_DIR, "version.py"
+    )
+    with open(client_version_file, "w") as stream:
+        stream.write(CLIENT_VERSION_CONTENT.format(ADDON_NAME, ADDON_VERSION))
+
     if only_client:
         log.info("Creating client folder")
         if not output_dir:
@@ -346,18 +350,13 @@ def main(
 
     log.info("Start creating package")
 
-    version_content: dict[str, Any] = {}
-    with open(VERSION_PATH, "r") as stream:
-        exec(stream.read(), version_content)
-    addon_version: str = version_content["__version__"]
-
     addon_output_root: str = os.path.join(output_dir, ADDON_NAME)
     if os.path.isdir(addon_output_root):
         log.info(f"Purging {addon_output_root}")
         shutil.rmtree(addon_output_root)
 
-    log.info(f"Preparing package for {ADDON_NAME}-{addon_version}")
-    addon_output_dir: str = os.path.join(addon_output_root, addon_version)
+    log.info(f"Preparing package for {ADDON_NAME}-{ADDON_VERSION}")
+    addon_output_dir: str = os.path.join(addon_output_root, ADDON_VERSION)
     if not os.path.exists(addon_output_dir):
         os.makedirs(addon_output_dir)
 
@@ -368,7 +367,7 @@ def main(
     # Skip server zipping
     if not skip_zip:
         create_server_package(
-            output_dir, addon_output_dir, addon_version, log
+            output_dir, addon_output_dir, ADDON_VERSION, log
         )
         # Remove sources only if zip file is created
         if not keep_sources:

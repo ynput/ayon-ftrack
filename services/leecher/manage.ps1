@@ -10,7 +10,7 @@ $script_dir = (Get-Item $script_dir_rel).FullName
 
 $BASE_NAME = "ayon-ftrack-leecher"
 $IMAGE_NAME = "ynput/$($BASE_NAME)"
-$ADDON_VERSION = Invoke-Expression -Command "python -c ""import os;import sys;content={};f=open(r'$($script_dir)/../../version.py');exec(f.read(),content);f.close();print(content['__version__'])"""
+$ADDON_VERSION = Invoke-Expression -Command "python -c ""import os;import sys;content={};f=open(r'$($script_dir)/../../package.py');exec(f.read(),content);f.close();print(content['version'])"""
 $IMAGE_FULL_NAME = "$($IMAGE_NAME):$($ADDON_VERSION)"
 $BASH_CONTAINER_NAME = "$($BASE_NAME)-bash-$($ADDON_VERSION)"
 
