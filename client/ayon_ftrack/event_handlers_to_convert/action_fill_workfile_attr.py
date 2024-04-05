@@ -6,11 +6,12 @@ import tempfile
 import datetime
 
 import ftrack_api
-
-from ayon_core.client import (
+from ayon_api import (
     get_project,
-    get_assets,
+    get_folders,
+    get_tasks,
 )
+
 from ayon_core.settings import get_project_settings
 from ayon_core.lib import StringTemplate
 from ayon_core.pipeline import Anatomy
@@ -53,13 +54,13 @@ class FillWorkfileAttributeAction(LocalAction):
 
     def launch(self, session, entities, event):
         # Separate entities and get project entity
-        project_entity = None
+        ft_project_entity = None
         for entity in entities:
-            if project_entity is None:
-                project_entity = self.get_project_from_entity(entity)
+            if ft_project_entity is None:
+                ft_project_entity = self.get_project_from_entity(entity)
                 break
 
-        if not project_entity:
+        if not ft_project_entity:
             return {
                 "message": (
                     "Couldn't find project entity."
@@ -70,7 +71,7 @@ class FillWorkfileAttributeAction(LocalAction):
 
         # Get project settings and check if custom attribute where workfile
         #   should be set is defined.
-        project_name = project_entity["full_name"]
+        project_name = ft_project_entity["full_name"]
         project_settings = get_project_settings(project_name)
         custom_attribute_key = (
             project_settings
@@ -132,7 +133,7 @@ class FillWorkfileAttributeAction(LocalAction):
                 session,
                 entities,
                 job_entity,
-                project_entity,
+                ft_project_entity,
                 project_settings,
                 attr_conf,
                 report
@@ -225,12 +226,12 @@ class FillWorkfileAttributeAction(LocalAction):
         session,
         entities,
         job_entity,
-        project_entity,
+        ft_project_entity,
         project_settings,
         attr_conf,
         report
     ):
-        task_entities = []
+        ft_task_entities = []
         other_entities = []
         project_selected = False
         for entity in entities:
@@ -240,31 +241,49 @@ class FillWorkfileAttributeAction(LocalAction):
                 break
 
             elif ent_type_low == "task":
-                task_entities.append(entity)
+                ft_task_entities.append(entity)
             else:
                 other_entities.append(entity)
 
-        project_name = project_entity["full_name"]
+        project_name = ft_project_entity["full_name"]
 
         # Find matchin asset documents and map them by ftrack task entities
-        # - result stored to 'asset_docs_with_task_entities' is list with
-        #   tuple `(asset document, [task entitis, ...])`
-        # Quety all asset documents
-        asset_docs = list(get_assets(project_name))
+        # - result stored to 'folder_entities_with_ft_task_entities' is list
+        #   with a tuple `(folder entity, [ftrack task entitis, ...])`
+        # Fetch all folder and task entities
+        folder_entities = list(get_folders(
+            project_name, fields={"id", "folderType", "path", "attrib"}
+        ))
+        task_entities_by_folder_id = collections.defaultdict(list)
+        for task_entity in get_tasks(
+            project_name, fields={"id", "taskType", "name", "folderId"}
+        ):
+            folder_id = task_entity["folderId"]
+            task_entities_by_folder_id[folder_id].append(task_entity)
+
         job_entity["data"] = json.dumps({
-            "description": "(1/3) Asset documents queried."
+            "description": "(1/3) Folder & Task entities queried."
         })
         session.commit()
 
         # When project is selected then we can query whole project
         if project_selected:
-            asset_docs_with_task_entities = self._get_asset_docs_for_project(
-                session, project_entity, asset_docs, report
+            folder_entities_with_ft_task_entities = self._get_asset_docs_for_project(
+                session,
+                ft_project_entity,
+                folder_entities,
+                task_entities_by_folder_id,
+                report
             )
 
         else:
-            asset_docs_with_task_entities = self._get_tasks_for_selection(
-                session, other_entities, task_entities, asset_docs, report
+            folder_entities_with_ft_task_entities = self._get_tasks_for_selection(
+                session,
+                other_entities,
+                ft_task_entities,
+                folder_entities,
+                task_entities_by_folder_id,
+                report
             )
 
         job_entity["data"] = json.dumps({
@@ -275,18 +294,42 @@ class FillWorkfileAttributeAction(LocalAction):
         # Keep placeholders in the template unfilled
         host_name = "{app}"
         extension = "{ext}"
-        project_doc = get_project(project_name)
+        project_entity = get_project(project_name)
         project_settings = get_project_settings(project_name)
         anatomy = Anatomy(project_name)
         templates_by_key = {}
 
         operations = []
-        for asset_doc, task_entities in asset_docs_with_task_entities:
-            for task_entity in task_entities:
+        for folder_entity, ft_task_entities in folder_entities_with_ft_task_entities:
+            folder_id = folder_entity["id"]
+            folder_path = folder_entity["path"]
+            task_entities_by_name = {
+                task_entity["name"]: task_entity
+                for task_entity in task_entities_by_folder_id[folder_id]
+            }
+            task_entities_by_low_name = {
+                name.lower(): task_entity
+                for name, task_entity in task_entities_by_name.items()
+            }
+            for ft_task_entity in ft_task_entities:
+                task_name = ft_task_entity["name"]
+                task_entity = task_entities_by_name.get(task_name)
+                if not task_entity:
+                    task_entity = task_entities_by_low_name.get(
+                        task_name.lower()
+                    )
+
+                if not task_entity:
+                    self.log.warning(
+                        f"Coulnd't find task entity \"{task_name}\""
+                        f" for folder \"{folder_path}\""
+                    )
+                    continue
+
                 workfile_data = get_template_data(
-                    project_doc,
-                    asset_doc,
-                    task_entity["name"],
+                    project_entity,
+                    folder_entity,
+                    task_entity,
                     host_name,
                     project_settings
                 )
@@ -294,7 +337,7 @@ class FillWorkfileAttributeAction(LocalAction):
                 workfile_data["version"] = 1
                 workfile_data["ext"] = extension
 
-                task_type = workfile_data["task"]["type"]
+                task_type = task_entity["taskType"]
                 template_key = get_workfile_template_key(
                     task_type,
                     host_name,
@@ -316,7 +359,7 @@ class FillWorkfileAttributeAction(LocalAction):
                 else:
                     table_values = collections.OrderedDict((
                         ("configuration_id", attr_conf["id"]),
-                        ("entity_id", task_entity["id"])
+                        ("entity_id", ft_task_entity["id"])
                     ))
                     operations.append(
                         ftrack_api.operation.UpdateEntityOperation(
@@ -347,145 +390,151 @@ class FillWorkfileAttributeAction(LocalAction):
         return "/".join(path_items)
 
     def _get_asset_docs_for_project(
-        self, session, project_entity, asset_docs, report
+        self,
+        session,
+        ft_project_entity,
+        folder_entities,
+        task_entities_by_folder_id,
+        report,
     ):
-        asset_docs_task_names = {}
-
-        for asset_doc in asset_docs:
-            asset_data = asset_doc["data"]
-            ftrack_id = asset_data.get("ftrackId")
+        folder_entity_task_names = {}
+        for folder_entity in folder_entities:
+            ftrack_id = folder_entity["attrib"].get("ftrackId")
             if not ftrack_id:
-                hierarchy = list(asset_data.get("parents") or [])
-                hierarchy.append(asset_doc["name"])
-                path = "/".join(hierarchy)
+                path = folder_entity["path"]
                 report[NOT_SYNCHRONIZED_TITLE].append(path)
                 continue
 
-            asset_tasks = asset_data.get("tasks") or {}
-            asset_docs_task_names[ftrack_id] = (
-                asset_doc, list(asset_tasks.keys())
-            )
+            folder_id = folder_entity["id"]
+            task_names = {
+                task_entity["name"]
+                for task_entity in task_entities_by_folder_id[folder_id]
+            }
+            folder_entity_task_names[ftrack_id] = (folder_entity, task_names)
 
-        task_entities = session.query((
+        ft_task_entities = session.query((
             "select id, name, parent_id, link from Task where project_id is {}"
-        ).format(project_entity["id"])).all()
-        task_entities_by_parent_id = collections.defaultdict(list)
-        for task_entity in task_entities:
-            parent_id = task_entity["parent_id"]
-            task_entities_by_parent_id[parent_id].append(task_entity)
+        ).format(ft_project_entity["id"])).all()
+        ft_task_entities_by_parent_id = collections.defaultdict(list)
+        for ft_task_entity in ft_task_entities:
+            parent_id = ft_task_entity["parent_id"]
+            ft_task_entities_by_parent_id[parent_id].append(ft_task_entity)
 
         output = []
-        for ftrack_id, item in asset_docs_task_names.items():
-            asset_doc, task_names = item
-            valid_task_entities = []
-            for task_entity in task_entities_by_parent_id[ftrack_id]:
-                if task_entity["name"] in task_names:
-                    valid_task_entities.append(task_entity)
+        for ftrack_id, item in folder_entity_task_names.items():
+            folder_entity, task_names = item
+            valid_ft_task_entities = []
+            for ft_task_entity in ft_task_entities_by_parent_id[ftrack_id]:
+                if ft_task_entity["name"] in task_names:
+                    valid_ft_task_entities.append(ft_task_entity)
                 else:
-                    path = self._get_entity_path(task_entity)
+                    path = self._get_entity_path(ft_task_entity)
                     report[NOT_SYNCHRONIZED_TITLE].append(path)
 
-            if valid_task_entities:
-                output.append((asset_doc, valid_task_entities))
+            if valid_ft_task_entities:
+                output.append((folder_entity, valid_ft_task_entities))
 
         return output
 
     def _get_tasks_for_selection(
-        self, session, other_entities, task_entities, asset_docs, report
+        self,
+        session,
+        other_entities,
+        ft_task_entities,
+        folder_entities,
+        task_entities_by_folder_id,
+        report,
     ):
         all_tasks = object()
-        asset_docs_by_ftrack_id = {}
-        asset_docs_by_parent_id = collections.defaultdict(list)
-        for asset_doc in asset_docs:
-            asset_data = asset_doc["data"]
-            ftrack_id = asset_data.get("ftrackId")
-            parent_id = asset_data.get("visualParent")
-            asset_docs_by_parent_id[parent_id].append(asset_doc)
+        folder_entities_by_ftrack_id = {}
+        for folder_entity in folder_entities:
+            ftrack_id = folder_entity["attrib"].get("ftrackId")
             if ftrack_id:
-                asset_docs_by_ftrack_id[ftrack_id] = asset_doc
+                folder_entities_by_ftrack_id[ftrack_id] = folder_entity
 
-        missing_doc_ftrack_ids = {}
+        missing_entity_ftrack_ids = {}
         all_tasks_ids = set()
         task_names_by_ftrack_id = collections.defaultdict(list)
         for other_entity in other_entities:
             ftrack_id = other_entity["id"]
-            if ftrack_id not in asset_docs_by_ftrack_id:
-                missing_doc_ftrack_ids[ftrack_id] = None
+            if ftrack_id not in folder_entities_by_ftrack_id:
+                missing_entity_ftrack_ids[ftrack_id] = None
                 continue
             all_tasks_ids.add(ftrack_id)
             task_names_by_ftrack_id[ftrack_id] = all_tasks
 
-        for task_entity in task_entities:
-            parent_id = task_entity["parent_id"]
-            if parent_id not in asset_docs_by_ftrack_id:
-                missing_doc_ftrack_ids[parent_id] = None
+        for ft_task_entity in ft_task_entities:
+            parent_id = ft_task_entity["parent_id"]
+            if parent_id not in folder_entities_by_ftrack_id:
+                missing_entity_ftrack_ids[parent_id] = None
                 continue
 
             if all_tasks_ids not in all_tasks_ids:
-                task_names_by_ftrack_id[ftrack_id].append(task_entity["name"])
+                task_names_by_ftrack_id[ftrack_id].append(ft_task_entity["name"])
 
         ftrack_ids = set()
-        asset_doc_with_task_names_by_id = {}
+        folder_entity_with_task_names_by_id = {}
         for ftrack_id, task_names in task_names_by_ftrack_id.items():
-            asset_doc = asset_docs_by_ftrack_id[ftrack_id]
-            asset_data = asset_doc["data"]
-            asset_tasks = asset_data.get("tasks") or {}
+            folder_entity = folder_entities_by_ftrack_id[ftrack_id]
+            folder_id = folder_entity["id"]
+            folder_task_names = {
+                task_entity["name"]
+                for task_entity in task_entities_by_folder_id[folder_id]
+            }
 
             if task_names is all_tasks:
-                task_names = list(asset_tasks.keys())
+                task_names = list(folder_task_names)
             else:
                 new_task_names = []
                 for task_name in task_names:
-                    if task_name in asset_tasks:
+                    if task_name in folder_task_names:
                         new_task_names.append(task_name)
                         continue
 
-                    if ftrack_id not in missing_doc_ftrack_ids:
-                        missing_doc_ftrack_ids[ftrack_id] = []
-                    if missing_doc_ftrack_ids[ftrack_id] is not None:
-                        missing_doc_ftrack_ids[ftrack_id].append(task_name)
+                    missing_entity_ftrack_ids.setdefault(ftrack_id, [])
+                    if missing_entity_ftrack_ids[ftrack_id] is not None:
+                        missing_entity_ftrack_ids[ftrack_id].append(task_name)
 
                 task_names = new_task_names
 
             if task_names:
                 ftrack_ids.add(ftrack_id)
-                asset_doc_with_task_names_by_id[ftrack_id] = (
-                    asset_doc, task_names
+                folder_entity_with_task_names_by_id[ftrack_id] = (
+                    folder_entity, task_names
                 )
 
-        task_entities = session.query((
+        ft_task_entities = session.query((
             "select id, name, parent_id from Task where parent_id in ({})"
         ).format(self.join_query_keys(ftrack_ids))).all()
         task_entitiy_by_parent_id = collections.defaultdict(list)
-        for task_entity in task_entities:
-            parent_id = task_entity["parent_id"]
-            task_entitiy_by_parent_id[parent_id].append(task_entity)
+        for ft_task_entity in ft_task_entities:
+            parent_id = ft_task_entity["parent_id"]
+            task_entitiy_by_parent_id[parent_id].append(ft_task_entity)
 
         output = []
-        for ftrack_id, item in asset_doc_with_task_names_by_id.items():
+        for ftrack_id, item in folder_entity_with_task_names_by_id.items():
             asset_doc, task_names = item
-            valid_task_entities = []
-            for task_entity in task_entitiy_by_parent_id[ftrack_id]:
-                if task_entity["name"] in task_names:
-                    valid_task_entities.append(task_entity)
+            valid_ft_task_entities = []
+            for ft_task_entity in task_entitiy_by_parent_id[ftrack_id]:
+                if ft_task_entity["name"] in task_names:
+                    valid_ft_task_entities.append(ft_task_entity)
                 else:
-                    if ftrack_id not in missing_doc_ftrack_ids:
-                        missing_doc_ftrack_ids[ftrack_id] = []
-                    if missing_doc_ftrack_ids[ftrack_id] is not None:
-                        missing_doc_ftrack_ids[ftrack_id].append(task_name)
-            if valid_task_entities:
-                output.append((asset_doc, valid_task_entities))
+                    missing_entity_ftrack_ids.setdefault(ftrack_id, [])
+                    if missing_entity_ftrack_ids[ftrack_id] is not None:
+                        missing_entity_ftrack_ids[ftrack_id].append(task_name)
+            if valid_ft_task_entities:
+                output.append((asset_doc, valid_ft_task_entities))
 
         # Store report information about not synchronized entities
-        if missing_doc_ftrack_ids:
+        if missing_entity_ftrack_ids:
             missing_entities = session.query(
                 "select id, link from TypedContext where id in ({})".format(
-                    self.join_query_keys(missing_doc_ftrack_ids.keys())
+                    self.join_query_keys(missing_entity_ftrack_ids.keys())
                 )
             ).all()
             for missing_entity in missing_entities:
                 path = self._get_entity_path(missing_entity)
-                task_names = missing_doc_ftrack_ids[missing_entity["id"]]
+                task_names = missing_entity_ftrack_ids[missing_entity["id"]]
                 if task_names is None:
                     report[NOT_SYNCHRONIZED_TITLE].append(path)
                 else:
