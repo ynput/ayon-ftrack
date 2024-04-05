@@ -8,20 +8,13 @@ from ayon_ftrack.common import (
     is_ftrack_enabled_in_settings,
 )
 
-from openpype.settings import get_project_settings
-from openpype.lib.applications import PostLaunchHook
-try:
-    # Backwards compatibility
-    # TODO remove in next minor version bump (after 0.3.x)
-    from openpype.lib.applications import LaunchTypes
-    local_launch_type = LaunchTypes.local
-except Exception:
-    local_launch_type = "local"
+from ayon_core.settings import get_project_settings
+from ayon_applications import PostLaunchHook, LaunchTypes
 
 
 class PostFtrackHook(PostLaunchHook):
     order = None
-    launch_types = {local_launch_type}
+    launch_types = {LaunchTypes.local}
 
     def execute(self):
         project_name = self.data.get("project_name")

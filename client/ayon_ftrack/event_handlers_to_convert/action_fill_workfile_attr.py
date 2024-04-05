@@ -7,15 +7,15 @@ import datetime
 
 import ftrack_api
 
-from openpype.client import (
+from ayon_core.client import (
     get_project,
     get_assets,
 )
-from openpype.settings import get_project_settings, get_system_settings
-from openpype.lib import StringTemplate
-from openpype.pipeline import Anatomy
-from openpype.pipeline.template_data import get_template_data
-from openpype.pipeline.workfile import get_workfile_template_key
+from ayon_core.settings import get_project_settings
+from ayon_core.lib import StringTemplate
+from ayon_core.pipeline import Anatomy
+from ayon_core.pipeline.template_data import get_template_data
+from ayon_core.pipeline.workfile import get_workfile_template_key
 from ayon_ftrack.common import LocalAction, create_chunks
 from ayon_ftrack.lib import get_ftrack_icon_url
 
@@ -277,7 +277,6 @@ class FillWorkfileAttributeAction(LocalAction):
         extension = "{ext}"
         project_doc = get_project(project_name)
         project_settings = get_project_settings(project_name)
-        system_settings = get_system_settings()
         anatomy = Anatomy(project_name)
         templates_by_key = {}
 
@@ -289,7 +288,7 @@ class FillWorkfileAttributeAction(LocalAction):
                     asset_doc,
                     task_entity["name"],
                     host_name,
-                    system_settings
+                    project_settings
                 )
                 # Use version 1 for each workfile
                 workfile_data["version"] = 1

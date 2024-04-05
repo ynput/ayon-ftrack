@@ -1,6 +1,6 @@
 import re
 
-from openpype.pipeline.project_folders import (
+from ayon_core.pipeline.project_folders import (
     get_project_basic_paths,
     create_project_folders,
 )

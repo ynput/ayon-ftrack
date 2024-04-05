@@ -1,5 +1,5 @@
 import pyblish.api
-from openpype.lib import filter_profiles
+from ayon_core.lib import filter_profiles
 
 from ayon_ftrack.pipeline import plugin
 
@@ -37,8 +37,8 @@ class IntegrateFtrackFarmStatus(plugin.FtrackPublishContextPlugin):
             # Skip disabled instances
             if instance.data.get("publish") is False:
                 continue
-            subset_name = instance.data["subset"]
-            msg_start = "Skipping instance {}.".format(subset_name)
+            product_name = instance.data["productName"]
+            msg_start = "Skipping instance {}.".format(product_name)
             if not instance.data.get("farm"):
                 self.log.debug(
                     "{} Won't be rendered on farm.".format(msg_start)
@@ -58,8 +58,8 @@ class IntegrateFtrackFarmStatus(plugin.FtrackPublishContextPlugin):
     def get_instances_with_statuse_names(self, context, instances):
         instances_with_status_names = []
         for instance in instances:
-            family = instance.data["family"]
-            subset_name = instance.data["subset"]
+            product_type = instance.data["productType"]
+            product_name = instance.data["productName"]
             task_entity = instance.data["ftrackTask"]
             host_name = context.data["hostName"]
             task_name = task_entity["name"]
@@ -70,8 +70,8 @@ class IntegrateFtrackFarmStatus(plugin.FtrackPublishContextPlugin):
                     "host_names": host_name,
                     "task_types": task_type,
                     "task_names": task_name,
-                    "product_types": family,
-                    "product_names": subset_name,
+                    "product_types": product_type,
+                    "product_names": product_name,
                 },
                 logger=self.log
             )

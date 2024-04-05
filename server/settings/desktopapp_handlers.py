@@ -98,10 +98,6 @@ class FtrackDesktopAppHandlers(BaseSettingsModel):
         title="Fill workfile Custom attribute",
         default_factory=FillWorkfileAttr,
     )
-    # Removed settings
-    # - seed_project
-    # - sync_to_avalon_local
-    # - store_thubmnail_to_avalon
 
 
 DEFAULT_DESKTOP_HANDLERS_SETTINGS = {

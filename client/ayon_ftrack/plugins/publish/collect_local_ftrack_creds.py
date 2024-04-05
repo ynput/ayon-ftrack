@@ -20,7 +20,7 @@ class CollectLocalFtrackCreds(plugin.FtrackPublishContextPlugin):
             and os.getenv("FTRACK_SERVER")
         ):
             return
-        addon = context.data["openPypeModules"]["ftrack"]
+        addon = context.data["ayonAddonsManager"].get("ftrack")
         if addon.enabled:
             creds = addon.get_credentials()
             username, api_key = creds

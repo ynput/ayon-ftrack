@@ -108,6 +108,12 @@ Example:
 import json
 import arrow
 
+from ayon_core.settings import get_studio_settings
+try:
+    from ayon_applications import ApplicationManager
+except ImportError:
+    ApplicationManager = None
+
 from ayon_ftrack.common import (
     LocalAction,
 
@@ -126,9 +132,6 @@ from ayon_ftrack.common import (
     tool_definitions_from_app_manager,
 )
 from ayon_ftrack.lib import get_ftrack_icon_url
-
-from openpype.settings import get_system_settings
-from openpype.lib import ApplicationManager
 
 
 class CustAttrException(Exception):
@@ -182,7 +185,13 @@ class CustomAttributes(LocalAction):
         session.commit()
 
         # TODO how to get custom attributes from different addons?
-        self.app_manager = ApplicationManager()
+        app_manager = None
+        if ApplicationManager is not None:
+            app_manager = ApplicationManager()
+        else:
+            self.log.info("Applications addon is not available.")
+
+        self.app_manager = app_manager
 
         try:
             self.prepare_global_data(session)
@@ -227,7 +236,7 @@ class CustomAttributes(LocalAction):
 
         self.groups = {}
 
-        self.ftrack_settings = get_system_settings()["modules"]["ftrack"]
+        self.ftrack_settings = get_studio_settings()["ftrack"]
         self.attrs_settings = self.prepare_attribute_settings()
 
     def prepare_attribute_settings(self):
@@ -294,6 +303,9 @@ class CustomAttributes(LocalAction):
             self.process_attr_data(item, event)
 
     def applications_attribute(self, event):
+        if self.app_manager is None:
+            return
+
         apps_data = app_definitions_from_app_manager(self.app_manager)
 
         applications_custom_attr_data = {
@@ -310,6 +322,9 @@ class CustomAttributes(LocalAction):
         self.process_attr_data(applications_custom_attr_data, event)
 
     def tools_attribute(self, event):
+        if self.app_manager is None:
+            return
+
         tools_data = tool_definitions_from_app_manager(self.app_manager)
 
         tools_custom_attr_data = {

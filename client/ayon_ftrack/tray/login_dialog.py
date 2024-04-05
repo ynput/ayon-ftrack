@@ -1,7 +1,7 @@
 import requests
 from qtpy import QtCore, QtGui, QtWidgets
+from ayon_core import style, resources
 
-from openpype import style, resources
 from ayon_ftrack.lib import credentials
 
 from . import login_tools
@@ -25,7 +25,7 @@ class CredentialsDialog(QtWidgets.QDialog):
         self._is_logged = False
         self._in_advance_mode = False
 
-        icon = QtGui.QIcon(resources.get_openpype_icon_filepath())
+        icon = QtGui.QIcon(resources.get_ayon_icon_filepath())
         self.setWindowIcon(icon)
 
         self.setWindowFlags(

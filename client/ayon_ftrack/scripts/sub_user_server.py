@@ -2,8 +2,9 @@ import sys
 import signal
 import socket
 
-from openpype.lib import Logger
-from openpype.modules import ModulesManager
+from ayon_core.lib import Logger
+from ayon_core.addon import AddonsManager
+
 from ayon_ftrack.common import FtrackServer
 
 from ayon_ftrack.tray.user_server import (
@@ -36,8 +37,8 @@ def main(args):
         session = SocketSession(
             auto_connect_event_hub=True, sock=sock, Eventhub=SocketBaseEventHub
         )
-        manager = ModulesManager()
-        addon = manager.modules_by_name["ftrack"]
+        manager = AddonsManager()
+        addon = manager.get("ftrack")
         server = FtrackServer(addon.user_event_handlers_paths)
         log.debug("Launching User Ftrack Server")
         server.run_server(session=session)

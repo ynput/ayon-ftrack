@@ -7,7 +7,7 @@ from ayon_ftrack.common import (
     get_folder_path_for_entities,
     BaseAction,
 )
-from openpype.lib.applications import (
+from ayon_applications import (
     ApplicationManager,
     ApplicationLaunchFailed,
     ApplictionExecutableNotFound,
@@ -24,10 +24,7 @@ class AppplicationsAction(BaseAction):
     identifier = "ayon_app"
     _launch_identifier_with_id = None
 
-    icon_url = (
-        os.environ.get("AYON_STATICS_SERVER")
-        or os.environ.get("OPENPYPE_STATICS_SERVER")
-    )
+    icon_url = os.environ.get("AYON_STATICS_SERVER")
     # 30 seconds
     cache_lifetime = 30
 

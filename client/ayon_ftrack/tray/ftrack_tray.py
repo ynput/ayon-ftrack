@@ -6,10 +6,12 @@ import threading
 import ftrack_api
 from qtpy import QtCore, QtWidgets, QtGui
 
-from openpype import resources
-from openpype.lib import Logger
+from ayon_core import resources
+from ayon_core.lib import Logger
+
 from ayon_ftrack import resolve_ftrack_url, FTRACK_ADDON_DIR
 from ayon_ftrack.lib import credentials
+
 from . import login_dialog
 from .user_server import SocketThread
 

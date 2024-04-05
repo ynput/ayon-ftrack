@@ -7,7 +7,7 @@ Provides:
 """
 import pyblish.api
 
-from openpype.lib import filter_profiles
+from ayon_core.lib import filter_profiles
 
 from ayon_ftrack.pipeline import plugin
 
@@ -36,12 +36,12 @@ class CollectFtrackFamily(plugin.FtrackPublishInstancePlugin):
             return
 
         host_name = instance.context.data["hostName"]
-        family = instance.data["family"]
+        product_type = instance.data["productType"]
         task_name = instance.data.get("task")
 
         filtering_criteria = {
             "host_names": host_name,
-            "product_types": family,
+            "product_types": product_type,
             "task_names": task_name
         }
         profile = filter_profiles(
@@ -57,7 +57,7 @@ class CollectFtrackFamily(plugin.FtrackPublishInstancePlugin):
             add_ftrack_family = profile["add_ftrack_family"]
             additional_filters = profile.get("advanced_filtering")
             if additional_filters:
-                families_set = set(families) | {family}
+                families_set = set(families) | {product_type}
                 self.log.info(
                     "'{}' families used for additional filtering".format(
                         families_set))
@@ -74,7 +74,7 @@ class CollectFtrackFamily(plugin.FtrackPublishInstancePlugin):
                 families.append("ftrack")
 
         self.log.debug("{} 'ftrack' family for instance with '{}'".format(
-            result_str, family
+            result_str, product_type
         ))
 
     def _get_add_ftrack_f_from_addit_filters(
