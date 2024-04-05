@@ -1661,180 +1661,180 @@ class AutoSyncFromFtrack(BaseEventHandler):
             username = user_entity["username"] or username
         return username
 
-    @property
-    def duplicated_report(self):
-        if not self.duplicated:
-            return []
-
-        ft_project = self.cur_project
-        duplicated_names = []
-        for ftrack_id in self.duplicated:
-            ftrack_ent = self.ftrack_ents_by_id.get(ftrack_id)
-            if not ftrack_ent:
-                ftrack_ent = self.process_session.query(
-                    self.entities_query_by_id.format(
-                        ft_project["id"], ftrack_id
-                    )
-                ).one()
-                self.ftrack_ents_by_id[ftrack_id] = ftrack_ent
-            name = ftrack_ent["name"]
-            if name not in duplicated_names:
-                duplicated_names.append(name)
-
-        joined_names = ", ".join(
-            ["\"{}\"".format(name) for name in duplicated_names]
-        )
-        ft_ents = self.process_session.query(
-            self.entities_name_query_by_name.format(
-                ft_project["id"], joined_names
-            )
-        ).all()
-
-        ft_ents_by_name = collections.defaultdict(list)
-        for ft_ent in ft_ents:
-            name = ft_ent["name"]
-            ft_ents_by_name[name].append(ft_ent)
-
-        if not ft_ents_by_name:
-            return []
-
-        subtitle = "Duplicated entity names:"
-        items = []
-        items.append({
-            "type": "label",
-            "value": "# {}".format(subtitle)
-        })
-        items.append({
-            "type": "label",
-            "value": (
-                "<p><i>NOTE: It is not allowed to use the same name"
-                " for multiple entities in the same project</i></p>"
-            )
-        })
-
-        for name, ents in ft_ents_by_name.items():
-            items.append({
-                "type": "label",
-                "value": "## {}".format(name)
-            })
-            paths = []
-            for ent in ents:
-                ftrack_id = ent["id"]
-                ent_path = "/".join([_ent["name"] for _ent in ent["link"]])
-                avalon_ent = self.avalon_ents_by_id.get(ftrack_id)
-
-                if avalon_ent:
-                    additional = " (synchronized)"
-                    if avalon_ent["name"] != name:
-                        additional = " (synchronized as {})".format(
-                            avalon_ent["name"]
-                        )
-                    ent_path += additional
-                paths.append(ent_path)
-
-            items.append({
-                "type": "label",
-                "value": '<p>{}</p>'.format("<br>".join(paths))
-            })
-
-        return items
-
-    @property
-    def regex_report(self):
-        if not self.regex_failed:
-            return []
-
-        subtitle = "Entity names contain prohibited symbols:"
-        items = []
-        items.append({
-            "type": "label",
-            "value": "# {}".format(subtitle)
-        })
-        items.append({
-            "type": "label",
-            "value": (
-                "<p><i>NOTE: You can use Letters( a-Z ),"
-                " Numbers( 0-9 ) and Underscore( _ )</i></p>"
-            )
-        })
-
-        ft_project = self.cur_project
-        for ftrack_id in self.regex_failed:
-            ftrack_ent = self.ftrack_ents_by_id.get(ftrack_id)
-            if not ftrack_ent:
-                ftrack_ent = self.process_session.query(
-                    self.entities_query_by_id.format(
-                        ft_project["id"], ftrack_id
-                    )
-                ).one()
-                self.ftrack_ents_by_id[ftrack_id] = ftrack_ent
-
-            name = ftrack_ent["name"]
-            ent_path_items = [_ent["name"] for _ent in ftrack_ent["link"][:-1]]
-            ent_path_items.append("<strong>{}</strong>".format(name))
-            ent_path = "/".join(ent_path_items)
-            items.append({
-                "type": "label",
-                "value": "<p>{} - {}</p>".format(name, ent_path)
-            })
-
-        return items
-
-    def report(self):
-        msg_len = len(self.duplicated) + len(self.regex_failed)
-        for msgs in self.report_items.values():
-            msg_len += len(msgs)
-
-        if msg_len == 0:
-            return
-
-        items = []
-        project_name = self.cur_project["full_name"]
-        title = "Synchronization report ({}):".format(project_name)
-
-        keys = ["error", "warning", "info"]
-        for key in keys:
-            subitems = []
-            if key == "warning":
-                subitems.extend(self.duplicated_report)
-                subitems.extend(self.regex_report)
-
-            for _msg, _items in self.report_items[key].items():
-                if not _items:
-                    continue
-
-                msg_items = _msg.split("||")
-                msg = msg_items[0]
-                subitems.append({
-                    "type": "label",
-                    "value": "# {}".format(msg)
-                })
-
-                if len(msg_items) > 1:
-                    for note in msg_items[1:]:
-                        subitems.append({
-                            "type": "label",
-                            "value": "<p><i>NOTE: {}</i></p>".format(note)
-                        })
-
-                if isinstance(_items, str):
-                    _items = [_items]
-                subitems.append({
-                    "type": "label",
-                    "value": '<p>{}</p>'.format("<br>".join(_items))
-                })
-
-            if items and subitems:
-                items.append(self.report_splitter)
-
-            items.extend(subitems)
-
-        self.show_interface(
-            items=items,
-            title=title,
-            event=self._cur_event
-        )
-        return True
+    # @property
+    # def duplicated_report(self):
+    #     if not self.duplicated:
+    #         return []
+    #
+    #     ft_project = self.cur_project
+    #     duplicated_names = []
+    #     for ftrack_id in self.duplicated:
+    #         ftrack_ent = self.ftrack_ents_by_id.get(ftrack_id)
+    #         if not ftrack_ent:
+    #             ftrack_ent = self.process_session.query(
+    #                 self.entities_query_by_id.format(
+    #                     ft_project["id"], ftrack_id
+    #                 )
+    #             ).one()
+    #             self.ftrack_ents_by_id[ftrack_id] = ftrack_ent
+    #         name = ftrack_ent["name"]
+    #         if name not in duplicated_names:
+    #             duplicated_names.append(name)
+    #
+    #     joined_names = ", ".join(
+    #         ["\"{}\"".format(name) for name in duplicated_names]
+    #     )
+    #     ft_ents = self.process_session.query(
+    #         self.entities_name_query_by_name.format(
+    #             ft_project["id"], joined_names
+    #         )
+    #     ).all()
+    #
+    #     ft_ents_by_name = collections.defaultdict(list)
+    #     for ft_ent in ft_ents:
+    #         name = ft_ent["name"]
+    #         ft_ents_by_name[name].append(ft_ent)
+    #
+    #     if not ft_ents_by_name:
+    #         return []
+    #
+    #     subtitle = "Duplicated entity names:"
+    #     items = []
+    #     items.append({
+    #         "type": "label",
+    #         "value": "# {}".format(subtitle)
+    #     })
+    #     items.append({
+    #         "type": "label",
+    #         "value": (
+    #             "<p><i>NOTE: It is not allowed to use the same name"
+    #             " for multiple entities in the same project</i></p>"
+    #         )
+    #     })
+    #
+    #     for name, ents in ft_ents_by_name.items():
+    #         items.append({
+    #             "type": "label",
+    #             "value": "## {}".format(name)
+    #         })
+    #         paths = []
+    #         for ent in ents:
+    #             ftrack_id = ent["id"]
+    #             ent_path = "/".join([_ent["name"] for _ent in ent["link"]])
+    #             avalon_ent = self.avalon_ents_by_id.get(ftrack_id)
+    #
+    #             if avalon_ent:
+    #                 additional = " (synchronized)"
+    #                 if avalon_ent["name"] != name:
+    #                     additional = " (synchronized as {})".format(
+    #                         avalon_ent["name"]
+    #                     )
+    #                 ent_path += additional
+    #             paths.append(ent_path)
+    #
+    #         items.append({
+    #             "type": "label",
+    #             "value": '<p>{}</p>'.format("<br>".join(paths))
+    #         })
+    #
+    #     return items
+    #
+    # @property
+    # def regex_report(self):
+    #     if not self.regex_failed:
+    #         return []
+    #
+    #     subtitle = "Entity names contain prohibited symbols:"
+    #     items = []
+    #     items.append({
+    #         "type": "label",
+    #         "value": "# {}".format(subtitle)
+    #     })
+    #     items.append({
+    #         "type": "label",
+    #         "value": (
+    #             "<p><i>NOTE: You can use Letters( a-Z ),"
+    #             " Numbers( 0-9 ) and Underscore( _ )</i></p>"
+    #         )
+    #     })
+    #
+    #     ft_project = self.cur_project
+    #     for ftrack_id in self.regex_failed:
+    #         ftrack_ent = self.ftrack_ents_by_id.get(ftrack_id)
+    #         if not ftrack_ent:
+    #             ftrack_ent = self.process_session.query(
+    #                 self.entities_query_by_id.format(
+    #                     ft_project["id"], ftrack_id
+    #                 )
+    #             ).one()
+    #             self.ftrack_ents_by_id[ftrack_id] = ftrack_ent
+    #
+    #         name = ftrack_ent["name"]
+    #         ent_path_items = [_ent["name"] for _ent in ftrack_ent["link"][:-1]]
+    #         ent_path_items.append("<strong>{}</strong>".format(name))
+    #         ent_path = "/".join(ent_path_items)
+    #         items.append({
+    #             "type": "label",
+    #             "value": "<p>{} - {}</p>".format(name, ent_path)
+    #         })
+    #
+    #     return items
+    #
+    # def report(self):
+    #     msg_len = len(self.duplicated) + len(self.regex_failed)
+    #     for msgs in self.report_items.values():
+    #         msg_len += len(msgs)
+    #
+    #     if msg_len == 0:
+    #         return
+    #
+    #     items = []
+    #     project_name = self.cur_project["full_name"]
+    #     title = "Synchronization report ({}):".format(project_name)
+    #
+    #     keys = ["error", "warning", "info"]
+    #     for key in keys:
+    #         subitems = []
+    #         if key == "warning":
+    #             subitems.extend(self.duplicated_report)
+    #             subitems.extend(self.regex_report)
+    #
+    #         for _msg, _items in self.report_items[key].items():
+    #             if not _items:
+    #                 continue
+    #
+    #             msg_items = _msg.split("||")
+    #             msg = msg_items[0]
+    #             subitems.append({
+    #                 "type": "label",
+    #                 "value": "# {}".format(msg)
+    #             })
+    #
+    #             if len(msg_items) > 1:
+    #                 for note in msg_items[1:]:
+    #                     subitems.append({
+    #                         "type": "label",
+    #                         "value": "<p><i>NOTE: {}</i></p>".format(note)
+    #                     })
+    #
+    #             if isinstance(_items, str):
+    #                 _items = [_items]
+    #             subitems.append({
+    #                 "type": "label",
+    #                 "value": '<p>{}</p>'.format("<br>".join(_items))
+    #             })
+    #
+    #         if items and subitems:
+    #             items.append(self.report_splitter)
+    #
+    #         items.extend(subitems)
+    #
+    #     self.show_interface(
+    #         items=items,
+    #         title=title,
+    #         event=self._cur_event
+    #     )
+    #     return True
 
 
 def register(session):
