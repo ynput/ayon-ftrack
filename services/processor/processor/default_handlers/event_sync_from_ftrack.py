@@ -1601,7 +1601,7 @@ class AutoSyncFromFtrack(BaseEventHandler):
                 f" \"{sync_process.project_name}\" by \"{username}\".{sub_msg}"
             ))
             if sync_process.trigger_project_sync:
-                # Trigger sync to avalon action if auto sync was turned on
+                # Trigger sync to AYON action if auto sync was turned on
                 selection = [{
                     "entityId": sync_process.ft_project_id,
                     "entityType": "show"
