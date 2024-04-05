@@ -18,7 +18,7 @@ from .user_server import SocketThread
 
 class FtrackTrayWrapper:
     def __init__(self, module):
-        self.module = module
+        self._addon = module
         self.log = Logger.get_logger(self.__class__.__name__)
 
         self.thread_action_server = None
@@ -49,7 +49,7 @@ class FtrackTrayWrapper:
         self.widget_login.raise_()
 
     def show_ftrack_browser(self):
-        QtGui.QDesktopServices.openUrl(self.module.ftrack_url)
+        QtGui.QDesktopServices.openUrl(self._addon.ftrack_url)
 
     def validate(self):
         validation = False
@@ -59,7 +59,7 @@ class FtrackTrayWrapper:
         validation = credentials.check_credentials(ft_user, ft_api_key)
         if validation:
             self.widget_login.set_credentials(ft_user, ft_api_key)
-            self.module.set_credentials_to_env(ft_user, ft_api_key)
+            self._addon.set_credentials_to_env(ft_user, ft_api_key)
             self.log.info("Connected to Ftrack successfully")
             self.on_login_change()
 
@@ -121,7 +121,7 @@ class FtrackTrayWrapper:
         self.bool_action_server_running = True
         self.bool_action_thread_running = False
 
-        ftrack_url = self.module.ftrack_url
+        ftrack_url = self._addon.ftrack_url
         os.environ["FTRACK_SERVER"] = ftrack_url
 
         min_fail_seconds = 5
@@ -346,7 +346,7 @@ class FtrackTrayWrapper:
 
     def changed_user(self):
         self.stop_action_server()
-        self.module.set_credentials_to_env(None, None)
+        self._addon.set_credentials_to_env(None, None)
         self.validate()
 
     def start_timer_manager(self, data):
@@ -358,10 +358,10 @@ class FtrackTrayWrapper:
             self.thread_timer.ftrack_stop_timer()
 
     def timer_started(self, data):
-        self.module.timer_started(data)
+        self._addon.timer_started(data)
 
     def timer_stopped(self):
-        self.module.timer_stopped()
+        self._addon.timer_stopped()
 
 
 class FtrackEventsThread(QtCore.QThread):
