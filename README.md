@@ -2,7 +2,7 @@
 
 This project provides three elements for the AYON pipeline:
  * server - The AYON backend Addon.
- * client - The AYON (currently OpenPype) desktop integration.
+ * client - The AYON desktop integration.
  * services - Standalone dockerized daemons that act based on events (aka `leecher` and `processors`).
 
 There is a common code that can be re-used for `server`, `client` and `services`. Is located inside client code for developer mode `./client/ayon_ftrack/common/`.
