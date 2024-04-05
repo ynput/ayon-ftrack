@@ -5,7 +5,6 @@ import time
 import atexit
 
 import arrow
-import ayon_api
 import ftrack_api
 
 from ayon_api import (
