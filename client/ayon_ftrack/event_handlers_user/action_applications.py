@@ -10,8 +10,7 @@ from ayon_ftrack.common import (
 from ayon_applications import (
     ApplicationManager,
     ApplicationLaunchFailed,
-    ApplictionExecutableNotFound,
-    CUSTOM_LAUNCH_APP_GROUPS
+    ApplicationExecutableNotFound,
 )
 
 
@@ -166,9 +165,6 @@ class AppplicationsAction(BaseAction):
             if not app or not app.enabled:
                 continue
 
-            if app.group.name in CUSTOM_LAUNCH_APP_GROUPS:
-                continue
-
             # Skip applications without valid executables
             if only_available and not app.find_executable():
                 continue
@@ -251,7 +247,7 @@ class AppplicationsAction(BaseAction):
                 task_name=task_name
             )
 
-        except ApplictionExecutableNotFound as exc:
+        except ApplicationExecutableNotFound as exc:
             self.log.warning(exc.exc_msg)
             return {
                 "success": False,
