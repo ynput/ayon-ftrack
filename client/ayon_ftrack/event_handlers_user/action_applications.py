@@ -243,7 +243,7 @@ class AppplicationsAction(BaseAction):
             self.applications_manager.launch(
                 app_name,
                 project_name=project_name,
-                asset_name=folder_path,
+                folder_path=folder_path,
                 task_name=task_name
             )
 
