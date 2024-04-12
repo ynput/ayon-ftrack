@@ -1,5 +1,5 @@
 import pyblish.api
-from openpype.pipeline.publish import (
+from ayon_core.pipeline.publish import (
     get_plugin_settings,
     apply_plugin_settings_automatically,
 )

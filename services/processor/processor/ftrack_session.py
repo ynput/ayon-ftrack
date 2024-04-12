@@ -176,7 +176,7 @@ class CustomEventHubSession(ftrack_api.session.Session):
         # Currently pending operations.
         self.recorded_operations = ftrack_api.operation.Operations()
 
-        # OpenPype change - In new API are operations properties
+        # AYON change - In new API are operations properties
         new_api = hasattr(self.__class__, "record_operations")
 
         if new_api:

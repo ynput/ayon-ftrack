@@ -2,7 +2,7 @@ import os
 import collections
 import copy
 
-from openpype.pipeline import Anatomy
+from ayon_core.pipeline import Anatomy
 from ayon_ftrack.common import LocalAction
 from ayon_ftrack.lib import get_ftrack_icon_url
 

@@ -6,10 +6,6 @@ import ayon_api
 
 from ayon_ftrack.common import FTRACK_ID_ATTRIB
 from ayon_ftrack.pipeline import plugin
-try:
-    from openpype.client import get_asset_name_identifier
-except ImportError:
-    get_asset_name_identifier = None
 
 
 class CollectFtrackApi(plugin.FtrackPublishContextPlugin):
@@ -33,7 +29,7 @@ class CollectFtrackApi(plugin.FtrackPublishContextPlugin):
 
         # Collect task
         project_name = context.data["projectName"]
-        folder_path = context.data["asset"]
+        folder_path = context.data["folderPath"]
         task_name = context.data["task"]
 
         # Find project entity
@@ -56,7 +52,7 @@ class CollectFtrackApi(plugin.FtrackPublishContextPlugin):
 
         context_ftrack_entity = None
         if folder_path:
-            # Find asset entity
+            # Find folder entity
             entities_by_path = self.find_ftrack_entities(
                 session, project_entity, [folder_path]
             )
@@ -67,13 +63,13 @@ class CollectFtrackApi(plugin.FtrackPublishContextPlugin):
                     " in Ftrack project \"{}\"."
                 ).format(folder_path, project_name))
 
-        self.log.debug("Asset found: {}".format(context_ftrack_entity))
+        self.log.debug("Folder found: {}".format(context_ftrack_entity))
 
         task_entity = None
         # Find task entity if task is set
         if not context_ftrack_entity:
             self.log.warning(
-                "Asset entity is not set. Skipping query of task entity."
+                "Folder entity is not set. Skipping query of task entity."
             )
         elif not task_name:
             self.log.warning("Task name is not set.")
@@ -122,7 +118,7 @@ class CollectFtrackApi(plugin.FtrackPublishContextPlugin):
             self.log.debug(
                 "Checking entities of instance \"{}\"".format(str(instance))
             )
-            instance_folder_path = instance.data.get("asset")
+            instance_folder_path = instance.data.get("folderPath")
             instance_task_name = instance.data.get("task")
 
             folder_path = None
@@ -140,7 +136,7 @@ class CollectFtrackApi(plugin.FtrackPublishContextPlugin):
                 ):
                     self.log.debug((
                         "Instance's context is same as in publish context."
-                        " Asset: {} | Task: {}"
+                        " Folder: {} | Task: {}"
                     ).format(context_folder_path, context_task_name))
                     instance.data["ftrackEntity"] = context_ftrack_entity
                     instance.data["ftrackTask"] = context_task_entity
@@ -164,7 +160,7 @@ class CollectFtrackApi(plugin.FtrackPublishContextPlugin):
             elif instance_folder_path:
                 if instance_folder_path == context_folder_path:
                     self.log.debug((
-                        "Instance's context asset is same as in publish"
+                        "Instance's context folder is same as in publish"
                         " context. Folder: {}"
                     ).format(context_folder_path))
                     instance.data["ftrackEntity"] = context_ftrack_entity
@@ -223,23 +219,8 @@ class CollectFtrackApi(plugin.FtrackPublishContextPlugin):
     def find_ftrack_entities(self, session, project_entity, folder_paths):
         output = {path: None for path in folder_paths}
         folder_paths_s = set(output.keys())
-        # Folder paths are not yet used as unique identifier if
-        #   'get_asset_name_identifier' is 'None' so we can query only by name
-        if get_asset_name_identifier is None:
-            folder_paths_s.discard(None)
-            joined_paths = ",".join([
-                '"{}"'.format(p) for p in folder_paths_s
-            ])
-            entities = session.query(
-                (
-                    "TypedContext where project_id is \"{}\" and name in ({})"
-                ).format(project_entity["id"], joined_paths)
-            ).all()
-            for entity in entities:
-                output[entity["name"]] = entity
-            return output
 
-        # We can't use 'assetEntity' and folders must be queried because
+        # We can't use 'folderEntity' and folders must be queried because
         #   we must be assured that 'ownAttrib' is used to avoid collisions
         #   because of hierarchical values.
         folders = ayon_api.get_folders(

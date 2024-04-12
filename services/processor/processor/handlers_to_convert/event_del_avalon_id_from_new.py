@@ -1,6 +1,6 @@
 from ftrack_common import BaseEventHandler, CUST_ATTR_KEY_SERVER_ID
 
-from openpype_modules.ftrack.event_handlers_server.event_sync_to_avalon import (
+from ayon_ftrack.event_handlers_server.event_sync_to_avalon import (
     SyncToAvalonEvent
 )
 

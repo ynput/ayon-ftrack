@@ -1,5 +1,5 @@
 import pyblish.api
-from openpype.pipeline.publish import ValidateContentsOrder
+from ayon_core.pipeline.publish import ValidateContentsOrder
 
 from ayon_ftrack.pipeline import plugin
 
@@ -7,10 +7,6 @@ from ayon_ftrack.pipeline import plugin
 class ValidateFtrackAttributes(plugin.FtrackPublishInstancePlugin):
     """
     This will validate attributes in ftrack against data in scene.
-
-    Attributes to be validated are specified in:
-
-        `$OPENPYPE_CONFIG/presets/<host>/ftrack_attributes.json`
 
     This is array (list) of checks in format:
     [

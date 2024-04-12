@@ -84,7 +84,7 @@ def get_datetime_data(datetime_obj=None):
     """Returns current datetime data as dictionary.
 
     Note:
-        This function is copied from 'openpype.lib'.
+        This function is copied from 'ayon_core.lib'.
 
     Args:
         datetime_obj (datetime): Specific datetime object

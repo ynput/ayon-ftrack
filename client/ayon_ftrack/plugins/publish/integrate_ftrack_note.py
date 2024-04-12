@@ -13,7 +13,7 @@ import copy
 
 import six
 import pyblish.api
-from openpype.lib import StringTemplate
+from ayon_core.lib import StringTemplate
 
 from ayon_ftrack.pipeline import plugin
 
@@ -21,7 +21,7 @@ from ayon_ftrack.pipeline import plugin
 class IntegrateFtrackNote(plugin.FtrackPublishInstancePlugin):
     """Create comments in Ftrack."""
 
-    # Must be after integrate asset new
+    # Must be after IntegrateAsset plugin in ayon_core
     order = pyblish.api.IntegratorOrder + 0.4999
     label = "Integrate Ftrack note"
     families = ["ftrack"]

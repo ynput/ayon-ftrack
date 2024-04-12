@@ -2,12 +2,12 @@ import os
 
 import click
 
-from openpype.modules import (
+from ayon_core.addon import (
     AYONAddon,
-    ITrayModule,
+    ITrayAddon,
     IPluginPaths,
 )
-from openpype.lib import Logger
+from ayon_core.lib import Logger
 
 FTRACK_ADDON_DIR = os.path.dirname(os.path.abspath(__file__))
 _URL_NOT_SET = object()
@@ -15,11 +15,10 @@ _URL_NOT_SET = object()
 
 class FtrackAddon(
     AYONAddon,
-    ITrayModule,
+    ITrayAddon,
     IPluginPaths,
 ):
     name = "ftrack"
-    enabled = True
 
     def initialize(self, settings):
         ftrack_settings = settings[self.name]
@@ -36,11 +35,11 @@ class FtrackAddon(
 
         # Prepare attribute
         self.user_event_handlers_paths = user_event_handlers_paths
-        self.tray_module = None
+        self._tray_wrapper = None
 
         # TimersManager connection
         self.timers_manager_connector = None
-        self._timers_manager_module = None
+        self._timers_manager_addon = None
 
     def get_ftrack_url(self):
         """Resolved ftrack url.
@@ -91,7 +90,10 @@ class FtrackAddon(
         return os.path.join(FTRACK_ADDON_DIR, "launch_hooks")
 
     def modify_application_launch_arguments(self, application, env):
-        if not application.use_python_2:
+        if (
+            not hasattr(application, "use_python_2")
+            or not application.use_python_2
+        ):
             return
 
         self.log.info("Adding Ftrack Python 2 packages to PYTHONPATH.")
@@ -144,9 +146,6 @@ class FtrackAddon(
                 if key == "user":
                     self.user_event_handlers_paths.extend(value)
 
-    def connect_with_modules(self, enabled_modules):
-        self.connect_with_addons(enabled_modules)
-
     def create_ftrack_session(self, **session_kwargs):
         import ftrack_api
 
@@ -176,18 +175,18 @@ class FtrackAddon(
     def tray_init(self):
         from .tray import FtrackTrayWrapper
 
-        self.tray_module = FtrackTrayWrapper(self)
-        # Module is it's own connector to TimersManager
+        self._tray_wrapper = FtrackTrayWrapper(self)
+        # Addon is it's own connector to TimersManager
         self.timers_manager_connector = self
 
     def tray_menu(self, parent_menu):
-        return self.tray_module.tray_menu(parent_menu)
+        return self._tray_wrapper.tray_menu(parent_menu)
 
     def tray_start(self):
-        return self.tray_module.validate()
+        return self._tray_wrapper.validate()
 
     def tray_exit(self):
-        self.tray_module.tray_exit()
+        self._tray_wrapper.tray_exit()
 
     def set_credentials_to_env(self, username, api_key):
         os.environ["FTRACK_API_USER"] = username or ""
@@ -195,31 +194,38 @@ class FtrackAddon(
 
     # --- TimersManager connection methods ---
     def start_timer(self, data):
-        if self.tray_module:
-            self.tray_module.start_timer_manager(data)
+        if self._tray_wrapper:
+            self._tray_wrapper.start_timer_manager(data)
 
     def stop_timer(self):
-        if self.tray_module:
-            self.tray_module.stop_timer_manager()
+        if self._tray_wrapper:
+            self._tray_wrapper.stop_timer_manager()
 
-    def register_timers_manager(self, timer_manager_module):
-        self._timers_manager_module = timer_manager_module
+    def register_timers_manager(self, timers_manager_addon):
+        self._timers_manager_addon = timers_manager_addon
 
     def timer_started(self, data):
-        if self._timers_manager_module is not None:
-            self._timers_manager_module.timer_started(self.id, data)
+        if self._timers_manager_addon is not None:
+            self._timers_manager_addon.timer_started(self.id, data)
 
     def timer_stopped(self):
-        if self._timers_manager_module is not None:
-            self._timers_manager_module.timer_stopped(self.id)
+        if self._timers_manager_addon is not None:
+            self._timers_manager_addon.timer_stopped(self.id)
 
-    def get_task_time(self, project_name, asset_name, task_name):
+    def get_task_time(self, project_name, folder_path, task_name):
+        folder_entity = ayon_api.get_folder_by_path(project_name, folder_path)
+        if not folder_entity:
+            return 0
+        ftrack_id = folder_entity["attrib"].get("ftrackId")
+        if not ftrack_id:
+            return 0
+
         session = self.create_ftrack_session()
         query = (
-            'Task where name is "{}"'
-            ' and parent.name is "{}"'
+            'select time_logged from Task where name is "{}"'
+            ' and parent_id is "{}"'
             ' and project.full_name is "{}"'
-        ).format(task_name, asset_name, project_name)
+        ).format(task_name, ftrack_id, project_name)
         task_entity = session.query(query).first()
         if not task_entity:
             return 0

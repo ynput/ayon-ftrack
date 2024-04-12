@@ -22,7 +22,7 @@ try:
 except ImportError:
     from ftrack_api._weakref import WeakMethod
 
-from openpype.lib import get_openpype_execute_args, Logger
+from ayon_core.lib import get_ayon_launcher_args, Logger
 
 
 class SocketBaseEventHub(ftrack_api.event.hub.EventHub):
@@ -111,7 +111,7 @@ class CustomEventHubSession(ftrack_api.session.Session):
         # Currently pending operations.
         self.recorded_operations = ftrack_api.operation.Operations()
 
-        # OpenPype change - In new API are operations properties
+        # AYON change - In new API are operations properties
         new_api = hasattr(self.__class__, "record_operations")
 
         if new_api:
@@ -278,8 +278,8 @@ class SocketThread(threading.Thread):
         )
 
         env = os.environ.copy()
-        # OpenPype executable (with path to start script if not build)
-        args = get_openpype_execute_args(
+        # AYON executable (with path to start script if not build)
+        args = get_ayon_launcher_args(
             # Add `run` command
             "run",
             self.filepath,

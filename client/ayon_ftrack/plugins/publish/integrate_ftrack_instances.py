@@ -1,17 +1,19 @@
 import os
 import json
 import copy
+
 import pyblish.api
 
-from openpype.pipeline.publish import get_publish_repre_path
-from openpype.lib.openpype_version import get_openpype_version
-from openpype.lib.transcoding import (
+from ayon_core.pipeline.publish import get_publish_repre_path
+from ayon_core.lib.ayon_info import get_ayon_launcher_version
+from ayon_core.lib.transcoding import (
     get_ffprobe_streams,
     convert_ffprobe_fps_to_float,
 )
-from openpype.lib.profiles_filtering import filter_profiles
-from openpype.lib.transcoding import VIDEO_EXTENSIONS, IMAGE_EXTENSIONS
+from ayon_core.lib.profiles_filtering import filter_profiles
+from ayon_core.lib.transcoding import VIDEO_EXTENSIONS, IMAGE_EXTENSIONS
 
+from ayon_ftrack import __version__
 from ayon_ftrack.pipeline import plugin
 
 
@@ -79,17 +81,15 @@ class IntegrateFtrackInstance(plugin.FtrackPublishInstancePlugin):
 
         version_number = int(instance_version)
 
-        family = instance.data["family"]
+        product_type = instance.data["productType"]
 
         # Perform case-insensitive family mapping
-        family_low = family.lower()
+        product_type_low = product_type.lower()
         asset_type = instance.data.get("ftrackFamily")
         if not asset_type:
             for item in self.product_type_mapping:
-                map_family = item["name"]
-                map_value = item["asset_type"]
-                if map_family.lower() == family_low:
-                    asset_type = map_value
+                if item["name"].lower() == product_type_low:
+                    asset_type = item["asset_type"]
                     break
 
         if not asset_type:
@@ -97,7 +97,7 @@ class IntegrateFtrackInstance(plugin.FtrackPublishInstancePlugin):
 
         self.log.debug(
             "Family: {}\nMapping: {}".format(
-                family_low, self.product_type_mapping)
+                product_type_low, self.product_type_mapping)
         )
         status_name = self._get_asset_version_status_name(instance)
 
@@ -108,7 +108,7 @@ class IntegrateFtrackInstance(plugin.FtrackPublishInstancePlugin):
                 "short": asset_type,
             },
             "asset_data": {
-                "name": instance.data["subset"],
+                "name": instance.data["productName"],
             },
             "assetversion_data": {
                 "version": version_number,
@@ -514,7 +514,7 @@ class IntegrateFtrackInstance(plugin.FtrackPublishInstancePlugin):
         anatomy_data = instance.data["anatomyData"]
         task_type = anatomy_data.get("task", {}).get("type")
         filtering_criteria = {
-            "product_types": instance.data["family"],
+            "product_types": instance.data["productType"],
             "host_names": instance.context.data["hostName"],
             "task_types": task_type
         }
@@ -562,7 +562,7 @@ class IntegrateFtrackInstance(plugin.FtrackPublishInstancePlugin):
         metadata = {}
         if "openpype_version" in self.additional_metadata_keys:
             label = self.metadata_keys_to_label["openpype_version"]
-            metadata[label] = get_openpype_version()
+            metadata[label] = __version__
 
         extension = os.path.splitext(component_path)[-1]
         streams = []

@@ -1,7 +1,7 @@
 import copy
 
 import pyblish.api
-from openpype.lib import filter_profiles
+from ayon_core.lib import filter_profiles
 
 from ayon_ftrack.common import create_chunks
 from ayon_ftrack.pipeline import plugin
@@ -151,8 +151,8 @@ class IntegrateFtrackStatusBase(plugin.FtrackPublishInstancePlugin):
             "host_names": context.data["hostName"],
             "task_types": task_entity["type"]["name"],
             "task_names": task_entity["name"],
-            "families": instance.data["family"],
-            "subset_names": instance.data["subset"],
+            "families": instance.data["productType"],
+            "subset_names": instance.data["productName"],
         }
 
     def is_valid_instance(self, context, instance):
@@ -182,7 +182,7 @@ class IntegrateFtrackStatusBase(plugin.FtrackPublishInstancePlugin):
         if not task_entity:
             self.log.debug(
                 "Skipping instance  Does not have filled task".format(
-                    instance.data["subset"]))
+                    instance.data["productName"]))
             return False
 
         task_id = task_entity["id"]
@@ -247,7 +247,7 @@ class IntegrateFtrackFarmStatus(IntegrateFtrackStatusBase):
     def is_valid_instance(self, context, instance):
         if not instance.data.get("farm"):
             self.log.debug("{} Won't be rendered on farm.".format(
-                instance.data["subset"]
+                instance.data["productName"]
             ))
             return False
         return super(IntegrateFtrackFarmStatus, self).is_valid_instance(
@@ -289,7 +289,7 @@ class IntegrateFtrackLocalStatus(IntegrateFtrackStatusBase):
     def is_valid_instance(self, context, instance):
         if instance.data.get("farm"):
             self.log.debug("{} Will be rendered on farm.".format(
-                instance.data["subset"]
+                instance.data["productName"]
             ))
             return False
         return super(IntegrateFtrackLocalStatus, self).is_valid_instance(

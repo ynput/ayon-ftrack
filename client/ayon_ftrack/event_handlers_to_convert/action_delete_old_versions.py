@@ -3,20 +3,21 @@ import collections
 import uuid
 
 import clique
-from pymongo import UpdateOne
 
-from openpype.client import (
-    get_assets,
-    get_subsets,
+from ayon_api import (
+    get_folders,
+    get_products,
     get_versions,
-    get_representations
+    get_representations,
 )
-from openpype.lib import (
+from ayon_api.operations import OperationsSession
+
+from ayon_core.lib import (
     StringTemplate,
     TemplateUnsolved,
     format_file_size,
 )
-from openpype.pipeline import AvalonMongoDB, Anatomy
+from ayon_core.pipeline import Anatomy
 from ayon_ftrack.common import LocalAction
 from ayon_ftrack.lib import get_ftrack_icon_url
 
@@ -33,8 +34,6 @@ class DeleteOldVersions(LocalAction):
     icon = get_ftrack_icon_url("AYONAdmin.svg")
 
     settings_key = "delete_old_versions"
-
-    dbcon = AvalonMongoDB()
 
     inteface_title = "Choose your preferences"
     splitter_item = {"type": "label", "value": "---"}
@@ -161,12 +160,10 @@ class DeleteOldVersions(LocalAction):
             " and will keep {1} latest version{2}."
         ).format(_val1, versions_count, _val3))
 
-        self.dbcon.install()
-
         project = None
-        avalon_asset_names = []
+        folder_paths = []
         asset_versions_by_parent_id = collections.defaultdict(list)
-        subset_names_by_asset_name = collections.defaultdict(list)
+        product_names_by_folder_path = collections.defaultdict(list)
 
         ftrack_assets_by_name = {}
         for entity in entities:
@@ -174,10 +171,13 @@ class DeleteOldVersions(LocalAction):
 
             parent_ent = ftrack_asset["parent"]
             parent_ftrack_id = parent_ent["id"]
-            parent_name = parent_ent["name"]
 
-            if parent_name not in avalon_asset_names:
-                avalon_asset_names.append(parent_name)
+            path_items = [item["name"] for item in entity["link"]]
+            path_items[0] = ""
+            folder_path = "/".join(path_items)
+
+            if folder_path not in folder_paths:
+                folder_paths.append(folder_path)
 
             # Group asset versions by parent entity
             asset_versions_by_parent_id[parent_ftrack_id].append(entity)
@@ -186,101 +186,93 @@ class DeleteOldVersions(LocalAction):
             if project is None:
                 project = parent_ent["project"]
 
-            # Collect subset names per asset
-            subset_name = ftrack_asset["name"]
-            subset_names_by_asset_name[parent_name].append(subset_name)
+            # Collect product names per asset
+            product_name = ftrack_asset["name"]
+            product_names_by_folder_path[folder_path].append(product_name)
 
-            if subset_name not in ftrack_assets_by_name:
-                ftrack_assets_by_name[subset_name] = ftrack_asset
+            if product_name not in ftrack_assets_by_name:
+                ftrack_assets_by_name[product_name] = ftrack_asset
 
         # Set Mongo collection
         project_name = project["full_name"]
         anatomy = Anatomy(project_name)
-        self.dbcon.Session["AVALON_PROJECT"] = project_name
         self.log.debug("Project is set to {}".format(project_name))
 
-        # Get Assets from avalon database
-        assets = list(
-            get_assets(project_name, asset_names=avalon_asset_names)
-        )
-        asset_id_to_name_map = {
-            asset["_id"]: asset["name"] for asset in assets
+        # Fetch folders
+        folder_path_by_id = {
+            folder_entity["id"]: folder_entity["path"]
+            for folder_entity in get_folders(
+                project_name, folder_paths=folder_paths
+            )
         }
-        asset_ids = list(asset_id_to_name_map.keys())
+        folder_ids = set(folder_path_by_id.keys())
 
-        self.log.debug("Collected assets ({})".format(len(asset_ids)))
+        self.log.debug("Collected assets ({})".format(len(folder_ids)))
 
-        # Get Subsets
-        subsets = list(
-            get_subsets(project_name, asset_ids=asset_ids)
-        )
-        subsets_by_id = {}
-        subset_ids = []
-        for subset in subsets:
-            asset_id = subset["parent"]
-            asset_name = asset_id_to_name_map[asset_id]
-            available_subsets = subset_names_by_asset_name[asset_name]
+        # Get product entities
+        product_entities_by_id = {
+            product_entity["id"]: product_entity
+            for product_entity in get_products(
+                project_name, folder_ids=folder_ids
+            )
+        }
+        # Filter products by available product names
+        for product_entity in product_entities_by_id.values():
+            folder_id = product_entity["folderId"]
+            folder_path = folder_path_by_id[folder_id]
 
-            if subset["name"] not in available_subsets:
-                continue
+            available_products = product_names_by_folder_path[folder_path]
+            if product_entity["name"] not in available_products:
+                product_id = product_entity["id"]
+                product_entities_by_id.pop(product_id)
 
-            subset_ids.append(subset["_id"])
-            subsets_by_id[subset["_id"]] = subset
+        product_ids = set(product_entities_by_id.keys())
 
-        self.log.debug("Collected subsets ({})".format(len(subset_ids)))
+        self.log.debug("Collected products ({})".format(len(product_ids)))
 
         # Get Versions
-        versions = list(
-            get_versions(project_name, subset_ids=subset_ids)
-        )
+        version_entities_by_id = {
+            version_entity["id"]: version_entity
+            for version_entity in get_versions(
+                project_name,
+                product_ids=product_ids,
+                hero=False,
+                active=None
+            )
+        }
 
+        # Store all versions by product id even inactive entities
         versions_by_parent = collections.defaultdict(list)
-        for ent in versions:
-            versions_by_parent[ent["parent"]].append(ent)
+        for version_entity in version_entities_by_id.values():
+            product_id = version_entity["productId"]
+            versions_by_parent[product_id].append(version_entity)
 
         def sort_func(ent):
-            return int(ent["name"])
+            return ent["version"]
 
-        all_last_versions = []
-        for parent_id, _versions in versions_by_parent.items():
-            for idx, version in enumerate(
-                sorted(_versions, key=sort_func, reverse=True)
+        # Filter latest versions
+        for parent_id, version_entities in versions_by_parent.items():
+            for idx, version_entity in enumerate(
+                sorted(version_entities, key=sort_func, reverse=True)
             ):
                 if idx >= versions_count:
                     break
-                all_last_versions.append(version)
+                version_entities_by_id.pop(version_entity["id"])
 
-        self.log.debug("Collected versions ({})".format(len(versions)))
-
-        # Filter latest versions
-        for version in all_last_versions:
-            versions.remove(version)
+        self.log.debug(
+            "Collected versions ({})".format(len(version_entities_by_id))
+        )
 
         # Update versions_by_parent without filtered versions
         versions_by_parent = collections.defaultdict(list)
-        for ent in versions:
-            versions_by_parent[ent["parent"]].append(ent)
+        for version_entity in version_entities_by_id.values():
+            # Filter already deactivated versions
+            if not version_entity["active"]:
+                continue
+            product_id = version_entity["productId"]
+            versions_by_parent[product_id].append(version_entity)
 
-        # Filter already deleted versions
-        versions_to_pop = []
-        for version in versions:
-            version_tags = version["data"].get("tags")
-            if version_tags and "deleted" in version_tags:
-                versions_to_pop.append(version)
-
-        for version in versions_to_pop:
-            subset = subsets_by_id[version["parent"]]
-            asset_id = subset["parent"]
-            asset_name = asset_id_to_name_map[asset_id]
-            msg = "Asset: \"{}\" | Subset: \"{}\" | Version: \"{}\"".format(
-                asset_name, subset["name"], version["name"]
-            )
-            self.log.warning((
-                "Skipping version. Already tagged as `deleted`. < {} >"
-            ).format(msg))
-            versions.remove(version)
-
-        version_ids = [ent["_id"] for ent in versions]
+        version_ids = set(version_entities_by_id.keys())
 
         self.log.debug(
             "Filtered versions to delete ({})".format(len(version_ids))
@@ -294,22 +286,26 @@ class DeleteOldVersions(LocalAction):
                 "message": msg
             }
 
-        repres = list(
+        repre_entities = list(
             get_representations(project_name, version_ids=version_ids)
         )
 
         self.log.debug(
-            "Collected representations to remove ({})".format(len(repres))
+            "Collected representations to remove ({})".format(
+                len(repre_entities)
+            )
         )
 
         dir_paths = {}
         file_paths_by_dir = collections.defaultdict(list)
-        for repre in repres:
-            file_path, seq_path = self.path_from_represenation(repre, anatomy)
+        for repre_entity in repre_entities:
+            file_path, seq_path = self.path_from_represenation(
+                repre_entity, anatomy
+            )
             if file_path is None:
                 self.log.warning((
                     "Could not format path for represenation \"{}\""
-                ).format(str(repre)))
+                ).format(str(repre_entity)))
                 continue
 
             dir_path = os.path.dirname(file_path)
@@ -345,8 +341,6 @@ class DeleteOldVersions(LocalAction):
             ).format(paths_msg))
 
         # Size of files.
-        size = 0
-
         if only_calculate:
             if force_to_remove:
                 size = self.delete_whole_dir_paths(
@@ -368,44 +362,33 @@ class DeleteOldVersions(LocalAction):
         else:
             size = self.delete_only_repre_files(dir_paths, file_paths_by_dir)
 
-        mongo_changes_bulk = []
-        for version in versions:
-            orig_version_tags = version["data"].get("tags") or []
-            version_tags = [tag for tag in orig_version_tags]
-            if "deleted" not in version_tags:
-                version_tags.append("deleted")
+        op_session = OperationsSession()
+        for version_entity in version_entities_by_id.values():
+            op_session.update_entity(
+                project_name,
+                "version",
+                version_entity["id"],
+                {"active": False}
+            )
 
-            if version_tags == orig_version_tags:
-                continue
-
-            update_query = {"_id": version["_id"]}
-            update_data = {"$set": {"data.tags": version_tags}}
-            mongo_changes_bulk.append(UpdateOne(update_query, update_data))
-
-        if mongo_changes_bulk:
-            self.dbcon.bulk_write(mongo_changes_bulk)
-
-        self.dbcon.uninstall()
+        op_session.commit()
 
         # Set attribute `is_published` to `False` on ftrack AssetVersions
-        for subset_id, _versions in versions_by_parent.items():
-            subset_name = None
-            for subset in subsets:
-                if subset["_id"] == subset_id:
-                    subset_name = subset["name"]
-                    break
-
-            if subset_name is None:
+        for product_id, _versions in versions_by_parent.items():
+            product_entity = product_entities_by_id.get(product_id)
+            if product_entity is None:
                 self.log.warning(
-                    "Subset with ID `{}` was not found.".format(str(subset_id))
+                    "Product with ID `{}` was not found.".format(str(product_id))
                 )
                 continue
 
-            ftrack_asset = ftrack_assets_by_name.get(subset_name)
+            product_name = product_entity["name"]
+
+            ftrack_asset = ftrack_assets_by_name.get(product_name)
             if not ftrack_asset:
                 self.log.warning((
                     "Could not find Ftrack asset with name `{}`"
-                ).format(subset_name))
+                ).format(product_name))
                 continue
 
             version_numbers = [int(ver["name"]) for ver in _versions]

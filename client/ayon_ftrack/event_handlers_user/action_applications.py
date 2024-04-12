@@ -7,11 +7,10 @@ from ayon_ftrack.common import (
     get_folder_path_for_entities,
     BaseAction,
 )
-from openpype.lib.applications import (
+from ayon_applications import (
     ApplicationManager,
     ApplicationLaunchFailed,
-    ApplictionExecutableNotFound,
-    CUSTOM_LAUNCH_APP_GROUPS
+    ApplicationExecutableNotFound,
 )
 
 
@@ -24,10 +23,7 @@ class AppplicationsAction(BaseAction):
     identifier = "ayon_app"
     _launch_identifier_with_id = None
 
-    icon_url = (
-        os.environ.get("AYON_STATICS_SERVER")
-        or os.environ.get("OPENPYPE_STATICS_SERVER")
-    )
+    icon_url = os.environ.get("AYON_STATICS_SERVER")
     # 30 seconds
     cache_lifetime = 30
 
@@ -169,9 +165,6 @@ class AppplicationsAction(BaseAction):
             if not app or not app.enabled:
                 continue
 
-            if app.group.name in CUSTOM_LAUNCH_APP_GROUPS:
-                continue
-
             # Skip applications without valid executables
             if only_available and not app.find_executable():
                 continue
@@ -250,11 +243,11 @@ class AppplicationsAction(BaseAction):
             self.applications_manager.launch(
                 app_name,
                 project_name=project_name,
-                asset_name=folder_path,
+                folder_path=folder_path,
                 task_name=task_name
             )
 
-        except ApplictionExecutableNotFound as exc:
+        except ApplicationExecutableNotFound as exc:
             self.log.warning(exc.exc_msg)
             return {
                 "success": False,

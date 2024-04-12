@@ -708,7 +708,7 @@ class SyncFromFtrack:
             #   in 'attribs'
             for key, value in attribute_values.items():
                 # QUESTION Should we skip "unsetting" of project attributes?
-                #   - very dangerous for OpenPype and maybe for project should
+                #   - very dangerous for AYON and maybe for project should
                 #       be taken default value of attribute (if there is any)
                 if is_project and value is None:
                     continue

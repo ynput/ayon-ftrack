@@ -287,7 +287,7 @@ class FtrackTaskStatusOnFarmModel(BaseSettingsModel):
         title="Status profiles",
         default_factory=list,
         description=(
-            "Change status of task when it's subset is integrated on farm"
+            "Change status of task when it's product is integrated on farm"
         )
     )
 

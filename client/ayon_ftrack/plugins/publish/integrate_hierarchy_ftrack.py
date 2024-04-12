@@ -4,17 +4,12 @@ from copy import deepcopy
 
 import six
 import pyblish.api
+import ayon_api
 
-from openpype.client import get_asset_by_id
-from openpype.lib import filter_profiles
-from openpype.pipeline import KnownPublishError
+from ayon_core.lib import filter_profiles
+from ayon_core.pipeline import KnownPublishError
 from ayon_ftrack.common import get_ayon_attr_configs
 from ayon_ftrack.pipeline import plugin
-
-try:
-    from openpype.client import get_asset_name_identifier
-except ImportError:
-    get_asset_name_identifier = None
 
 
 class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
@@ -23,17 +18,20 @@ class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
     Example of entry data:
     {
         "ProjectXS": {
-            "entity_type": "Project",
-            "custom_attributes": {
-                "fps": 24,...
+            "entity_type": "project",
+            "attributes": {
+                "fps": 24,
+                ...
             },
             "tasks": [
                 "Compositing",
-                "Lighting",... *task must exist as task type in project schema*
+                "Lighting",
+                ... *task must exist as task type in project schema*
             ],
-            "childs": {
+            "children": {
                 "sq01": {
-                    "entity_type": "Sequence",
+                    "entity_type": "folder",
+                    "folder_type": "Sequence",
                     ...
                 }
             }
@@ -63,23 +61,20 @@ class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
 
         session = context.data["ftrackSession"]
         project_name = context.data["projectName"]
-        project = session.query(
+        ft_project = session.query(
             'select id, full_name from Project where full_name is "{}"'.format(
                 project_name
             )
         ).first()
-        if not project:
+        if not ft_project:
             raise KnownPublishError(
                 "Project \"{}\" was not found on ftrack.".format(project_name)
             )
 
-        self.session = session
-        self.ft_project = project
-        self.task_types = self.get_all_task_types(project)
-        self.task_statuses = self.get_task_statuses(project)
-
         # import ftrack hierarchy
-        self.import_to_ftrack(context, project_name, hierarchy_context)
+        self.import_to_ftrack(
+            session, context, ft_project, project_name, hierarchy_context
+        )
 
     def query_ftrack_entitites(self, session, ft_project):
         project_id = ft_project["id"]
@@ -145,7 +140,7 @@ class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
             entity_data["ft_entity"] = entity
             matching_ftrack_entities.append(entity)
 
-            hierarchy_children = entity_data.get("childs")
+            hierarchy_children = entity_data.get("children")
             if not hierarchy_children:
                 continue
 
@@ -205,27 +200,32 @@ class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
 
         return output
 
-    def import_to_ftrack(self, context, project_name, hierarchy_context):
+    def import_to_ftrack(
+        self, session, ft_project, context, project_name, hierarchy_context
+    ):
+        ft_task_types = self.get_all_task_types(project)
+        ft_task_statuses = self.get_task_statuses(project)
+
         # Prequery hiearchical custom attributes
-        hier_attrs = get_ayon_attr_configs(self.session)[1]
+        hier_attrs = get_ayon_attr_configs(session)[1]
         hier_attr_by_key = {
             attr["key"]: attr
             for attr in hier_attrs
         }
         # Query user entity (for comments)
-        user = self.session.query(
-            "User where username is \"{}\"".format(self.session.api_user)
+        user = session.query(
+            "User where username is \"{}\"".format(session.api_user)
         ).first()
         if not user:
             self.log.warning(
                 "Was not able to query current User {}".format(
-                    self.session.api_user
+                    session.api_user
                 )
             )
 
         # Query ftrack hierarchy with parenting
         ftrack_hierarchy = self.query_ftrack_entitites(
-            self.session, self.ft_project)
+            session, ft_project)
 
         # Fill ftrack entities to hierarchy context
         # - there is no need to query entities again
@@ -233,10 +233,19 @@ class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
             hierarchy_context, ftrack_hierarchy)
         # Query custom attribute values of each entity
         custom_attr_values_by_id = self.query_custom_attribute_values(
-            self.session, matching_entities, hier_attrs)
+            session, matching_entities, hier_attrs)
 
         # Get ftrack api module (as they are different per python version)
         ftrack_api = context.data["ftrackPythonModule"]
+
+        self.log.debug(
+            "Available task types in ftrack: %s",
+            str(ft_task_types)
+        )
+        self.log.debug(
+            "Available task statuses in ftrack: %s",
+            str(ft_task_statuses)
+        )
 
         # Use queue of hierarchy items to process
         import_queue = collections.deque()
@@ -258,38 +267,36 @@ class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
 
             entity = entity_data.get("ft_entity")
             if entity is None and entity_type.lower() == "project":
-                raise AssertionError(
+                raise KnownPublishError(
                     "Collected items are not in right order!"
                 )
 
             # Create entity if not exists
             if entity is None:
-                entity = self.session.create(entity_type, {
+                folder_type = entity_data["folder_type"]
+                entity = session.create(folder_type, {
                     "name": entity_name,
                     "parent": parent
                 })
                 entity_data["ft_entity"] = entity
 
-            if get_asset_name_identifier is None:
-                entity_path = entity["name"]
-            else:
-                entity_path = "{}/{}".format(parent_path, entity_name)
+            entity_path = "{}/{}".format(parent_path, entity_name)
 
             # CUSTOM ATTRIBUTES
-            custom_attributes = entity_data.get("custom_attributes", {})
+            attributes = entity_data.get("attributes", {})
             instances = []
             for instance in context:
-                instance_asset_name = instance.data.get("asset")
+                instance_folder_path = instance.data.get("folderPath")
                 if (
-                    instance_asset_name
-                    and instance_asset_name.lower() == entity_path.lower()
+                    instance_folder_path
+                    and instance_folder_path.lower() == entity_path.lower()
                 ):
                     instances.append(instance)
 
             for instance in instances:
                 instance.data["ftrackEntity"] = entity
 
-            for key, cust_attr_value in custom_attributes.items():
+            for key, cust_attr_value in attributes.items():
                 if cust_attr_value is None:
                     continue
 
@@ -337,15 +344,15 @@ class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
                     )
 
                 if op is not None:
-                    self.session.recorded_operations.push(op)
+                    session.recorded_operations.push(op)
 
-            if self.session.recorded_operations:
+            if session.recorded_operations:
                 try:
-                    self.session.commit()
+                    session.commit()
                 except Exception:
                     tp, value, tb = sys.exc_info()
-                    self.session.rollback()
-                    self.session._configure_locations()
+                    session.rollback()
+                    session._configure_locations()
                     six.reraise(tp, value, tb)
 
             # TASKS
@@ -376,22 +383,25 @@ class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
 
             for task_name, task_type in tasks_to_create:
                 task_entity = self.create_task(
+                    session,
                     task_name,
                     task_type,
                     entity,
+                    ft_task_types,
+                    ft_task_statuses,
                     ftrack_status_by_task_id
                 )
                 for instance in instances_by_task_name[task_name.lower()]:
                     instance.data["ftrackTask"] = task_entity
 
             # Incoming links.
-            self.create_links(project_name, entity_data, entity)
+            self.create_links(session, project_name, entity_data, entity)
             try:
-                self.session.commit()
+                session.commit()
             except Exception:
                 tp, value, tb = sys.exc_info()
-                self.session.rollback()
-                self.session._configure_locations()
+                session.rollback()
+                session._configure_locations()
                 six.reraise(tp, value, tb)
 
             # Create notes.
@@ -401,15 +411,15 @@ class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
                     entity.create_note(comment, user)
 
                 try:
-                    self.session.commit()
+                    session.commit()
                 except Exception:
                     tp, value, tb = sys.exc_info()
-                    self.session.rollback()
-                    self.session._configure_locations()
+                    session.rollback()
+                    session._configure_locations()
                     six.reraise(tp, value, tb)
 
             # Import children.
-            children = entity_data.get("childs")
+            children = entity_data.get("children")
             if not children:
                 continue
 
@@ -418,34 +428,51 @@ class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
                     (entity_name, entity_data, entity, entity_path)
                 )
 
-    def create_links(self, project_name, entity_data, entity):
+    def create_links(self, session, project_name, entity_data, entity):
+        # WARNING Don't know how does this work?
+        #   The logic looks only for 'AssetBuild' entities. Not sure where
+        #   value of 'inputs' on entity data comes from.
+
         # Clear existing links.
         for link in entity.get("incoming_links", []):
-            self.session.delete(link)
+            session.delete(link)
             try:
-                self.session.commit()
+                session.commit()
             except Exception:
                 tp, value, tb = sys.exc_info()
-                self.session.rollback()
-                self.session._configure_locations()
+                session.rollback()
+                session._configure_locations()
                 six.reraise(tp, value, tb)
 
         # Create new links.
-        for asset_id in entity_data.get("inputs", []):
-            asset_doc = get_asset_by_id(project_name, asset_id)
+        input_folder_ids = {
+            folder_id
+            for folder_id in entity_data.get("inputs", [])
+        }
+        folder_entities = {}
+        if input_folder_ids:
+            folder_entities = {
+                folder_entity["id"]: folder_entity
+                for folder_entity in ayon_api.get_folders(
+                    project_name, folder_ids=input_folder_ids
+                )
+            }
+
+        for folder_id in input_folder_ids:
+            folder_entity = folder_entities.get(folder_id)
             ftrack_id = None
-            if asset_doc:
-                ftrack_id = asset_doc["data"].get("ftrackId")
+            if folder_entity:
+                ftrack_id = folder_entity["attrib"].get("ftrackId")
             if not ftrack_id:
                 continue
 
-            assetbuild = self.session.get("AssetBuild", ftrack_id)
+            assetbuild = session.get("AssetBuild", ftrack_id)
             self.log.debug(
                 "Creating link from {0} to {1}".format(
                     assetbuild["name"], entity["name"]
                 )
             )
-            self.session.create(
+            session.create(
                 "TypedContextLink", {"from": assetbuild, "to": entity}
             )
 
@@ -468,7 +495,16 @@ class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
             for status in task_workflow_statuses
         }
 
-    def create_task(self, name, task_type, parent, ftrack_status_by_task_id):
+    def create_task(
+        self,
+        session,
+        name,
+        task_type,
+        parent,
+        ft_task_types,
+        ft_task_statuses,
+        ftrack_status_by_task_id
+    ):
         filter_data = {
             "task_names": name,
             "task_types": task_type
@@ -478,11 +514,10 @@ class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
             filter_data
         )
         status_id = None
-        status_name = None
         if profile:
             status_name = profile["status_name"]
             status_name_low = status_name.lower()
-            for _status_id, status in self.task_statuses.items():
+            for _status_id, status in ft_task_statuses.items():
                 if status["name"].lower() == status_name_low:
                     status_id = _status_id
                     status_name = status["name"]
@@ -493,23 +528,22 @@ class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
                     "Task status \"{}\" was not found".format(status_name)
                 )
 
-        task = self.session.create("Task", {
+        task = session.create("Task", {
             "name": name,
             "parent": parent
         })
         # TODO not secured!!! - check if task_type exists
-        self.log.info(task_type)
-        self.log.info(self.task_types)
-        task["type"] = self.task_types[task_type]
+        self.log.debug(task_type)
+        task["type"] = ft_task_types[task_type]
         if status_id is not None:
             task["status_id"] = status_id
 
         try:
-            self.session.commit()
+            session.commit()
         except Exception:
             tp, value, tb = sys.exc_info()
-            self.session.rollback()
-            self.session._configure_locations()
+            session.rollback()
+            session._configure_locations()
             six.reraise(tp, value, tb)
 
         if status_id is not None:
@@ -546,7 +580,7 @@ class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
 
         while hierarchy_queue:
             (name, item, path, parent_item) = hierarchy_queue.popleft()
-            children = item.get("childs")
+            children = item.get("children")
             if children:
                 for child_name, child_item in children.items():
                     child_path = "/".join([path, child_name])
