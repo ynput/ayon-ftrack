@@ -162,14 +162,12 @@ def find_files_in_subdir(
 
 def copy_server_content(
     addon_output_dir: str,
-    current_dir: str,
     log: logging.Logger
 ):
     """Copies server side folders to 'addon_package_dir'
 
     Args:
         addon_output_dir (str): package dir in addon repo dir
-        current_dir (str): addon repo dir
         log (logging.Logger)
     """
 
@@ -182,7 +180,7 @@ def copy_server_content(
             (path, os.path.join("server", sub_path))
         )
 
-    public_dir = os.path.join(current_dir, "public")
+    public_dir = os.path.join(CURRENT_DIR, "public")
     for path, sub_path in find_files_in_subdir(public_dir):
         filepaths_to_copy.append(
             (path, os.path.join("public", sub_path))
@@ -195,7 +193,7 @@ def copy_server_content(
             os.path.join("server", "constants.py")
         ),
         (
-            os.path.join(current_dir, "package.py"),
+            os.path.join(CURRENT_DIR, "package.py"),
             os.path.join(addon_output_dir, "package.py")
         )
     ])
@@ -208,7 +206,7 @@ def copy_server_content(
         )
 
 
-def _get_client_files_mapping(current_dir: str):
+def _get_client_files_mapping():
     client_code = os.path.join(CLIENT_DIR, ADDON_CLIENT_DIR)
     return [
         (src, os.path.join(ADDON_CLIENT_DIR, dst))
@@ -218,7 +216,6 @@ def _get_client_files_mapping(current_dir: str):
 
 def zip_client_side(
     addon_package_dir: str,
-    current_dir: str,
     log: logging.Logger,
     zip_basename: Optional[str] = None
 ):
@@ -226,7 +223,6 @@ def zip_client_side(
 
     Args:
         addon_package_dir (str): Output package directory path.
-        current_dir (str): Directoy path of addon source.
         zip_basename (str): Output zip file name in format. 'client' by
             default.
         log (logging.Logger): Logger object.
@@ -239,9 +235,7 @@ def zip_client_side(
     if not os.path.exists(private_dir):
         os.makedirs(private_dir)
 
-    files_mapping: list[tuple[str, str]] = _get_client_files_mapping(
-        current_dir
-    )
+    files_mapping: list[tuple[str, str]] = _get_client_files_mapping()
     zip_filename: str = zip_basename + ".zip"
     zip_filepath: str = os.path.join(os.path.join(private_dir, zip_filename))
     with ZipFileLongPaths(
@@ -294,11 +288,10 @@ def create_server_package(
     log.info(f"Output package can be found: {output_path}")
 
 
-def copy_client_code(current_dir: str, output_dir: str):
+def copy_client_code(output_dir: str):
     """Copy client code to output directory.
 
     Args:
-        current_dir (str): Directory path of addon source.
         output_dir (str): Directory path to output client code.
     """
 
@@ -311,7 +304,7 @@ def copy_client_code(current_dir: str, output_dir: str):
         )
 
     os.makedirs(output_dir, exist_ok=True)
-    mapping = _get_client_files_mapping(current_dir)
+    mapping = _get_client_files_mapping()
     for (src_path, dst_path) in mapping:
         full_dst_path = os.path.join(output_dir, dst_path)
         os.makedirs(os.path.dirname(full_dst_path), exist_ok=True)
@@ -326,13 +319,12 @@ def main(
 ):
     log: logging.Logger = logging.getLogger("create_package")
 
-    current_dir: str = os.path.dirname(os.path.abspath(__file__))
     if not output_dir:
-        output_dir = os.path.join(current_dir, "package")
+        output_dir = os.path.join(CURRENT_DIR, "package")
 
     # Update client version file with version from 'package.py'
     client_version_file = os.path.join(
-        current_dir, "client", ADDON_CLIENT_DIR, "version.py"
+        CURRENT_DIR, "client", ADDON_CLIENT_DIR, "version.py"
     )
     with open(client_version_file, "w") as stream:
         stream.write(CLIENT_VERSION_CONTENT.format(ADDON_NAME, ADDON_VERSION))
@@ -344,7 +336,7 @@ def main(
                 "Output directory must be defined"
                 " for client only preparation."
             )
-        copy_client_code(current_dir, output_dir)
+        copy_client_code(output_dir)
         log.info("Client folder created")
         return
 
@@ -360,9 +352,9 @@ def main(
     if not os.path.exists(addon_output_dir):
         os.makedirs(addon_output_dir)
 
-    copy_server_content(addon_output_dir, current_dir, log)
+    copy_server_content(addon_output_dir, log)
 
-    zip_client_side(addon_output_dir, current_dir, log)
+    zip_client_side(addon_output_dir, log)
 
     # Skip server zipping
     if not skip_zip:
