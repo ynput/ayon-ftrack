@@ -258,13 +258,13 @@ class FtrackTaskStatusProfile(BaseSettingsModel):
         default_factory=list,
         title="Task names",
     )
-    families: list[str] = Field(
+    product_types: list[str] = Field(
         default_factory=list,
-        title="Families",
+        title="Product types",
     )
-    subset_names: list[str] = Field(
+    product_names: list[str] = Field(
         default_factory=list,
-        title="Subset names",
+        title="Product names",
     )
     status_name: str = Field(
         "",
@@ -708,15 +708,15 @@ DEFAULT_PUBLISH_SETTINGS = {
     "IntegrateFtrackFarmStatus": {
         "farm_status_profiles": [
             {
-                "hosts": [
+                "host_names": [
                     "celaction"
                 ],
                 "task_types": [],
                 "task_names": [],
-                "families": [
+                "product_types": [
                     "render"
                 ],
-                "subsets": [],
+                "product_names": [],
                 "status_name": "Render"
             }
         ]

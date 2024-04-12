@@ -117,8 +117,8 @@ class IntegrateFtrackStatusBase(plugin.FtrackPublishInstancePlugin):
                 "host_names": ["nuke"],
                 "task_types": ["Compositing"],
                 "task_names": ["Comp"],
-                "families": ["render"],
-                "subset_names": ["renderComp"],
+                "product_types": ["render"],
+                "product_names": ["renderComp"],
                 "status_name": "Rendering",
             }
 
@@ -151,8 +151,8 @@ class IntegrateFtrackStatusBase(plugin.FtrackPublishInstancePlugin):
             "host_names": context.data["hostName"],
             "task_types": task_entity["type"]["name"],
             "task_names": task_entity["name"],
-            "families": instance.data["productType"],
-            "subset_names": instance.data["productName"],
+            "product_types": instance.data["productType"],
+            "product_names": instance.data["productName"],
         }
 
     def is_valid_instance(self, context, instance):
@@ -256,9 +256,6 @@ class IntegrateFtrackFarmStatus(IntegrateFtrackStatusBase):
     def get_status_profiles(self):
         if self.status_profiles is None:
             profiles = copy.deepcopy(self.farm_status_profiles)
-            for profile in profiles:
-                profile["host_names"] = profile.pop("hosts")
-                profile["subset_names"] = profile.pop("subsets")
             self.status_profiles = profiles
         return self.status_profiles
 
