@@ -138,6 +138,14 @@ class FtrackAddon(BaseServerAddon):
         return overrides
 
     def _convert_integrate_ftrack_status_settings(self, overrides):
+        """Convert settings of 'IntegrateFtrackFarmStatus' profiles.
+
+        This change happened in 1.1.0 version of the addon, where the settings
+        were converted to use AYON naming convention over OpenPype convention.
+
+        Args:
+            overrides (dict[str, Any]): Settings overrides.
+        """
         value = overrides
         for key in (
             "publish",
