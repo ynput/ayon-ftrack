@@ -185,7 +185,7 @@ def integrate_ftrack_metadata_enum():
 class IntegrateFtrackInstanceModel(BaseSettingsModel):
     _isGroup = True
     product_type_mapping: list[IntegrateFtrackFamilyMapping] = Field(
-        title="Family Mapping",
+        title="Product type Mapping",
         default_factory=list,
     )
     keep_first_product_name_for_review: bool = Field(
@@ -355,7 +355,7 @@ class FtrackPublishPlugins(BaseSettingsModel):
         title="Integrate Ftrack Farm Status",
         default_factory=IntegrateFtrackFarmStatusModel,
         description=(
-            "Change status of task when it's subset is submitted to farm"
+            "Change status of task when it's product is submitted to farm"
         ),
     )
     ftrack_task_status_local_publish: FtrackTaskStatusLocalModel = Field(
