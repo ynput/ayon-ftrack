@@ -136,7 +136,9 @@ class FtrackAddon(BaseServerAddon):
     ) -> dict[str, Any]:
         self._convert_integrate_ftrack_status_settings(overrides)
         # Use super conversion
-        return await super().convert_settings_overrides(overrides)
+        return await super().convert_settings_overrides(
+            source_version, overrides
+        )
 
     def _convert_integrate_ftrack_status_settings(self, overrides):
         """Convert settings of 'IntegrateFtrackFarmStatus' profiles.
