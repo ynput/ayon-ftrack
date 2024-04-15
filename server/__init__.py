@@ -1,5 +1,5 @@
 import semver
-from typing import Type
+from typing import Type, Any
 
 from ayon_server.addons import BaseServerAddon, AddonLibrary
 from ayon_server.lib.postgres import Postgres
@@ -129,3 +129,34 @@ class FtrackAddon(BaseServerAddon):
             )
         return True
 
+    async def convert_settings_overrides(
+        self,
+        source_version: str,
+        overrides: dict[str, Any],
+    ) -> dict[str, Any]:
+        self._convert_integrate_ftrack_status_settings(overrides)
+        return overrides
+
+    def _convert_integrate_ftrack_status_settings(self, overrides):
+        value = overrides
+        for key in (
+            "publish",
+            "IntegrateFtrackFarmStatus",
+            "farm_status_profiles",
+        ):
+            if not isinstance(value, dict) or key not in value:
+                return
+
+            value = value[key]
+
+        if not isinstance(value, list):
+            return
+
+        for profile in value:
+            for src_key, dst_key in (
+                ("hosts", "host_names"),
+                ("families", "product_types"),
+                ("subset_names", "product_names"),
+            ):
+                if src_key in profile:
+                    profile[dst_key] = profile.pop(src_key)
