@@ -171,7 +171,8 @@ class IntegrateFtrackFamilyMapping(BaseSettingsModel):
 
 def integrate_ftrack_metadata_enum():
     return [
-        {"value": "openpype_version", "label": "OpenPype version"},
+        {"value": "ayon_ftrack_version", "label": "AYON ftrack version"},
+        {"value": "ayon_launcher_version", "label": "AYON launcher version"},
         {"value": "frame_start", "label": "Frame start"},
         {"value": "frame_end", "label": "Frame end"},
         {"value": "duration", "label": "Duration"},

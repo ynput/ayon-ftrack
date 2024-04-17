@@ -28,7 +28,8 @@ class IntegrateFtrackInstance(plugin.FtrackPublishInstancePlugin):
     families = ["ftrack"]
 
     metadata_keys_to_label = {
-        "openpype_version": "OpenPype version",
+        "ayon_ftrack_version": "AYON ftrack version",
+        "ayon_launcher_version": "AYON launcher version",
         "frame_start": "Frame start",
         "frame_end": "Frame end",
         "duration": "Duration",
@@ -560,9 +561,13 @@ class IntegrateFtrackInstance(plugin.FtrackPublishInstancePlugin):
         self, instance, repre, component_path, is_review=None
     ):
         metadata = {}
-        if "openpype_version" in self.additional_metadata_keys:
-            label = self.metadata_keys_to_label["openpype_version"]
-            metadata[label] = __version__
+        for key, value in (
+            ("ayon_ftrack_version", __version__),
+            ("ayon_launcher_version", get_ayon_launcher_version()),
+        ):
+            if key in self.additional_metadata_keys:
+                label = self.metadata_keys_to_label[key]
+                metadata[label] = value
 
         extension = os.path.splitext(component_path)[-1]
         streams = []
