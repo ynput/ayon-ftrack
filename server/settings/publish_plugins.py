@@ -708,15 +708,15 @@ DEFAULT_PUBLISH_SETTINGS = {
     "IntegrateFtrackFarmStatus": {
         "farm_status_profiles": [
             {
-                "hosts": [
+                "host_names": [
                     "celaction"
                 ],
                 "task_types": [],
                 "task_names": [],
-                "families": [
+                "product_types": [
                     "render"
                 ],
-                "subsets": [],
+                "product_names": [],
                 "status_name": "Render"
             }
         ]
