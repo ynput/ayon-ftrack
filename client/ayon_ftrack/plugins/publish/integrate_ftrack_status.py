@@ -257,8 +257,17 @@ class IntegrateFtrackFarmStatus(IntegrateFtrackStatusBase):
         if self.status_profiles is None:
             profiles = copy.deepcopy(self.farm_status_profiles)
             for profile in profiles:
-                profile["host_names"] = profile.pop("hosts")
-                profile["subset_names"] = profile.pop("subsets")
+                if "hosts" in profile:
+                    profile["host_names"] = profile.pop("hosts")
+
+                if "product_types" in profile:
+                    profile["families"] = profile.pop("product_types")
+
+                if "subsets" in profile:
+                    profile["subset_names"] = profile.pop("subsets")
+                elif "product_names" in profile:
+                    profile["subset_names"] = profile.pop("product_names")
+
             self.status_profiles = profiles
         return self.status_profiles
 
