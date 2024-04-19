@@ -2,10 +2,10 @@ name: ayon-ftrack-services
 services:
   leecher:
     container_name: leecher
-    image: ynput/ayon-ftrack-leecher:1.0.6
+    image: ynput/ayon-ftrack-leecher:1.0.7-dev.1
     restart: unless-stopped
     environment:
       - "AYON_SERVER_URL=${AYON_SERVER_URL}"
       - "AYON_API_KEY=${AYON_API_KEY}"
       - "AYON_ADDON_NAME=ftrack"
-      - "AYON_ADDON_VERSION=1.0.6"
+      - "AYON_ADDON_VERSION=1.0.7-dev.1"
