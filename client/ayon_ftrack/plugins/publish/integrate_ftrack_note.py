@@ -45,8 +45,6 @@ class IntegrateFtrackNote(plugin.FtrackPublishInstancePlugin):
 
         context = instance.context
         host_name = context.data["hostName"]
-        app_name = context.data["appName"]
-        app_label = context.data["appLabel"]
         comment = instance.data["comment"]
         if not comment:
             self.log.debug("Comment is not set.")
@@ -98,10 +96,16 @@ class IntegrateFtrackNote(plugin.FtrackPublishInstancePlugin):
 
         base_format_data = {
             "host_name": host_name,
-            "app_name": app_name,
-            "app_label": app_label,
             "source": instance.data.get("source", '')
         }
+        for src_key, dst_key in (
+            ("appName", "app_name"),
+            ("appLabel", "app_label"),
+        ):
+            value = context.data.get(src_key)
+            if value is not None:
+                base_format_data[dst_key] = value
+
         if comment:
             base_format_data["comment"] = comment
         for asset_version_data in asset_versions_data_by_id.values():
