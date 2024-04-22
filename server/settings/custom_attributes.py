@@ -1,14 +1,12 @@
-from pydantic import Field
-
-from ayon_server.settings import BaseSettingsModel
+from ayon_server.settings import BaseSettingsModel, SettingsField
 
 
 class CustomAttributeModel(BaseSettingsModel):
-    write_security_roles: list[str] = Field(
+    write_security_roles: list[str] = SettingsField(
         default_factory=list,
         title="Write roles",
     )
-    read_roles: list[str] = Field(
+    read_roles: list[str] = SettingsField(
         default_factory=list,
         title="Read roles",
     )
@@ -89,11 +87,11 @@ class HierarchicalAttributesModel(BaseSettingsModel):
 
 
 class CustomAttributesModel(BaseSettingsModel):
-    show: ProjectCustomAttributesModel = Field(
+    show: ProjectCustomAttributesModel = SettingsField(
         default_factory=ProjectCustomAttributesModel,
         title="Project Custom attributes",
     )
-    is_hierarchical: HierarchicalAttributesModel = Field(
+    is_hierarchical: HierarchicalAttributesModel = SettingsField(
         default_factory=HierarchicalAttributesModel,
         title="Hierarchical Attributes",
     )

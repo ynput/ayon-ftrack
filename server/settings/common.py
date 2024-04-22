@@ -1,6 +1,4 @@
-from pydantic import Field
-
-from ayon_server.settings import BaseSettingsModel
+from ayon_server.settings import BaseSettingsModel, SettingsField
 
 
 ROLES_TITLE = "Roles for action"
@@ -13,5 +11,5 @@ class DictWithStrList(BaseSettingsModel):
     """
 
     _layout = "expanded"
-    name: str = Field("")
-    value: list[str] = Field(default_factory=list)
+    name: str = SettingsField("")
+    value: list[str] = SettingsField(default_factory=list)
