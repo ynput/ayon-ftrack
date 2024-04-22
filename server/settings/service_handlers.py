@@ -1,6 +1,10 @@
-from pydantic import Field, validator
+from pydantic import validator
 
-from ayon_server.settings import BaseSettingsModel, ensure_unique_names
+from ayon_server.settings import (
+    BaseSettingsModel,
+    SettingsField,
+    ensure_unique_names,
+)
 
 
 from .common import DictWithStrList, ROLES_TITLE
@@ -8,7 +12,7 @@ from .common import DictWithStrList, ROLES_TITLE
 
 class SimpleAction(BaseSettingsModel):
     enabled: bool = True
-    role_list: list[str] = Field(
+    role_list: list[str] = SettingsField(
         title=ROLES_TITLE,
         default_factory=list,
     )
@@ -16,19 +20,19 @@ class SimpleAction(BaseSettingsModel):
 
 class SyncHierarchicalAttributes(BaseSettingsModel):
     enabled: bool = True
-    interest_entity_types: list[str] = Field(
+    interest_entity_types: list[str] = SettingsField(
         title="Entity types of interest",
         default_factory=list,
     )
-    interest_attributes: list[str] = Field(
+    interest_attributes: list[str] = SettingsField(
         title="Attributes to sync",
         default_factory=list,
     )
-    action_enabled: bool = Field(
+    action_enabled: bool = SettingsField(
         True,
         title="Enable Action",
     )
-    role_list: list[str] = Field(
+    role_list: list[str] = SettingsField(
         title=ROLES_TITLE,
         default_factory=list,
     )
@@ -36,19 +40,21 @@ class SyncHierarchicalAttributes(BaseSettingsModel):
 
 class CloneReviewAction(BaseSettingsModel):
     enabled: bool = True
-    role_list: list[str] = Field(default_factory=list, title=ROLES_TITLE)
+    role_list: list[str] = SettingsField(
+        default_factory=list, title=ROLES_TITLE
+    )
 
 
 class ThumbnailHierarchyUpdates(BaseSettingsModel):
     """Push thumbnail from version, up through multiple hierarchy levels."""
 
     enabled: bool = True
-    levels: int = Field(1, title="Levels", ge=0)
+    levels: int = SettingsField(1, title="Levels", ge=0)
 
 
 class SyncStatusTaskToParentMapping(BaseSettingsModel):
-    new_status: str = Field(title="New parent status")
-    task_statuses: list[str] = Field(
+    new_status: str = SettingsField(title="New parent status")
+    task_statuses: list[str] = SettingsField(
         title="Task status",
         default_factory=list,
     )
@@ -57,28 +63,32 @@ class SyncStatusTaskToParentMapping(BaseSettingsModel):
 class SyncStatusTaskToParent(BaseSettingsModel):
     _isGroup = True
     enabled: bool = True
-    parent_object_types: list[str] = Field(
+    parent_object_types: list[str] = SettingsField(
         title="Object types",
         default_factory=list,
     )
-    parent_status_match_all_task_statuses: list[DictWithStrList] = Field(
-        title="Change parent if all tasks match",
-        default_factory=list,
+    parent_status_match_all_task_statuses: list[DictWithStrList] = (
+        SettingsField(
+            title="Change parent if all tasks match",
+            default_factory=list,
+        )
     )
-    parent_status_by_task_status: list[SyncStatusTaskToParentMapping] = Field(
-        title="Change parent status if a single task matches",
-        default_factory=list,
+    parent_status_by_task_status: list[SyncStatusTaskToParentMapping] = (
+        SettingsField(
+            title="Change parent status if a single task matches",
+            default_factory=list,
+        )
     )
 
 
 class SyncStatusTaskToVersion(BaseSettingsModel):
     _isGroup = True
     enabled: bool = True
-    mapping: list[DictWithStrList] = Field(
+    mapping: list[DictWithStrList] = SettingsField(
         title="Status mapping",
         default_factory=list,
     )
-    asset_types_to_skip: list[str] = Field(
+    asset_types_to_skip: list[str] = SettingsField(
         title="Skip on Asset types (short)",
         default_factory=list,
     )
@@ -94,11 +104,11 @@ class SyncStatusTaskToVersion(BaseSettingsModel):
 class SyncStatusVersionToTask(BaseSettingsModel):
     _isGroup = True
     enabled: bool = True
-    mapping: list[DictWithStrList] = Field(
+    mapping: list[DictWithStrList] = SettingsField(
         title="Status mapping",
         default_factory=list,
     )
-    asset_types_to_skip: list[str] = Field(
+    asset_types_to_skip: list[str] = SettingsField(
         title="Skip on Asset types (short)",
         default_factory=list,
     )
@@ -120,11 +130,11 @@ class NextTaskStatusMapping(BaseSettingsModel):
 class NextTaskUpdate(BaseSettingsModel):
     _isGroup = True
     enabled: bool = True
-    mapping: list[NextTaskStatusMapping] = Field(
+    mapping: list[NextTaskStatusMapping] = SettingsField(
         title="Status Mappings",
         default_factory=list,
     )
-    ignored_statuses: list[str] = Field(
+    ignored_statuses: list[str] = SettingsField(
         title="Ignored statuses",
         default_factory=list,
     )
@@ -141,7 +151,7 @@ class NextTaskUpdate(BaseSettingsModel):
 class TransferHierNonHierAttrsAction(BaseSettingsModel):
     _isGroup = True
     enabled: bool = True
-    role_list: list[str] = Field(
+    role_list: list[str] = SettingsField(
         title=ROLES_TITLE,
         default_factory=list,
     )
@@ -150,23 +160,23 @@ class TransferHierNonHierAttrsAction(BaseSettingsModel):
 # class CreateDailyReviewSession(BaseSettingsModel):
 #     _isGroup = True
 #     enabled: bool = True
-#     review_session_template: str = Field(
+#     review_session_template: str = SettingsField(
 #         "",
 #         title="ReviewSession name template",
 #     )
-#     cycle_enabled: bool = Field(
+#     cycle_enabled: bool = SettingsField(
 #         False,
 #         title="Run automatically every day",
 #         section="Automated execution",
 #     )
-#     cycle_hour_start: str = Field(
+#     cycle_hour_start: str = SettingsField(
 #         "00:00:00",
 #         title="Create daily review session at",
 #         description="This may take affect on next day",
 #         widget="time",
 #         regex="(?:[01]\d|2[0123]):(?:[012345]\d):(?:[012345]\d)",
 #     )
-#     role_list: list[str] = Field(
+#     role_list: list[str] = SettingsField(
 #         section="---",
 #         title=ROLES_TITLE,
 #         default_factory=list,
@@ -185,18 +195,18 @@ def custom_attribute_type():
 
 class DailyListCustomAttributesModel(BaseSettingsModel):
     _layout = "expanded"
-    attr_name: str = Field("", title="Attribute name")
-    attr_type: str = Field(
+    attr_name: str = SettingsField("", title="Attribute name")
+    attr_type: str = SettingsField(
         "bool_value",
         title="Attribute type",
         enum_resolver=custom_attribute_type,
         conditionalEnum=True,
     )
-    bool_value: bool = Field(True, title="Expected value")
-    str_value: str = Field("", title="Expected value")
-    int_value: int = Field(0, title="Expected value")
-    float_value: float = Field(0.0, title="Expected value")
-    enum_value: list[str] = Field(
+    bool_value: bool = SettingsField(True, title="Expected value")
+    str_value: str = SettingsField("", title="Expected value")
+    int_value: int = SettingsField(0, title="Expected value")
+    float_value: float = SettingsField(0.0, title="Expected value")
+    enum_value: list[str] = SettingsField(
         title="Expected value",
         default_factory=list,
     )
@@ -204,11 +214,11 @@ class DailyListCustomAttributesModel(BaseSettingsModel):
 
 class DailyListFilterModel(BaseSettingsModel):
     _layout = "expanded"
-    statuses: list[str] = Field(
+    statuses: list[str] = SettingsField(
         title="Statuses",
         default_factory=list,
     )
-    custom_attributes: list[DailyListCustomAttributesModel] = Field(
+    custom_attributes: list[DailyListCustomAttributesModel] = SettingsField(
         title="Custom attributes",
         default_factory=list,
     )
@@ -218,17 +228,17 @@ class DailyListItemModel(BaseSettingsModel):
     """Create list with AssetVersions by filter criteria."""
 
     _layout = "expanded"
-    name_template: str = Field("{yy}{mm}{dd}", title="Name template")
-    category: str = Field(
+    name_template: str = SettingsField("{yy}{mm}{dd}", title="Name template")
+    category: str = SettingsField(
         "Dailies",
         title="List category",
         enum_resolver=lambda: ["Default", "Clients", "Dailies"],
     )
-    cycle_enabled: bool = Field(
+    cycle_enabled: bool = SettingsField(
         False,
         title="Run automatically",
     )
-    filters: list[DailyListFilterModel] = Field(
+    filters: list[DailyListFilterModel] = SettingsField(
         title="Asset version filters",
         default_factory=list,
     )
@@ -257,7 +267,7 @@ class CreateDailyListsModel(BaseSettingsModel):
 
     _isGroup = True
     enabled: bool = True
-    cycle_hour_start: str = Field(
+    cycle_hour_start: str = SettingsField(
         "00:00:00",
         title="Create daily lists at",
         description="This may take affect on next day",
@@ -266,17 +276,17 @@ class CreateDailyListsModel(BaseSettingsModel):
         section="Automated execution",
         scope=["studio"],
     )
-    cycle_days: list[str] = Field(
+    cycle_days: list[str] = SettingsField(
         title="Days of week",
         default_factory=default_week_days,
         enum_resolver=week_days,
         scope=["studio"],
     )
-    lists: list[DailyListItemModel] = Field(
+    lists: list[DailyListItemModel] = SettingsField(
         title="Lists",
         default_factory=list,
     )
-    role_list: list[str] = Field(
+    role_list: list[str] = SettingsField(
         section="---",
         title=ROLES_TITLE,
         default_factory=list,
@@ -286,55 +296,55 @@ class CreateDailyListsModel(BaseSettingsModel):
 class FtrackServiceHandlers(BaseSettingsModel):
     """Settings for event handlers running in ftrack service."""
 
-    prepare_project: SimpleAction = Field(
+    prepare_project: SimpleAction = SettingsField(
         title="Prepare Project",
         default_factory=SimpleAction,
     )
-    sync_from_ftrack: SimpleAction = Field(
+    sync_from_ftrack: SimpleAction = SettingsField(
         title="Sync to AYON",
         default_factory=SimpleAction,
     )
-    sync_hier_entity_attributes: SyncHierarchicalAttributes = Field(
+    sync_hier_entity_attributes: SyncHierarchicalAttributes = SettingsField(
         title="Sync Hierarchical and Entity Attributes",
         default_factory=SyncHierarchicalAttributes,
     )
-    clone_review_session: CloneReviewAction = Field(
+    clone_review_session: CloneReviewAction = SettingsField(
         title="Clone Review Session",
         default_factory=CloneReviewAction,
     )
-    delete_ayon_entities: SimpleAction = Field(
+    delete_ayon_entities: SimpleAction = SettingsField(
         title="Delete Folders/Products",
         default_factory=SimpleAction,
     )
-    thumbnail_updates: ThumbnailHierarchyUpdates = Field(
+    thumbnail_updates: ThumbnailHierarchyUpdates = SettingsField(
         title="Update Hierarchy thumbnails",
         default_factory=ThumbnailHierarchyUpdates,
     )
-    status_task_to_parent: SyncStatusTaskToParent = Field(
+    status_task_to_parent: SyncStatusTaskToParent = SettingsField(
         title="Sync status from Task to Parent",
         default_factory=SyncStatusTaskToParent,
     )
-    status_task_to_version: SyncStatusTaskToVersion = Field(
+    status_task_to_version: SyncStatusTaskToVersion = SettingsField(
         title="Sync status from Task to Version",
         default_factory=SyncStatusTaskToVersion,
     )
-    status_version_to_task: SyncStatusVersionToTask = Field(
+    status_version_to_task: SyncStatusVersionToTask = SettingsField(
         title="Sync status from Version to Task",
         default_factory=SyncStatusVersionToTask,
     )
-    next_task_update: NextTaskUpdate = Field(
+    next_task_update: NextTaskUpdate = SettingsField(
         title="Update status on next task",
         default_factory=NextTaskUpdate,
     )
-    transfer_values_of_hierarchical_attributes: TransferHierNonHierAttrsAction = Field(
+    transfer_values_of_hierarchical_attributes: TransferHierNonHierAttrsAction = SettingsField(
         title="Action to transfer hierarchical attribute values",
         default_factory=TransferHierNonHierAttrsAction,
     )
-    # create_daily_review_session: CreateDailyReviewSession = Field(
+    # create_daily_review_session: CreateDailyReviewSession = SettingsField(
     #     title="Create daily review session",
     #     default_factory=CreateDailyReviewSession,
     # )
-    create_daily_lists: CreateDailyListsModel = Field(
+    create_daily_lists: CreateDailyListsModel = SettingsField(
         title="Create daily lists",
         default_factory=CreateDailyListsModel,
     )
