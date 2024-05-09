@@ -73,7 +73,7 @@ class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
 
         # import ftrack hierarchy
         self.import_to_ftrack(
-            session, context, ft_project, project_name, hierarchy_context
+            session, ft_project, context, project_name, hierarchy_context
         )
 
     def query_ftrack_entitites(self, session, ft_project):
@@ -203,8 +203,8 @@ class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
     def import_to_ftrack(
         self, session, ft_project, context, project_name, hierarchy_context
     ):
-        ft_task_types = self.get_all_task_types(project)
-        ft_task_statuses = self.get_task_statuses(project)
+        ft_task_types = self.get_all_task_types(ft_project)
+        ft_task_statuses = self.get_task_statuses(ft_project)
 
         # Prequery hiearchical custom attributes
         hier_attrs = get_ayon_attr_configs(session)[1]
@@ -273,7 +273,7 @@ class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
 
             # Create entity if not exists
             if entity is None:
-                folder_type = entity_data["folder_type"]
+                folder_type = entity_data["folder_type"].capitalize()
                 entity = session.create(folder_type, {
                     "name": entity_name,
                     "parent": parent
@@ -287,6 +287,13 @@ class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
             instances = []
             for instance in context:
                 instance_folder_path = instance.data.get("folderPath")
+
+                # Ensure project name is the first entry in the folder path.
+                if not instance_folder_path.startswith("/" + project_name):
+                    instance_folder_path = "/{}{}".format(
+                        project_name, instance_folder_path
+                    )
+
                 if (
                     instance_folder_path
                     and instance_folder_path.lower() == entity_path.lower()
