@@ -289,7 +289,10 @@ class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
                 })
                 entity_data["ft_entity"] = entity
 
-            entity_path = "{}/{}".format(parent_path, entity_name)
+            if entity_type.lower() == "project":
+                entity_path = ""
+            else:
+                entity_path = "{}/{}".format(parent_path, entity_name)
 
             # CUSTOM ATTRIBUTES
             attributes = entity_data.get("attributes", {})
