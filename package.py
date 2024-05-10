@@ -13,3 +13,6 @@ plugin_for = ["ayon_server"]
 ayon_required_addons = {
     "core": ">=0.3.0",
 }
+ayon_compatible_addons = {
+    "applications": ">=0.2.0",
+}
