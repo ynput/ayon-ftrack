@@ -283,7 +283,7 @@ class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
                 object_type = object_types_by_lower_name[folder_type_low]
                 entity_type = object_type["name"].replace(" ", "")
 
-                entity = session.create(folder_type, {
+                entity = session.create(entity_type, {
                     "name": entity_name,
                     "parent": parent
                 })
