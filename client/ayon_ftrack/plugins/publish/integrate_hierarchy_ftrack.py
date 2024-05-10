@@ -247,6 +247,11 @@ class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
             str(ft_task_statuses)
         )
 
+        object_types_by_lower_name = {
+            x["name"].lower(): x
+            for x in ft_project["project_schema"]["object_types"]
+        }
+
         # Use queue of hierarchy items to process
         import_queue = collections.deque()
         for entity_name, entity_data in hierarchy_context.items():
@@ -273,7 +278,11 @@ class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
 
             # Create entity if not exists
             if entity is None:
-                folder_type = entity_data["folder_type"].capitalize()
+                # Sanitize against case sensitive folder types.
+                folder_type = object_types_by_lower_name[
+                    entity_data["folder_type"].lower()
+                ]["name"]
+
                 entity = session.create(folder_type, {
                     "name": entity_name,
                     "parent": parent
@@ -287,12 +296,6 @@ class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
             instances = []
             for instance in context:
                 instance_folder_path = instance.data.get("folderPath")
-
-                # Ensure project name is the first entry in the folder path.
-                if not instance_folder_path.startswith("/" + project_name):
-                    instance_folder_path = "/{}{}".format(
-                        project_name, instance_folder_path
-                    )
 
                 if (
                     instance_folder_path
