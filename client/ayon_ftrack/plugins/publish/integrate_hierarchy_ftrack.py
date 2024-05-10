@@ -248,8 +248,8 @@ class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
         )
 
         object_types_by_lower_name = {
-            x["name"].lower(): x
-            for x in ft_project["project_schema"]["object_types"]
+            obj_type["name"].lower(): obj_type
+            for obj_type in ft_project["project_schema"]["object_types"]
         }
 
         # Use queue of hierarchy items to process
