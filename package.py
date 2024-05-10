@@ -9,3 +9,7 @@ services = {
 }
 
 plugin_for = ["ayon_server"]
+
+ayon_required_addons = {
+    "core": ">=0.3.0",
+}
