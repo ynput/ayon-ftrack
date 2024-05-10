@@ -279,9 +279,9 @@ class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
             # Create entity if not exists
             if entity is None:
                 # Sanitize against case sensitive folder types.
-                folder_type = object_types_by_lower_name[
-                    entity_data["folder_type"].lower()
-                ]["name"]
+                folder_type_low = entity_data["folder_type"].lower()
+                object_type = object_types_by_lower_name[folder_type_low]
+                entity_type = object_type["name"].replace(" ", "")
 
                 entity = session.create(folder_type, {
                     "name": entity_name,
