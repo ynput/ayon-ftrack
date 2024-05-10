@@ -73,7 +73,7 @@ class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
 
         # import ftrack hierarchy
         self.import_to_ftrack(
-            session, context, ft_project, project_name, hierarchy_context
+            session, ft_project, context, project_name, hierarchy_context
         )
 
     def query_ftrack_entitites(self, session, ft_project):
@@ -203,8 +203,8 @@ class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
     def import_to_ftrack(
         self, session, ft_project, context, project_name, hierarchy_context
     ):
-        ft_task_types = self.get_all_task_types(project)
-        ft_task_statuses = self.get_task_statuses(project)
+        ft_task_types = self.get_all_task_types(ft_project)
+        ft_task_statuses = self.get_task_statuses(ft_project)
 
         # Prequery hiearchical custom attributes
         hier_attrs = get_ayon_attr_configs(session)[1]
@@ -247,6 +247,11 @@ class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
             str(ft_task_statuses)
         )
 
+        object_types_by_lower_name = {
+            obj_type["name"].lower(): obj_type
+            for obj_type in ft_project["project_schema"]["object_types"]
+        }
+
         # Use queue of hierarchy items to process
         import_queue = collections.deque()
         for entity_name, entity_data in hierarchy_context.items():
@@ -273,20 +278,28 @@ class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
 
             # Create entity if not exists
             if entity is None:
-                folder_type = entity_data["folder_type"]
-                entity = session.create(folder_type, {
+                # Sanitize against case sensitive folder types.
+                folder_type_low = entity_data["folder_type"].lower()
+                object_type = object_types_by_lower_name[folder_type_low]
+                entity_type = object_type["name"].replace(" ", "")
+
+                entity = session.create(entity_type, {
                     "name": entity_name,
                     "parent": parent
                 })
                 entity_data["ft_entity"] = entity
 
-            entity_path = "{}/{}".format(parent_path, entity_name)
+            if entity_type.lower() == "project":
+                entity_path = ""
+            else:
+                entity_path = "{}/{}".format(parent_path, entity_name)
 
             # CUSTOM ATTRIBUTES
             attributes = entity_data.get("attributes", {})
             instances = []
             for instance in context:
                 instance_folder_path = instance.data.get("folderPath")
+
                 if (
                     instance_folder_path
                     and instance_folder_path.lower() == entity_path.lower()
