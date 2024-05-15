@@ -82,7 +82,7 @@ class PrepareProjectServer(ServerAction):
                 "label": item["label"],
                 "name": name,
                 "value": value in default
-           })
+            })
         output.append({
             "type": "hidden",
             "value": json.dumps(mapping),
