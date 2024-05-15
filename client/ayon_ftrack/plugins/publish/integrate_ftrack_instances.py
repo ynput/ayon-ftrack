@@ -15,6 +15,10 @@ from ayon_core.lib.transcoding import VIDEO_EXTENSIONS, IMAGE_EXTENSIONS
 
 from ayon_ftrack import __version__
 from ayon_ftrack.pipeline import plugin
+from ayon_ftrack.common.constants import (
+    CUST_ATTR_KEY_SERVER_ID,
+    CUST_ATTR_KEY_SERVER_PATH,
+)
 
 
 class IntegrateFtrackInstance(plugin.FtrackPublishInstancePlugin):
@@ -104,6 +108,19 @@ class IntegrateFtrackInstance(plugin.FtrackPublishInstancePlugin):
 
         # Base of component item data
         # - create a copy of this object when want to use it
+        version_entity = instance.data.get("versionEntity")
+        av_custom_attributes = {}
+        if version_entity:
+            version_path = "/".join([
+                instance.data["folderPath"],
+                instance.data["productName"],
+                "v{:0>3}".format(version_entity["version"])
+            ])
+            av_custom_attributes.update({
+                CUST_ATTR_KEY_SERVER_ID: version_entity["id"],
+                CUST_ATTR_KEY_SERVER_PATH: version_path,
+            })
+
         base_component_item = {
             "assettype_data": {
                 "short": asset_type,
@@ -114,7 +131,8 @@ class IntegrateFtrackInstance(plugin.FtrackPublishInstancePlugin):
             "assetversion_data": {
                 "version": version_number,
                 "comment": instance.context.data.get("comment") or "",
-                "status_name": status_name
+                "status_name": status_name,
+                "custom_attributes": av_custom_attributes
             },
             "component_overwrite": False,
             # This can be change optionally
