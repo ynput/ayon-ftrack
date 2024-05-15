@@ -82,7 +82,7 @@ class PrepareProjectServer(ServerAction):
                 "label": item["label"],
                 "name": name,
                 "value": value in default
-           })
+            })
         output.append({
             "type": "hidden",
             "value": json.dumps(mapping),
@@ -565,9 +565,13 @@ class PrepareProjectServer(ServerAction):
             )
             return None
 
+        attr_config_data = attr_config["data"]
+        if isinstance(attr_config_data, str):
+            attr_config_data = json.loads(attr_config_data)
+
         available_values = {
             item["value"]
-            for item in attr_config["data"]
+            for item in attr_config_data
         }
         new_value = [
             item
