@@ -293,6 +293,15 @@ class CreateDailyListsModel(BaseSettingsModel):
     )
 
 
+class ComponentsSizeCalcModel(BaseSettingsModel):
+    # Cannot be turned off per project
+    enabled: bool = SettingsField(True, scope=["studio"])
+    role_list: list[str] = SettingsField(
+        title=ROLES_TITLE,
+        default_factory=list,
+    )
+
+
 class FtrackServiceHandlers(BaseSettingsModel):
     """Settings for event handlers running in ftrack service."""
 
@@ -347,6 +356,10 @@ class FtrackServiceHandlers(BaseSettingsModel):
     create_daily_lists: CreateDailyListsModel = SettingsField(
         title="Create daily lists",
         default_factory=CreateDailyListsModel,
+    )
+    project_components_sizes: ComponentsSizeCalcModel = SettingsField(
+        title="Calculate project component sizes",
+        default_factory=ComponentsSizeCalcModel,
     )
 
 
@@ -487,6 +500,13 @@ DEFAULT_SERVICE_HANDLERS_SETTINGS = {
                     }
                 ]
             }
+        ],
+    },
+    "project_components_sizes": {
+        "enabled": True,
+        "role_list": [
+            "Administrator",
+            "Project Manager"
         ],
     },
 }
