@@ -1,6 +1,5 @@
 import os
 
-import click
 
 from ayon_core.addon import (
     AYONAddon,
@@ -240,9 +239,6 @@ class FtrackAddon(
         cred = credentials.get_credentials(self.ftrack_url)
         return cred.get("username"), cred.get("api_key")
 
-    def cli(self, click_group):
-        click_group.add_command(cli_main)
-
 
 def _check_ftrack_url(url):
     import requests
@@ -290,8 +286,3 @@ def resolve_ftrack_url(url, logger=None):
         logger.error("Ftrack server \"{}\" is not accessible!".format(url))
 
     return ftrack_url
-
-
-@click.group(FtrackAddon.name, help="Ftrack addon related commands.")
-def cli_main():
-    pass
