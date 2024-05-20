@@ -159,11 +159,12 @@ class IntegrateFtrackInstance(plugin.FtrackPublishInstancePlugin):
             self.log.debug("Representation {}".format(repre))
 
             # include only thumbnail representations
+            repre_path = get_publish_repre_path(instance, repre, False)
             if repre.get("thumbnail") or "thumbnail" in repre_tags:
                 thumbnail_representations.append(repre)
 
             # include only review representations
-            elif "ftrackreview" in repre_tags:
+            elif "ftrackreview" in repre_tags and repre_path:
                 review_representations.append(repre)
                 if self._is_repre_video(repre):
                     has_movie_review = True
@@ -260,6 +261,13 @@ class IntegrateFtrackInstance(plugin.FtrackPublishInstancePlugin):
             # Add item to component list
             thumbnail_data_items.append(current_item_data)
 
+        # Filter out image reviews if there is a movie review
+        review_representations = [
+            repre
+            for repre in review_representations
+            if not has_movie_review or self._is_repre_video(repre)
+        ]
+
         # Create review components
         # Change asset name of each new component for review
         multiple_reviewable = len(review_representations) > 1
@@ -270,14 +278,6 @@ class IntegrateFtrackInstance(plugin.FtrackPublishInstancePlugin):
                     "Movie repre has priority from {}".format(repre)
                 )
                 continue
-
-            repre_path = get_publish_repre_path(instance, repre, False)
-            if not repre_path:
-                self.log.warning(
-                    "Published path is not set and source was removed."
-                )
-                continue
-
             # Create copy of base comp item and append it
             review_item = copy.deepcopy(base_component_item)
 
