@@ -204,6 +204,7 @@ class IntegrateFtrackInstance(plugin.FtrackPublishInstancePlugin):
         thumbnail_data_items = []
 
         # Create thumbnail components
+        thumbnail_item = None
         for repre in thumbnail_representations:
             # get repre path from representation
             # and return published_path if available
@@ -365,6 +366,9 @@ class IntegrateFtrackInstance(plugin.FtrackPublishInstancePlugin):
                     os.path.splitext(filename)[0]
                 )
                 component_list.append(origin_name_component)
+
+        if not review_representations and thumbnail_item:
+            component_list.append(thumbnail_item)
 
         # Add others representations as component
         for repre in other_representations:
