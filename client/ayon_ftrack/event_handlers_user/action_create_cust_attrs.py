@@ -538,8 +538,10 @@ class CustomAttributes(LocalAction):
         elif type_name == "enumerator":
             config = self.get_enumerator_config(attr)
 
-        if config is not None:
-            output["config"] = config
+        # Fake empty config
+        if config is None:
+            config = json.dumps({})
+        output["config"] = config
 
         return output
 
