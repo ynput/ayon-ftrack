@@ -564,12 +564,11 @@ class CustomAttributes(LocalAction):
 
         data = []
         for item in attr["config"]["data"]:
-            item_data = {}
             for key in item:
-                # TODO key check by regex
-                item_data["menu"] = item[key]
-                item_data["value"] = key
-                data.append(item_data)
+                data.append({
+                    "menu": item[key],
+                    "value": key,
+                })
 
         multi_selection = False
         for key, value in attr["config"].items():
