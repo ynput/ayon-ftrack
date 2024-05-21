@@ -584,8 +584,6 @@ class CustomAttributes(LocalAction):
             "data": json.dumps(data)
         })
 
-        return config
-
     def get_group(self, attr):
         if isinstance(attr, dict):
             group_name = attr["group"].lower()
