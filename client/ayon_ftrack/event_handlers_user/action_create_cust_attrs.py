@@ -288,8 +288,7 @@ class CustomAttributes(LocalAction):
                 "type": "boolean",
                 "default": False,
                 "group": CUST_ATTR_GROUP,
-                "is_hierarchical": True,
-                "config": {"markdown": False}
+                "is_hierarchical": True
             },
             {
                 "key": CUST_ATTR_AUTO_SYNC,
@@ -457,6 +456,7 @@ class CustomAttributes(LocalAction):
             "select is_hierarchical, key, type, entity_type, object_type_id"
             " from CustomAttributeConfiguration"
         )).all()
+
         matching = []
         is_hierarchical = data.get("is_hierarchical", False)
         for attr in existing_attrs:
