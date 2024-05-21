@@ -1,3 +1,3 @@
 # -*- coding: utf-8 -*-
 """Package declaring ftrack addon version."""
-__version__ = "1.1.3"
+__version__ = "1.1.4-dev.1"
