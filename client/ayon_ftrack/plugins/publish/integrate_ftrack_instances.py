@@ -324,6 +324,7 @@ class IntegrateFtrackInstance(plugin.FtrackPublishInstancePlugin):
             if sync_thumbnail_item_src:
                 component_list.append(copy.deepcopy(sync_thumbnail_item_src))
 
+            repre_path = get_publish_repre_path(instance, repre, False)
             # add metadata to review component
             if self._is_repre_video(repre):
                 component_name = "ftrackreview-mp4"
