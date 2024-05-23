@@ -2,6 +2,8 @@ import os
 import collections
 import copy
 
+import ayon_api
+
 from ayon_core.pipeline import Anatomy
 from ayon_ftrack.common import LocalAction
 from ayon_ftrack.lib import get_ftrack_icon_url
@@ -98,6 +100,13 @@ class CreateFolders(LocalAction):
         project_entity = self.get_project_from_entity(filtered_entities[0])
 
         project_name = project_entity["full_name"]
+        ayon_project = ayon_api.get_project(project_name)
+        if not ayon_project:
+            return {
+                "success": False,
+                "message": f"Project '{project_name}' was not found in AYON.",
+            }
+
         project_code = project_entity["name"]
 
         task_entities, other_entities = self.get_all_entities(
@@ -112,7 +121,7 @@ class CreateFolders(LocalAction):
             for task_type in task_types
         }
 
-        anatomy = Anatomy(project_name)
+        anatomy = Anatomy(project_name, project_entity=ayon_project)
 
         work_keys = ["work", "folder"]
         work_template = anatomy.templates
