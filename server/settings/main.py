@@ -136,5 +136,6 @@ DEFAULT_VALUES = {
             }
         ]
     },
-    "publish": DEFAULT_PUBLISH_SETTINGS
+    "publish": DEFAULT_PUBLISH_SETTINGS,
+    "custom_attributes": DEFAULT_CUSTOM_ATTRIBUTES_SETTINGS,
 }
