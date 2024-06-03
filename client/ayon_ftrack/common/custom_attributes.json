@@ -9,7 +9,7 @@
         "fps": {
             "label": "FPS",
             "type": "number",
-            "config": {"isdecimal": true}
+            "config": {"isdecimal": true, "precision": 6}
         },
         "clipIn": {
             "label": "Clip in",

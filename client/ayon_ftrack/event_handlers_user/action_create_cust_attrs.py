@@ -736,11 +736,20 @@ class CustomAttributes(LocalAction):
         return output
 
     def get_number_config(self, attr):
-        is_decimal = attr.get("config", {}).get("isdecimal")
+        config = attr.get("config", {})
+        is_decimal = config.get("isdecimal")
         if is_decimal is None:
             is_decimal = False
 
-        return json.dumps({"isdecimal": is_decimal})
+        config_data = {
+            "isdecimal": is_decimal,
+        }
+        if is_decimal:
+            precision = config.get("precision")
+            if precision is not None:
+                config_data["precision"] = precision
+
+        return json.dumps(config_data)
 
     def get_text_config(self, attr):
         markdown = attr.get("config", {}).get("markdown")
