@@ -1,12 +1,13 @@
 import os
 
-
 from ayon_core.addon import (
     AYONAddon,
     ITrayAddon,
     IPluginPaths,
 )
 from ayon_core.lib import Logger
+
+from .version import __version__
 
 FTRACK_ADDON_DIR = os.path.dirname(os.path.abspath(__file__))
 _URL_NOT_SET = object()
@@ -18,6 +19,7 @@ class FtrackAddon(
     IPluginPaths,
 ):
     name = "ftrack"
+    version = __version__
 
     def initialize(self, settings):
         ftrack_settings = settings[self.name]
