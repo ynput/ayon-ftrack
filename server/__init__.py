@@ -2,6 +2,7 @@ from typing import Type, Any
 
 import semver
 from fastapi import Query
+from nxtools import logging
 
 from ayon_server.addons import BaseServerAddon, AddonLibrary
 from ayon_server.lib.postgres import Postgres
@@ -86,9 +87,16 @@ class FtrackAddon(BaseServerAddon):
             addon = addons_mapping.get(addon_version)
             if not hasattr(addon, "get_custom_ftrack_handlers_endpoint"):
                 continue
-            endpoint = addon.get_custom_ftrack_handlers_endpoint()
-            if endpoint:
-                endpoints.append(endpoint)
+            try:
+                endpoint = addon.get_custom_ftrack_handlers_endpoint()
+                if endpoint:
+                    endpoints.append(endpoint)
+            except BaseException as exc:
+                logging.warning(
+                    f"Failed to receive ftrack handlers from addon"
+                    f" {addon_name} {addon_version}. {exc}"
+                )
+
         return output
 
     async def _empty_create_ftrack_attributes(self):
