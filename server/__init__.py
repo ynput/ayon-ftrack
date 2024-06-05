@@ -59,7 +59,8 @@ class FtrackAddon(BaseServerAddon):
         variant: str = Query("production"),
     ) -> {}:
         bundles = await Postgres.fetch(
-            "SELECT name, is_production, is_staging, is_dev, data->'addons' as addons FROM bundles"
+            "SELECT name, is_production, is_staging,"
+            " is_dev, data->'addons' as addons FROM bundles"
         )
         bundles_by_variant = {
             "production": None,
@@ -76,8 +77,8 @@ class FtrackAddon(BaseServerAddon):
             if bundle["is_staging"]:
                 bundles_by_variant["staging"] = bundle
 
-        endpoints = []
-        output = {"endpoints": endpoints}
+        handlers = []
+        output = {"custom_handlers": handlers}
         if variant not in bundles_by_variant:
             return output
         addons = bundles_by_variant[variant]["addons"]
@@ -90,7 +91,11 @@ class FtrackAddon(BaseServerAddon):
             try:
                 endpoint = addon.get_custom_ftrack_handlers_endpoint()
                 if endpoint:
-                    endpoints.append(endpoint)
+                    handlers.append({
+                        "addon_name": addon_name,
+                        "addon_version": addon_version,
+                        "endpoint": endpoint,
+                    })
             except BaseException as exc:
                 logging.warning(
                     f"Failed to receive ftrack handlers from addon"
