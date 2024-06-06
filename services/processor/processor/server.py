@@ -5,6 +5,7 @@ import time
 import logging
 import signal
 import traceback
+import atexit
 
 import ayon_api
 import ftrack_api
@@ -12,6 +13,10 @@ import ftrack_api
 from ftrack_common import FtrackServer
 
 from .ftrack_session import AYONServerSession
+from .download_utils import (
+    cleanup_download_root,
+    downloaded_event_handlers,
+)
 
 
 class _GlobalContext:
@@ -121,6 +126,13 @@ def create_session():
 
 
 def main_loop():
+    addon_name = ayon_api.get_service_addon_name()
+    addon_version = ayon_api.get_service_addon_version()
+    variant = ayon_api.get_default_settings_variant()
+    handlers_url = (
+        f"addons/{addon_name}/{addon_version}/customProcessorHandlers"
+        f"?variant={variant}"
+    )
     while not _GlobalContext.stop_event.is_set():
         session = create_session()
         if session is None:
@@ -129,11 +141,37 @@ def main_loop():
 
         _GlobalContext.session_fail_logged = False
 
-        handler_paths = get_handler_paths()
+        # Cleanup download root
+        cleanup_download_root()
 
-        server = FtrackServer(handler_paths)
-        print("Starting listening loop")
-        server.run_server(session)
+        response = ayon_api.get(handlers_url)
+        custom_handlers = []
+        if response.status_code == 200:
+            custom_handlers = response.data["custom_handlers"]
+
+        handler_paths = get_handler_paths()
+        with downloaded_event_handlers(custom_handlers) as custom_handler_dirs:
+            handler_paths.extend(custom_handler_dirs)
+            server = FtrackServer(handler_paths)
+            server.run_server(session)
+
+
+def _cleanup_process():
+    """Cleanup timer threads on exit."""
+    print("Process stop requested. Terminating process.")
+    if not _GlobalContext.stop_event.is_set():
+        _GlobalContext.stop_event.set()
+    session = _GlobalContext.session
+    if session is not None:
+        if session.event_hub.connected is True:
+            session.event_hub.disconnect()
+        session.close()
+
+    for thread in threading.enumerate():
+        if isinstance(thread, threading.Timer):
+            thread.cancel()
+
+    sys.exit(0)
 
 
 def main():
@@ -158,17 +196,10 @@ def main():
 
     # Register interrupt signal
     def signal_handler(sig, frame):
-        print("Process stop requested. Terminating process.")
-        _GlobalContext.stop_event.set()
-        session = _GlobalContext.session
-        if session is not None:
-            if session.event_hub.connected is True:
-                session.event_hub.disconnect()
-            session.close()
-        print("Termination finished.")
-        sys.exit(0)
+        _cleanup_process()
 
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
+    atexit.register(_cleanup_process)
 
     main_loop()
