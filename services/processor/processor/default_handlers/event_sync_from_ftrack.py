@@ -26,6 +26,7 @@ from ftrack_common import (
     CUST_ATTR_KEY_SYNC_FAIL,
 
     CUST_ATTR_AUTO_SYNC,
+    CUST_ATTR_TOOLS,
     FPS_KEYS,
 
     is_ftrack_enabled_in_settings,
@@ -1319,7 +1320,10 @@ class SyncProcess:
                 if key == "typeid" and entity.entity_type == "task":
                     task_type_changes[ftrack_id] = (entity, info)
 
-                if key not in entity.attribs:
+                dst_key = key
+                if key == CUST_ATTR_TOOLS:
+                    dst_key = "tools"
+                if dst_key not in entity.attribs:
                     continue
 
                 if value is not None:
@@ -1333,7 +1337,7 @@ class SyncProcess:
                                 continue
                         value = self._convert_value_by_cust_attr_conf(
                             value, attr)
-                entity.attribs[key] = value
+                entity.attribs[dst_key] = value
 
         self._propagate_task_type_changes(task_type_changes)
 
