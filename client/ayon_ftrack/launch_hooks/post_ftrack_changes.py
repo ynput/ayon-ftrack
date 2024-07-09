@@ -19,7 +19,7 @@ class PostFtrackHook(PostLaunchHook):
     def execute(self):
         project_name = self.data.get("project_name")
         project_settings = self.data.get("project_settings")
-        folder_path = self.data.get("asset_name")
+        folder_path = self.data.get("folder_path")
         task_name = self.data.get("task_name")
 
         missing_context_keys = [
