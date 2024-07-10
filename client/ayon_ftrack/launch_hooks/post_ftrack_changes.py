@@ -19,7 +19,7 @@ class PostFtrackHook(PostLaunchHook):
     def execute(self):
         project_name = self.data.get("project_name")
         project_settings = self.data.get("project_settings")
-        folder_path = self.data.get("asset_name")
+        folder_path = self.data.get("folder_path")
         task_name = self.data.get("task_name")
 
         missing_context_keys = [
@@ -126,13 +126,19 @@ class PostFtrackHook(PostLaunchHook):
                 if new_status in already_tested:
                     continue
 
-                from_statuses = [s.lower() for s in item["value"]]
-                if from_statuses in (current_status, "__any__"):
-                    if new_status != "__ignore__":
-                        next_status_name = new_status
-                        already_tested.add(new_status)
-                    break
                 already_tested.add(new_status)
+
+                found_match = False
+                for from_status in item["value"]:
+                    from_status = from_status.lower()
+                    if from_status in (current_status, "__any__"):
+                        found_match = True
+                        if new_status != "__ignore__":
+                            next_status_name = new_status
+                        break
+
+                if found_match:
+                    break
 
             if next_status_name is None:
                 break
