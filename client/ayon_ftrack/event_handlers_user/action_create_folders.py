@@ -124,7 +124,7 @@ class CreateFolders(LocalAction):
         anatomy = Anatomy(project_name, project_entity=ayon_project)
 
         work_template = anatomy.get_template_item(
-            "workfile", "default", "directory"
+            "work", "default", "directory"
         )
         publish_template = anatomy.get_template_item(
             "publish", "default", "directory"
