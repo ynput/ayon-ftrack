@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ftrack-processor"
-version = "1.1.7"
+version = "1.1.8-dev.1"
 description = ""
 authors = ["Ynput s.r.o. <info@ynput.io>"]
 
