@@ -123,15 +123,12 @@ class CreateFolders(LocalAction):
 
         anatomy = Anatomy(project_name, project_entity=ayon_project)
 
-        work_keys = ["work", "folder"]
-        work_template = anatomy.templates
-        for key in work_keys:
-            work_template = work_template[key]
-
-        publish_keys = ["publish", "folder"]
-        publish_template = anatomy.templates
-        for key in publish_keys:
-            publish_template = publish_template[key]
+        work_template = anatomy.get_template_item(
+            "work", "default", "directory"
+        )
+        publish_template = anatomy.get_template_item(
+            "publish", "default", "directory"
+        )
 
         project_data = {
             "project": {
@@ -167,10 +164,10 @@ class CreateFolders(LocalAction):
             if not task_entities:
                 # create path for entity
                 collected_paths.append(self.compute_template(
-                    anatomy, parent_data, work_keys
+                    parent_data, work_template
                 ))
                 collected_paths.append(self.compute_template(
-                    anatomy, parent_data, publish_keys
+                    parent_data, publish_template
                 ))
                 continue
 
@@ -185,12 +182,12 @@ class CreateFolders(LocalAction):
 
                 # Template wok
                 collected_paths.append(self.compute_template(
-                    anatomy, task_data, work_keys
+                    task_data, work_template
                 ))
 
                 # Template publish
                 collected_paths.append(self.compute_template(
-                    anatomy, task_data, publish_keys
+                    task_data, publish_template
                 ))
 
         if len(collected_paths) == 0:
@@ -319,11 +316,8 @@ class CreateFolders(LocalAction):
 
         return output
 
-    def compute_template(self, anatomy, data, anatomy_keys):
-        filled_template = anatomy.format_all(data)
-        for key in anatomy_keys:
-            filled_template = filled_template[key]
-
+    def compute_template(self, data, template):
+        filled_template = template.format(data)
         if filled_template.solved:
             return os.path.normpath(filled_template)
 
