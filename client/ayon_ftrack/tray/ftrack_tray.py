@@ -17,8 +17,8 @@ from .user_server import SocketThread
 
 
 class FtrackTrayWrapper:
-    def __init__(self, module):
-        self._addon = module
+    def __init__(self, addon):
+        self._addon = addon
         self.log = Logger.get_logger(self.__class__.__name__)
 
         self.thread_action_server = None
@@ -30,7 +30,7 @@ class FtrackTrayWrapper:
         self.bool_action_thread_running = False
         self.bool_timer_event = False
 
-        self.widget_login = login_dialog.CredentialsDialog(module)
+        self.widget_login = login_dialog.TrayCredentialsDialog(addon)
         self.widget_login.login_changed.connect(self.on_login_change)
         self.widget_login.logout_signal.connect(self.on_logout)
 
@@ -52,7 +52,6 @@ class FtrackTrayWrapper:
         QtGui.QDesktopServices.openUrl(self._addon.ftrack_url)
 
     def validate(self):
-        validation = False
         cred = credentials.get_credentials()
         ft_user = cred.get("username")
         ft_api_key = cred.get("api_key")
