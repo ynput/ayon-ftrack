@@ -293,7 +293,13 @@ class FtrackAddon(
             json_path = tmp.name
             json.dump({"server_url": ftrack_url}, tmp.file)
 
-        run_ayon_launcher_process(login_script, json_path)
+        run_ayon_launcher_process(
+            "--skip-bootstrap",
+            login_script, json_path,
+            add_sys_paths=True,
+            creationflags=0,
+
+        )
 
         with open(json_path, "r") as stream:
             data = json.load(stream)
