@@ -84,10 +84,9 @@ class FtrackTrayWrapper:
 
         if self.action_credentials:
             self.action_credentials.setIcon(self.icon_logged)
+            username, _ = self.widget_login.get_credentials()
             self.action_credentials.setToolTip(
-                "Logged as user \"{}\"".format(
-                    self.widget_login.user_input.text()
-                )
+                f"Logged as user \"{username}\""
             )
 
         self.set_menu_visibility()
