@@ -142,20 +142,14 @@ DEFAULT_CUSTOM_ATTRIBUTES_SETTINGS = {
             ]
         },
         "ayon_id": {
-            "write_security_roles": [
-                "API",
-                "Administrator"
-            ],
+            "write_security_roles": [],
             "read_security_roles": [
                 "API",
                 "Administrator"
             ]
         },
         "ayon_path": {
-            "write_security_roles": [
-                "API",
-                "Administrator"
-            ],
+            "write_security_roles": [],
             "read_security_roles": [
                 "API",
                 "Administrator"
