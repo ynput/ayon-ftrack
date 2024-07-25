@@ -450,7 +450,7 @@ class PrepareProjectServer(ServerAction):
         )
         if repeated:
             intro_message = (
-                f"Entered values are <b>not valid</b>.<br/><br/>"
+                "Entered values are <b>not valid</b>.<br/><br/>"
             ) + intro_message
 
         items = [
