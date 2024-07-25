@@ -6,7 +6,7 @@ class CustomAttributeModel(BaseSettingsModel):
         default_factory=list,
         title="Write roles",
     )
-    read_roles: list[str] = SettingsField(
+    read_security_roles: list[str] = SettingsField(
         default_factory=list,
         title="Read roles",
     )
