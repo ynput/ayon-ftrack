@@ -1265,7 +1265,7 @@ class SyncProcess:
             if entity.task_type == new_type_name:
                 continue
 
-            if not new_type_name in task_types_names:
+            if new_type_name not in task_types_names:
                 project_need_update = True
 
             to_change.append((entity, new_type_name))

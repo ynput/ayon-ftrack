@@ -4,6 +4,8 @@ import json
 
 import ayon_api
 
+import ayon_api
+
 from ayon_core.addon import (
     AYONAddon,
     ITrayAddon,

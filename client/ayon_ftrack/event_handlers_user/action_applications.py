@@ -1,14 +1,12 @@
-import os
 import time
 
+from ayon_core.addon import AddonsManager
 from ayon_ftrack.common import (
-    CUST_ATTR_KEY_SERVER_PATH,
     is_ftrack_enabled_in_settings,
     get_folder_path_for_entities,
     BaseAction,
 )
 from ayon_applications import (
-    ApplicationManager,
     ApplicationLaunchFailed,
     ApplicationExecutableNotFound,
 )
@@ -23,7 +21,6 @@ class AppplicationsAction(BaseAction):
     identifier = "ayon_app"
     _launch_identifier_with_id = None
 
-    icon_url = os.environ.get("AYON_STATICS_SERVER")
     # 30 seconds
     cache_lifetime = 30
 
@@ -31,7 +28,15 @@ class AppplicationsAction(BaseAction):
         super(AppplicationsAction, self).__init__(*args, **kwargs)
 
         self._applications_manager = None
+        self._applications_addon = None
         self._expire_time = 0
+
+    @property
+    def applications_addon(self):
+        if self._applications_addon is None:
+            addons_manager = AddonsManager()
+            self._applications_addon = addons_manager.get("applications")
+        return self._applications_addon
 
     @property
     def applications_manager(self):
@@ -46,8 +51,10 @@ class AppplicationsAction(BaseAction):
 
         current_time = time.time()
         if self._applications_manager is None:
-            self._applications_manager = ApplicationManager()
-            self._expire_time = current_time
+            self._applications_manager = (
+                self.applications_addon.get_applications_manager()
+            )
+            self._expire_time = current_time + self.cache_lifetime
 
         elif self._expire_time < current_time:
             self._applications_manager.refresh()
@@ -169,16 +176,9 @@ class AppplicationsAction(BaseAction):
             if only_available and not app.find_executable():
                 continue
 
-            app_icon = app.icon
-            if app_icon and self.icon_url:
-                try:
-                    app_icon = app_icon.format(self.icon_url)
-                except Exception:
-                    self.log.warning((
-                        "Couldn't fill icon path. Icon template: \"{}\""
-                        " --- Icon url: \"{}\""
-                    ).format(app_icon, self.icon_url))
-                    app_icon = None
+            app_icon = self.applications_addon.get_app_icon_url(
+                app.icon, server=False
+            )
 
             items.append({
                 "label": app.group.label,
