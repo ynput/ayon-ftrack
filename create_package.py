@@ -273,7 +273,13 @@ def get_base_files_mapping() -> List[FileMapping]:
         (
             os.path.join(CURRENT_ROOT, "package.py"),
             "package.py"
-        )
+        ),
+        (
+            os.path.join(
+                CLIENT_ROOT, ADDON_CLIENT_DIR, "common", "constants.py"
+            ),
+            os.path.join("server", "constants.py")
+        ),
     ]
     # Go through server, private and public directories and find all files
     for dirpath in (SERVER_ROOT, PRIVATE_ROOT, PUBLIC_ROOT):
