@@ -4,7 +4,7 @@ import signal
 import logging
 import threading
 import traceback
-from typing import Any, Union
+from typing import Any
 
 import ftrack_api
 import ayon_api
