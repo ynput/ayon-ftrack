@@ -1772,7 +1772,6 @@ class SyncToAvalonEvent(BaseEventHandler):
                 continue
 
             new_parent_id = ent_info["changes"]["parent_id"]["new"]
-            old_parent_id = ent_info["changes"]["parent_id"]["old"]
 
             mongo_id = avalon_ent["_id"]
             if self.changeability_by_mongo_id[mongo_id]:
