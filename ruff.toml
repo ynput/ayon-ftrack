@@ -26,6 +26,7 @@ exclude = [
     "node_modules",
     "site-packages",
     "venv",
+    "client/ayon_ftrack/python2_vendor",
 ]
 
 # Same as Black.
