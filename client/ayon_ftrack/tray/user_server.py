@@ -345,7 +345,7 @@ class SocketThread(threading.Thread):
 
                         self._handle_data(connection, data)
 
-                    except Exception as exc:
+                    except Exception:
                         self.log.error(
                             "Event server process failed", exc_info=True
                         )

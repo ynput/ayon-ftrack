@@ -113,7 +113,7 @@ class PostFtrackHook(PostLaunchHook):
             [ent["name"] for ent in entity["link"]]
         )
 
-        statuses = session.query(f"select id, name from Status").all()
+        statuses = session.query("select id, name from Status").all()
         statuses_by_low_name = {
             status["name"].lower(): status
             for status in statuses

@@ -181,7 +181,7 @@ class IntegrateFtrackStatusBase(plugin.FtrackPublishInstancePlugin):
         task_entity = instance.data.get("ftrackTask")
         if not task_entity:
             self.log.debug(
-                "Skipping instance  Does not have filled task".format(
+                "Skipping instance {}. Does not have filled task".format(
                     instance.data["productName"]))
             return False
 
