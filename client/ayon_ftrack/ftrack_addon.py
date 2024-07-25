@@ -90,32 +90,6 @@ class FtrackAddon(
 
         return os.path.join(FTRACK_ADDON_DIR, "launch_hooks")
 
-    def modify_application_launch_arguments(self, application, env):
-        if (
-            not hasattr(application, "use_python_2")
-            or not application.use_python_2
-        ):
-            return
-
-        self.log.info("Adding Ftrack Python 2 packages to PYTHONPATH.")
-
-        # Prepare vendor dir path
-        python_2_vendor = os.path.join(FTRACK_ADDON_DIR, "python2_vendor")
-
-        # Add Python 2 modules
-        python_paths = [
-            # `python-ftrack-api`
-            os.path.join(python_2_vendor, "ftrack-python-api", "source"),
-        ]
-
-        # Load PYTHONPATH from current launch context
-        python_path = env.get("PYTHONPATH")
-        if python_path:
-            python_paths.append(python_path)
-
-        # Set new PYTHONPATH to launch context environments
-        env["PYTHONPATH"] = os.pathsep.join(python_paths)
-
     def connect_with_addons(self, enabled_addons):
         for addon in enabled_addons:
             if not hasattr(addon, "get_ftrack_event_handler_paths"):
