@@ -4,7 +4,7 @@ import json
 import requests
 from qtpy import QtWidgets, QtCore, QtGui
 
-from ayon_core import style, resources
+from ayon_core import style
 from ayon_core.resources import get_ayon_icon_filepath
 from ayon_core.tools.utils import get_qt_app
 
