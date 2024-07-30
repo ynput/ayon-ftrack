@@ -491,7 +491,7 @@ def main():
     json_filepath = sys.argv[-1]
     with open(json_filepath, "r") as stream:
         data = json.load(stream)
-    app = get_qt_app()
+    app = get_qt_app()  # noqa F841
     dialog = PopupCredentialsDialog(data["server_url"])
     dialog.exec_()
     username, api_key = dialog.get_credentials()
