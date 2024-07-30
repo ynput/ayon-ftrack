@@ -5,7 +5,7 @@ import threading
 
 import ftrack_api
 from qtpy import QtCore, QtWidgets, QtGui
-from aiohttp.web import json_response
+from aiohttp.web import Response, json_response
 
 from ayon_core import resources
 from ayon_core.lib import Logger
@@ -58,13 +58,14 @@ class FtrackTrayWrapper:
             self._web_get_credentials
         )
 
-    def _web_credentials_change(self, request):
-        data = request.json()
+    async def _web_credentials_change(self, request):
+        data = await request.json()
         username = data.get("username")
         api_key = data.get("api_key")
         self.set_credentials(username, api_key)
+        return Response(status=200)
 
-    def _web_get_credentials(self, _):
+    async def _web_get_credentials(self, _):
         username = api_key = None
         if self.bool_logged:
             username = self.widget_login.username
