@@ -2,8 +2,7 @@ import os
 import tempfile
 import json
 
-import ayon_api
-
+import requests
 import ayon_api
 
 from ayon_core.addon import (
@@ -13,6 +12,7 @@ from ayon_core.addon import (
 )
 from ayon_core.lib import Logger, run_ayon_launcher_process
 from ayon_core.settings import get_project_settings, get_studio_settings
+from ayon_core.tools.tray import get_tray_server_url
 
 from .version import __version__
 
@@ -48,6 +48,9 @@ class FtrackAddon(
         # TimersManager connection
         self.timers_manager_connector = None
         self._timers_manager_addon = None
+
+    def webserver_initialization(self, web_manager):
+        self._tray_wrapper.webserver_initialization(web_manager)
 
     def get_ftrack_url(self):
         """Resolved ftrack url.
@@ -237,6 +240,13 @@ class FtrackAddon(
         username, api_key = self._ask_for_credentials(server_url)
         if username and api_key:
             self.set_credentials_to_env(username, api_key)
+            # Send the credentials to the running tray
+            tray_url = get_tray_server_url()
+            if tray_url:
+                requests.post(
+                    f"{tray_url}/addons/ftrack/credentials",
+                    json={"username": username, "api_key": api_key},
+                )
             return
 
         raise ProcessPreparationError(
