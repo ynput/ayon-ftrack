@@ -5,6 +5,7 @@ import threading
 
 import ftrack_api
 from qtpy import QtCore, QtWidgets, QtGui
+from aiohttp.web import json_response
 
 from ayon_core import resources
 from ayon_core.lib import Logger
@@ -43,6 +44,37 @@ class FtrackTrayWrapper:
             resources.get_resource("icons", "circle_orange.png")
         )
 
+    def webserver_initialization(self, web_manager):
+        web_manager.add_addon_route(
+            self._addon.name,
+            "credentials",
+            "POST",
+            self._web_credentials_change
+        )
+        web_manager.add_addon_route(
+            self._addon.name,
+            "credentials",
+            "GET",
+            self._web_get_credentials
+        )
+
+    def _web_credentials_change(self, request):
+        data = request.json()
+        username = data.get("username")
+        api_key = data.get("api_key")
+        self.set_credentials(username, api_key)
+
+    def _web_get_credentials(self, _):
+        username = api_key = None
+        if self.bool_logged:
+            username = self.widget_login.username
+            api_key = self.widget_login.api_key
+
+        return json_response({
+            "username": username,
+            "api_key": api_key
+        })
+
     def show_login_widget(self):
         self.widget_login.show()
         self.widget_login.activateWindow()
@@ -53,28 +85,31 @@ class FtrackTrayWrapper:
 
     def validate(self):
         cred = credentials.get_credentials()
-        ft_user = cred.get("username")
-        ft_api_key = cred.get("api_key")
-        validation = credentials.check_credentials(ft_user, ft_api_key)
-        if validation:
-            self.widget_login.set_credentials(ft_user, ft_api_key)
-            self._addon.set_credentials_to_env(ft_user, ft_api_key)
-            self.log.info("Connected to Ftrack successfully")
-            self.on_login_change()
-
-            return validation
-
-        if not validation and ft_user and ft_api_key:
-            self.log.warning(
-                "Current Ftrack credentials are not valid. {}: {} - {}".format(
-                    str(os.environ.get("FTRACK_SERVER")), ft_user, ft_api_key
-                )
-            )
+        validation = self.set_credentials(
+            cred.get("username"), cred.get("api_key")
+        )
 
         self.log.info("Please sign in to Ftrack")
         self.bool_logged = False
         self.show_login_widget()
         self.set_menu_visibility()
+
+        return validation
+
+    def set_credentials(self, username, api_key):
+        validation = credentials.check_credentials(username, api_key)
+        if validation:
+            self.widget_login.set_credentials(username, api_key)
+            self._addon.set_credentials_to_env(username, api_key)
+            self.log.info("Connected to Ftrack successfully")
+            self.on_login_change()
+
+        if not validation and username and api_key:
+            server = self._addon.get_ftrack_url()
+            self.log.warning(
+                f"Current Ftrack credentials are not valid. {server}:"
+                f" {username} - {api_key}"
+            )
 
         return validation
 
