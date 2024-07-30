@@ -88,11 +88,11 @@ class FtrackTrayWrapper:
         validation = self.set_credentials(
             cred.get("username"), cred.get("api_key")
         )
-
-        self.log.info("Please sign in to Ftrack")
-        self.bool_logged = False
-        self.show_login_widget()
-        self.set_menu_visibility()
+        if not validation:
+            self.log.info("Please sign in to Ftrack")
+            self.bool_logged = False
+            self.show_login_widget()
+            self.set_menu_visibility()
 
         return validation
 
