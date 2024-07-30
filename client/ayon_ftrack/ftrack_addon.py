@@ -14,6 +14,8 @@ from ayon_core.lib import Logger, run_ayon_launcher_process
 from ayon_core.settings import get_project_settings, get_studio_settings
 from ayon_core.tools.tray import get_tray_server_url
 
+from ayon_ftrack.lib.credentials import save_credentials, get_credentials
+
 from .version import __version__
 
 FTRACK_ADDON_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -148,8 +150,7 @@ class FtrackAddon(
             api_user = os.environ.get("FTRACK_API_USER")
 
         if not api_key or not api_user:
-            from .lib import credentials
-            cred = credentials.get_credentials()
+            cred = get_credentials()
             api_user = cred.get("username")
             api_key = cred.get("api_key")
 
@@ -241,6 +242,7 @@ class FtrackAddon(
         if username and api_key:
             self.set_credentials_to_env(username, api_key)
             # Send the credentials to the running tray
+            save_credentials(username, api_key, self.get_ftrack_url())
             tray_url = get_tray_server_url()
             if tray_url:
                 requests.post(
@@ -287,9 +289,8 @@ class FtrackAddon(
     def get_credentials(self):
         # type: () -> tuple
         """Get local Ftrack credentials."""
-        from .lib import credentials
 
-        cred = credentials.get_credentials(self.ftrack_url)
+        cred = get_credentials(self.ftrack_url)
         return cred.get("username"), cred.get("api_key")
 
     @staticmethod
