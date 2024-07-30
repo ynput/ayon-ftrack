@@ -14,7 +14,11 @@ from ayon_core.lib import Logger, run_ayon_launcher_process
 from ayon_core.settings import get_project_settings, get_studio_settings
 from ayon_core.tools.tray import get_tray_server_url
 
-from ayon_ftrack.lib.credentials import save_credentials, get_credentials
+from ayon_ftrack.lib.credentials import (
+    save_credentials,
+    get_credentials,
+    check_credentials,
+)
 
 from .version import __version__
 
@@ -197,8 +201,6 @@ class FtrackAddon(
         # Safe to support older ayon-core without 'ProcessPreparationError'
         from ayon_core.addon import ProcessPreparationError
         from ayon_ftrack.common import is_ftrack_enabled_in_settings
-
-        from .lib.credentials import check_credentials
 
         # Do not continue if Ftrack is not enabled in settings
         if context.project_name:
