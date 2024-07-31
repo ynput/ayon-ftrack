@@ -215,6 +215,95 @@ def update_client_version(logger):
         stream.write(VERSION_PY_CONTENT)
 
 
+def update_docker_version(logger):
+    """Update version in Dockerfile if present."""
+    image_regex = re.compile(r"(?P<base>\s+image:[^:]+:)(?P<version>.+)")
+    env_regex = re.compile(
+        r"(?P<base>[\s\-]+\"AYON_ADDON_VERSION=)(?P<version>.+)(?P<end>\".*)"
+    )
+    for service_name in (
+        "leecher",
+        "processor",
+    ):
+        service_dir = os.path.join(
+            CURRENT_ROOT, "services", service_name
+        )
+
+        # Pyproject.toml
+        pyproject_toml = os.path.join(service_dir, "pyproject.toml")
+        with open(pyproject_toml, "r") as stream:
+            content = stream.read()
+
+        new_lines = []
+        changed = None
+        for line in content.splitlines():
+            if changed is None and line.startswith("version = "):
+                new_line = f'version = "{ADDON_VERSION}"'
+                changed = new_line != line
+                line = new_line
+            new_lines.append(line)
+
+        if changed is None:
+            # Version was not found (could be a bug?)
+            logger.error(
+                "Did not find 'version' in pyproject.toml"
+                f" of service '{service_name}"
+            )
+        elif changed:
+            # Add empty line at the end
+            if new_lines[-1]:
+                new_lines.append("")
+            # Store new lines if something changed
+            with open(pyproject_toml, "w") as stream:
+                stream.write("\n".join(new_lines))
+
+        # docker-dompose.yml
+        dockercompose_path = os.path.join(service_dir, "docker-compose.yml")
+        with open(dockercompose_path, "r") as stream:
+            content = stream.read()
+
+        new_lines = []
+        image_changed = None
+        env_changed = None
+        for line in content.splitlines():
+            if env_changed is None:
+                env_r = env_regex.search(line)
+                if env_r:
+                    base = env_r.group("base")
+                    end = env_r.group("end")
+                    new_line = f"{base}{ADDON_VERSION}{end}"
+                    env_changed = new_line != line
+                    line = new_line
+            if image_changed is None:
+                image_r = image_regex.search(line)
+                if image_r:
+                    base = image_r.group("base")
+                    new_line = f"{base}{ADDON_VERSION}"
+                    image_changed = new_line != line
+                    line = new_line
+
+            new_lines.append(line)
+
+        if env_changed is None:
+            logger.error(
+                "Did not find 'AYON_ADDON_VERSION' env in docker-compose.yml"
+                f" of service '{service_name}"
+            )
+
+        if image_changed is None:
+            logger.error(
+                "Did not find 'image' in in docker-compose.yml"
+                f" of service '{service_name}"
+            )
+
+        if image_changed or env_changed:
+            # Add empty line at the end
+            if new_lines[-1]:
+                new_lines.append("")
+            with open(dockercompose_path, "w") as stream:
+                stream.write("\n".join(new_lines))
+
+
 def build_frontend():
     yarn_executable = _get_yarn_executable()
     if yarn_executable is None:
@@ -402,6 +491,8 @@ def main(
 
     if not output_dir:
         output_dir = os.path.join(CURRENT_ROOT, "package")
+
+    update_docker_version(log)
 
     has_client_code = bool(ADDON_CLIENT_DIR)
     if has_client_code:
