@@ -1,5 +1,8 @@
 import os
+import tempfile
+import json
 
+import requests
 import ayon_api
 
 from ayon_core.addon import (
@@ -7,7 +10,15 @@ from ayon_core.addon import (
     ITrayAddon,
     IPluginPaths,
 )
-from ayon_core.lib import Logger
+from ayon_core.lib import Logger, run_ayon_launcher_process
+from ayon_core.settings import get_project_settings, get_studio_settings
+from ayon_core.tools.tray import get_tray_server_url
+
+from ayon_ftrack.lib.credentials import (
+    save_credentials,
+    get_credentials,
+    check_credentials,
+)
 
 from .version import __version__
 
@@ -43,6 +54,9 @@ class FtrackAddon(
         # TimersManager connection
         self.timers_manager_connector = None
         self._timers_manager_addon = None
+
+    def webserver_initialization(self, web_manager):
+        self._tray_wrapper.webserver_initialization(web_manager)
 
     def get_ftrack_url(self):
         """Resolved ftrack url.
@@ -140,8 +154,7 @@ class FtrackAddon(
             api_user = os.environ.get("FTRACK_API_USER")
 
         if not api_key or not api_user:
-            from .lib import credentials
-            cred = credentials.get_credentials()
+            cred = get_credentials()
             api_user = cred.get("username")
             api_key = cred.get("api_key")
 
@@ -178,6 +191,72 @@ class FtrackAddon(
         if self._tray_wrapper:
             self._tray_wrapper.stop_timer_manager()
 
+    def ensure_is_process_ready(self, context):
+        """Ensure addon is ready for process.
+
+        Args:
+            context (ProcessContext): Process context.
+
+        """
+        # Safe to support older ayon-core without 'ProcessPreparationError'
+        from ayon_core.addon import ProcessPreparationError
+        from ayon_ftrack.common import is_ftrack_enabled_in_settings
+
+        # Do not continue if Ftrack is not enabled in settings
+        if context.project_name:
+            settings = get_project_settings(context.project_name)
+        else:
+            settings = get_studio_settings()
+
+        if not is_ftrack_enabled_in_settings(settings):
+            return
+
+        # Not sure if this should crash or silently continue?
+        server_url = self.get_ftrack_url()
+        if not server_url:
+            return
+
+        username = os.getenv("FTRACK_API_USER")
+        api_key = os.getenv("FTRACK_API_KEY")
+
+        if (
+            username and api_key
+            and check_credentials(username, api_key, server_url)
+        ):
+            self.set_credentials_to_env(username, api_key)
+            return
+
+        username, api_key = self.get_credentials()
+        if (
+            username and api_key
+            and check_credentials(username, api_key, server_url)
+        ):
+            self.set_credentials_to_env(username, api_key)
+            return
+
+        if context.headless:
+            raise ProcessPreparationError(
+                "Ftrack credentials are not set. Cannot handle the situation"
+                " in headless mode."
+            )
+
+        username, api_key = self._ask_for_credentials(server_url)
+        if username and api_key:
+            self.set_credentials_to_env(username, api_key)
+            # Send the credentials to the running tray
+            save_credentials(username, api_key, self.get_ftrack_url())
+            tray_url = get_tray_server_url()
+            if tray_url:
+                requests.post(
+                    f"{tray_url}/addons/ftrack/credentials",
+                    json={"username": username, "api_key": api_key},
+                )
+            return
+
+        raise ProcessPreparationError(
+            "Failed to log to ftrack. Cannot continue with the process."
+        )
+
     def register_timers_manager(self, timers_manager_addon):
         self._timers_manager_addon = timers_manager_addon
 
@@ -212,10 +291,32 @@ class FtrackAddon(
     def get_credentials(self):
         # type: () -> tuple
         """Get local Ftrack credentials."""
-        from .lib import credentials
 
-        cred = credentials.get_credentials(self.ftrack_url)
+        cred = get_credentials(self.ftrack_url)
         return cred.get("username"), cred.get("api_key")
+
+    @staticmethod
+    def _ask_for_credentials(ftrack_url):
+        login_script = os.path.join(
+            FTRACK_ADDON_DIR, "tray", "login_dialog.py"
+        )
+        with tempfile.NamedTemporaryFile(
+            mode="w", prefix="ay_ftrack", suffix=".json", delete=False
+        ) as tmp:
+            json_path = tmp.name
+            json.dump({"server_url": ftrack_url}, tmp.file)
+
+        run_ayon_launcher_process(
+            "--skip-bootstrap",
+            login_script, json_path,
+            add_sys_paths=True,
+            creationflags=0,
+
+        )
+
+        with open(json_path, "r") as stream:
+            data = json.load(stream)
+        return data.get("username"), data.get("api_key")
 
 
 def _check_ftrack_url(url):
