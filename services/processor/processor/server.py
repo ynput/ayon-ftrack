@@ -171,8 +171,6 @@ def _cleanup_process():
         if isinstance(thread, threading.Timer):
             thread.cancel()
 
-    sys.exit(0)
-
 
 def main():
     logging.basicConfig(level=logging.INFO)
@@ -197,9 +195,12 @@ def main():
     # Register interrupt signal
     def signal_handler(sig, frame):
         _cleanup_process()
+        sys.exit(0)
 
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
     atexit.register(_cleanup_process)
-
-    main_loop()
+    try:
+        main_loop()
+    finally:
+        _cleanup_process()
