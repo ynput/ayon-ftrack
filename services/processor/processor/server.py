@@ -173,7 +173,7 @@ def _cleanup_process():
 
 
 def main():
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.DEBUG)
 
     try:
         ayon_api.init_service()
