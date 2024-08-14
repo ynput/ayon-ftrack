@@ -159,6 +159,10 @@ def main_loop():
 def _cleanup_process():
     """Cleanup timer threads on exit."""
     print("Process stop requested. Terminating process.")
+    for thread in threading.enumerate():
+        if isinstance(thread, threading.Timer):
+            thread.cancel()
+
     if not _GlobalContext.stop_event.is_set():
         _GlobalContext.stop_event.set()
     session = _GlobalContext.session
@@ -166,10 +170,6 @@ def _cleanup_process():
         if session.event_hub.connected is True:
             session.event_hub.disconnect()
         session.close()
-
-    for thread in threading.enumerate():
-        if isinstance(thread, threading.Timer):
-            thread.cancel()
 
 
 def main():
