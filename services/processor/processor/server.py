@@ -164,16 +164,16 @@ def main_loop():
 def _cleanup_process():
     """Cleanup timer threads on exit."""
     logging.info("Process stop requested. Terminating process.")
-    logging.debug("Canceling threading timers.")
+    logging.info("Canceling threading timers.")
     for thread in threading.enumerate():
         if isinstance(thread, threading.Timer):
             thread.cancel()
 
-    logging.debug("Stopping main loop.")
+    logging.info("Stopping main loop.")
     if not _GlobalContext.stop_event.is_set():
         _GlobalContext.stop_event.set()
     session = _GlobalContext.session
-    logging.debug("Closing ftrack session.")
+    logging.info("Closing ftrack session.")
     if session is not None:
         if session.event_hub.connected is True:
             session.event_hub.disconnect()
@@ -181,7 +181,7 @@ def _cleanup_process():
 
 
 def main():
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
 
     try:
         ayon_api.init_service()
