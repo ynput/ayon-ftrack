@@ -145,7 +145,7 @@ class TaskToVersionStatus(BaseEventHandler):
             for key, value in _status_mapping.items()
         }
 
-        asset_types_filter = event_settings["asset_types_filter"]
+        asset_types_to_skip = event_settings["asset_types_to_skip"]
 
         task_ids = [
             entity_info["entityId"]
@@ -154,7 +154,7 @@ class TaskToVersionStatus(BaseEventHandler):
 
         last_asset_versions_by_task_id = (
             self.find_last_asset_versions_for_task_ids(
-                session, task_ids, asset_types_filter
+                session, task_ids, asset_types_to_skip
             )
         )
 
@@ -306,7 +306,7 @@ class TaskToVersionStatus(BaseEventHandler):
         return av_statuses_by_low_name, av_statuses_by_id
 
     def find_last_asset_versions_for_task_ids(
-        self, session, task_ids, asset_types_filter
+        self, session, task_ids, asset_types_to_skip
     ):
         """Find latest AssetVersion entities for task.
 
@@ -316,14 +316,14 @@ class TaskToVersionStatus(BaseEventHandler):
         Args:
             asset_versions (list): AssetVersion entities sorted by "version".
             task_ids (list): Task ids.
-            asset_types_filter (list): Asset types short names that will be
+            asset_types_to_skip (list): Asset types short names that will be
                 used to filter AssetVersions. Filtering is skipped if entered
                 value is empty list.
         """
 
         # Allow event only on specific asset type names
         asset_query_part = ""
-        if asset_types_filter:
+        if asset_types_to_skip:
             # Query all AssetTypes
             asset_types = session.query(
                 "select id, short from AssetType"
@@ -337,14 +337,14 @@ class TaskToVersionStatus(BaseEventHandler):
             # Lower asset types from settings
             # WARNING: not sure if is good idea to lower names as Ftrack may
             #   contain asset type with name "Scene" and "scene"!
-            asset_types_filter_low = set(
+            asset_types_to_skip_low = set(
                 asset_types_name.lower()
-                for asset_types_name in asset_types_filter
+                for asset_types_name in asset_types_to_skip
             )
             asset_type_ids = []
             for type_id, short in asset_type_short_by_id.items():
                 # TODO log if asset type name is not found
-                if short.lower() in asset_types_filter_low:
+                if short.lower() not in asset_types_to_skip_low:
                     asset_type_ids.append(type_id)
 
             # TODO log that none of asset type names were found in ftrack
