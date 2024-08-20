@@ -384,6 +384,10 @@ class IntegrateFtrackApi(plugin.FtrackPublishInstancePlugin):
                 session.commit()
 
         else:
+            if version == 0:  # start with version v000
+                # explicit as string, with int it doesn't work
+                version = "0"
+
             new_asset_version_data = {
                 "version": version,
                 "asset_id": asset_id
