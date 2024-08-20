@@ -435,7 +435,7 @@ DEFAULT_SERVICE_HANDLERS_SETTINGS = {
     "status_task_to_version": {
         "enabled": True,
         "mapping": [],
-        "asset_types_filter": []
+        "asset_types_to_skip": []
     },
     "status_version_to_task": {
         "enabled": True,
