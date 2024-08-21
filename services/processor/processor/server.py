@@ -88,14 +88,16 @@ def create_session():
 
     session = _GlobalContext.session
     if session is not None:
-        print("Created ftrack session")
+        logging.info("Created ftrack session")
         return session
 
     if not error_message:
         error_message = error_summary
-    print(error_message)
+
+    log_msg = error_message
     if tb_content:
-        print(tb_content)
+        log_msg += f"\n{tb_content}"
+    logging.error(log_msg)
     if (
         (tb_content is not None and _GlobalContext.session_fail_logged == 2)
         or (tb_content is None and _GlobalContext.session_fail_logged == 1)
@@ -152,26 +154,30 @@ def main_loop():
         handler_paths = get_handler_paths()
         with downloaded_event_handlers(custom_handlers) as custom_handler_dirs:
             handler_paths.extend(custom_handler_dirs)
+            logging.info("Starting listen server")
             server = FtrackServer(handler_paths)
             server.run_server(session)
+        logging.info("Server stopped.")
+    logging.info("Main loop stopped.")
 
 
 def _cleanup_process():
     """Cleanup timer threads on exit."""
-    print("Process stop requested. Terminating process.")
-    if not _GlobalContext.stop_event.is_set():
-        _GlobalContext.stop_event.set()
-    session = _GlobalContext.session
-    if session is not None:
-        if session.event_hub.connected is True:
-            session.event_hub.disconnect()
-        session.close()
-
+    logging.info("Process stop requested. Terminating process.")
+    logging.info("Canceling threading timers.")
     for thread in threading.enumerate():
         if isinstance(thread, threading.Timer):
             thread.cancel()
 
-    sys.exit(0)
+    logging.info("Stopping main loop.")
+    if not _GlobalContext.stop_event.is_set():
+        _GlobalContext.stop_event.set()
+    session = _GlobalContext.session
+    logging.info("Closing ftrack session.")
+    if session is not None:
+        if session.event_hub.connected is True:
+            session.event_hub.disconnect()
+        session.close()
 
 
 def main():
@@ -184,7 +190,7 @@ def main():
         connected = False
 
     if not connected:
-        print("Failed to connect to AYON server.")
+        logging.warning("Failed to connect to AYON server.")
         # Sleep for 10 seconds, so it is possible to see the message in
         #   docker
         # NOTE: Becuase AYON connection failed, there's no way how to log it
@@ -192,14 +198,17 @@ def main():
         time.sleep(10)
         sys.exit(1)
 
-    print("Connected to AYON server.")
+    logging.info("Connected to AYON server.")
 
     # Register interrupt signal
     def signal_handler(sig, frame):
         _cleanup_process()
+        sys.exit(0)
 
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
     atexit.register(_cleanup_process)
-
-    main_loop()
+    try:
+        main_loop()
+    finally:
+        _cleanup_process()

@@ -4,7 +4,6 @@ import logging
 import argparse
 import subprocess
 import time
-import platform
 
 from ayon_api.constants import (
     DEFAULT_VARIANT_ENV_KEY,

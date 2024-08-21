@@ -72,6 +72,7 @@ class ProcessEventHub(ftrack_api.event.hub.EventHub):
         started = time.time()
         while True:
             job = None
+            empty_queue = False
             try:
                 item = self._event_queue.get(timeout=0.1)
                 if isinstance(item, tuple):
@@ -80,6 +81,11 @@ class ProcessEventHub(ftrack_api.event.hub.EventHub):
                     event = item
 
             except queue.Empty:
+                empty_queue = True
+
+            # Do not do this under except handling to avoid confusing
+            #   traceback if something happens
+            if empty_queue:
                 if not self.load_event_from_jobs():
                     time.sleep(0.1)
                 continue

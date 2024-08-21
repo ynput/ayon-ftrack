@@ -2,13 +2,11 @@ import time
 
 from ayon_core.addon import AddonsManager
 from ayon_ftrack.common import (
-    CUST_ATTR_KEY_SERVER_PATH,
     is_ftrack_enabled_in_settings,
     get_folder_path_for_entities,
     BaseAction,
 )
 from ayon_applications import (
-    ApplicationManager,
     ApplicationLaunchFailed,
     ApplicationExecutableNotFound,
 )

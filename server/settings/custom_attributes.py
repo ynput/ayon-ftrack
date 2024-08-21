@@ -6,7 +6,7 @@ class CustomAttributeModel(BaseSettingsModel):
         default_factory=list,
         title="Write roles",
     )
-    read_roles: list[str] = SettingsField(
+    read_security_roles: list[str] = SettingsField(
         default_factory=list,
         title="Read roles",
     )
@@ -142,20 +142,14 @@ DEFAULT_CUSTOM_ATTRIBUTES_SETTINGS = {
             ]
         },
         "ayon_id": {
-            "write_security_roles": [
-                "API",
-                "Administrator"
-            ],
+            "write_security_roles": [],
             "read_security_roles": [
                 "API",
                 "Administrator"
             ]
         },
         "ayon_path": {
-            "write_security_roles": [
-                "API",
-                "Administrator"
-            ],
+            "write_security_roles": [],
             "read_security_roles": [
                 "API",
                 "Administrator"

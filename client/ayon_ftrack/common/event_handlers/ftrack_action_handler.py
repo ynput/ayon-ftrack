@@ -1,4 +1,3 @@
-import os
 import functools
 
 import ftrack_api
