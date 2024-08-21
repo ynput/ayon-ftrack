@@ -236,8 +236,8 @@ class FtrackAddon(
 
         if context.headless:
             raise ProcessPreparationError(
-                "Ftrack credentials are not set. Cannot handle the situation"
-                " in headless mode."
+                "Ftrack login details are missing. Unable to proceed"
+                " without a user interface."
             )
 
         username, api_key = self._ask_for_credentials(server_url)
@@ -254,7 +254,8 @@ class FtrackAddon(
             return
 
         raise ProcessPreparationError(
-            "Failed to log to ftrack. Cannot continue with the process."
+            "Unable to connect to Ftrack. The process cannot proceed"
+            " without this connection."
         )
 
     def register_timers_manager(self, timers_manager_addon):
