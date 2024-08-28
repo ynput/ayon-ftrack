@@ -129,9 +129,10 @@ class NextTaskUpdate(BaseEventHandler):
             ))
             return
 
-        mod_mapping = {}
-        for item in event_settings["mapping"]:
-            mod_mapping[item["name"]] = item["value"]
+        mod_mapping = {
+            item["name"]: item["value"]
+            for item in event_settings["mapping"]
+        }
         event_settings["mapping"] = mod_mapping
 
         statuses = session.query("Status").all()
