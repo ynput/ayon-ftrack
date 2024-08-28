@@ -34,6 +34,36 @@ def _convert_integrate_ftrack_status_settings(overrides):
                 profile[dst_key] = profile.pop(src_key)
 
 
+def _convert_task_to_version_status_mapping_1_2_0(overrides):
+    value = overrides
+    for key in (
+        "service_event_handlers",
+        "status_task_to_version",
+    ):
+        value = value.get(key)
+        if not value:
+            return
+
+    if "asset_types_filter" in value:
+        value["asset_types"] = value.pop("asset_types_filter")
+        value["asset_types_filter_type"] = "allow_list"
+
+
+def _convert_version_to_task_status_mapping_1_2_0(overrides):
+    value = overrides
+    for key in (
+        "service_event_handlers",
+        "status_version_to_task",
+    ):
+        value = value.get(key)
+        if not value:
+            return
+
+    if "asset_types_to_skip" in value:
+        value["asset_types"] = value.pop("asset_types_to_skip")
+        value["asset_types_filter_type"] = "deny_list"
+
+
 def convert_settings_overrides(
     source_version: str,
     overrides: dict[str, Any],
