@@ -1,6 +1,5 @@
 import os
 import sys
-import logging
 import argparse
 import subprocess
 import time
@@ -96,5 +95,4 @@ def main():
 
 
 if __name__ == "__main__":
-    logging.basicConfig()
     main()
