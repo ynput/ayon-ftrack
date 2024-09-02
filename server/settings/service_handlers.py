@@ -98,7 +98,7 @@ class SyncStatusTaskToVersion(BaseSettingsModel):
     asset_types_filter_type: str = SettingsField(
         title="Asset types Allow/Deny",
         default="allow_list",
-        enum=_allow_deny_enum,
+        enum_resolver=_allow_deny_enum,
     )
     asset_types: list[str] = SettingsField(
         title="Asset types (short)",
@@ -123,7 +123,7 @@ class SyncStatusVersionToTask(BaseSettingsModel):
     asset_types_filter_type: str = SettingsField(
         title="Asset types Allow/Deny",
         default="deny_list",
-        enum=_allow_deny_enum,
+        enum_resolver=_allow_deny_enum,
     )
     asset_types: list[str] = SettingsField(
         title="Asset types (short)",
