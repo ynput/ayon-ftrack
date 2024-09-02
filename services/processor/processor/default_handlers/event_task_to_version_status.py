@@ -123,29 +123,29 @@ class TaskToVersionStatus(BaseEventHandler):
             ["service_event_handlers"]
             [self.settings_key]
         )
-        mod_mapping = {}
-        for item in event_settings["mapping"]:
-            mod_mapping[item["name"]] = item["value"]
-        event_settings["mapping"] = mod_mapping
-        _status_mapping = event_settings["mapping"]
         if not event_settings["enabled"]:
             self.log.debug("Project \"{}\" has disabled {}.".format(
                 project_name, self.__class__.__name__
             ))
             return
 
-        if not _status_mapping:
+        status_mapping = {
+            item["name"].lower(): item["value"]
+            for item in event_settings["mapping"]
+        }
+        if not status_mapping:
             self.log.debug((
                 "Project \"{}\" does not have set status mapping for {}."
             ).format(project_name, self.__class__.__name__))
             return
 
-        status_mapping = {
-            key.lower(): value
-            for key, value in _status_mapping.items()
+        asset_type_filter = event_settings["asset_types_filter_type"]
+        is_allow_list = asset_type_filter == "allow_list"
+        asset_type_names = {
+            asset_type_name.lower()
+            for asset_type_name in event_settings["asset_types"]
+            if asset_type_name
         }
-
-        asset_types_filter = event_settings["asset_types_filter"]
 
         task_ids = [
             entity_info["entityId"]
@@ -154,7 +154,7 @@ class TaskToVersionStatus(BaseEventHandler):
 
         last_asset_versions_by_task_id = (
             self.find_last_asset_versions_for_task_ids(
-                session, task_ids, asset_types_filter
+                session, task_ids, is_allow_list, asset_type_names
             )
         )
 
@@ -173,9 +173,10 @@ class TaskToVersionStatus(BaseEventHandler):
         if not task_entities:
             return
 
-        status_ids = set()
-        for task_entity in task_entities:
-            status_ids.add(task_entity["status_id"])
+        status_ids = {
+            task_entity["status_id"]
+            for task_entity in task_entities
+        }
 
         task_status_entities = session.query(
             "select id, name from Status where id in ({})".format(
@@ -306,7 +307,7 @@ class TaskToVersionStatus(BaseEventHandler):
         return av_statuses_by_low_name, av_statuses_by_id
 
     def find_last_asset_versions_for_task_ids(
-        self, session, task_ids, asset_types_filter
+        self, session, task_ids, is_allow_list, asset_type_names
     ):
         """Find latest AssetVersion entities for task.
 
@@ -314,42 +315,61 @@ class TaskToVersionStatus(BaseEventHandler):
         same version for the task.
 
         Args:
-            asset_versions (list): AssetVersion entities sorted by "version".
-            task_ids (list): Task ids.
-            asset_types_filter (list): Asset types short names that will be
+            session (ftrack_api.Session): Ftrack session.
+            task_ids (list[str]): Task ids.
+            is_allow_list (bool): If True then asset_types are used
+                as allow list.
+            asset_type_names (set[str]): Asset types short names that will be
                 used to filter AssetVersions. Filtering is skipped if entered
                 value is empty list.
+
+        Returns:
+            dict[str, list[ftrack_api.Entity]]: Dictionary with task id as key
+                and list of AssetVersion entities as value.
+
         """
+        last_asset_versions_by_task_id = collections.defaultdict(list)
+
+        if not task_ids:
+            return last_asset_versions_by_task_id
+
+        if is_allow_list and not asset_type_names:
+            return last_asset_versions_by_task_id
 
         # Allow event only on specific asset type names
         asset_query_part = ""
-        if asset_types_filter:
+        if asset_type_names:
             # Query all AssetTypes
             asset_types = session.query(
                 "select id, short from AssetType"
             ).all()
             # Store AssetTypes by id
             asset_type_short_by_id = {
-                asset_type["id"]: asset_type["short"]
+                asset_type["id"]: asset_type["short"].lower()
                 for asset_type in asset_types
             }
 
             # Lower asset types from settings
-            # WARNING: not sure if is good idea to lower names as Ftrack may
-            #   contain asset type with name "Scene" and "scene"!
-            asset_types_filter_low = set(
-                asset_types_name.lower()
-                for asset_types_name in asset_types_filter
-            )
-            asset_type_ids = []
-            for type_id, short in asset_type_short_by_id.items():
-                # TODO log if asset type name is not found
-                if short.lower() in asset_types_filter_low:
-                    asset_type_ids.append(type_id)
+            asset_type_ids = {
+                type_id
+                for type_id, short in asset_type_short_by_id.items()
+                if short.lower() in asset_type_names
+            }
 
-            # TODO log that none of asset type names were found in ftrack
-            if asset_type_ids:
+            # Allow list is enabled but asset type names are not available
+            if is_allow_list and not asset_type_ids:
+                self.log.warning((
+                    "None of asset type names were found in Ftrack."
+                    " Skipping filter."
+                ))
+                return last_asset_versions_by_task_id
+
+            if is_allow_list:
                 asset_query_part = " and asset.type_id in ({})".format(
+                    self.join_query_keys(asset_type_ids)
+                )
+            elif asset_type_ids:
+                asset_query_part = " and asset.type_id not in ({})".format(
                     self.join_query_keys(asset_type_ids)
                 )
 
@@ -360,7 +380,6 @@ class TaskToVersionStatus(BaseEventHandler):
             " order by version descending"
         ).format(self.join_query_keys(task_ids), asset_query_part)).all()
 
-        last_asset_versions_by_task_id = collections.defaultdict(list)
         last_version_by_task_id = {}
         not_finished_task_ids = set(task_ids)
         for asset_version in asset_versions:
@@ -381,7 +400,7 @@ class TaskToVersionStatus(BaseEventHandler):
             elif last_version > version:
                 # Skip processing if version is lower than last version
                 # and pop task id from `not_finished_task_ids`
-                not_finished_task_ids.remove(task_id)
+                not_finished_task_ids.discard(task_id)
                 continue
 
             # Add AssetVersion entity to output dictionary

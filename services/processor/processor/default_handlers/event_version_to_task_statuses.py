@@ -78,21 +78,17 @@ class VersionToTaskStatus(BaseEventHandler):
             ))
             return
 
-        mod_mapping = {}
-        for item in event_settings["mapping"]:
-            mod_mapping[item["name"]] = item["value"]
-        event_settings["mapping"] = mod_mapping
-
-        _status_mapping = event_settings["mapping"] or {}
         status_mapping = {
-            key.lower(): value
-            for key, value in _status_mapping.items()
+            item["name"].lower(): item["value"]
+            for item in event_settings["mapping"]
         }
+        asset_type_filter = event_settings["asset_types_filter_type"]
+        is_allow_list = asset_type_filter == "allow_list"
 
-        asset_types_to_skip = [
+        asset_types = {
             short_name.lower()
-            for short_name in event_settings["asset_types_to_skip"]
-        ]
+            for short_name in event_settings["asset_types"]
+        }
 
         # Collect entity ids
         asset_version_ids = set()
@@ -112,10 +108,12 @@ class VersionToTaskStatus(BaseEventHandler):
         task_ids = set()
         asset_version_entities = []
         for asset_version in _asset_version_entities:
-            if asset_types_to_skip:
-                short_name = asset_version["asset"]["type"]["short"].lower()
-                if short_name in asset_types_to_skip:
-                    continue
+            short_name = asset_version["asset"]["type"]["short"].lower()
+            if (
+                (is_allow_list and short_name not in asset_types)
+                or (not is_allow_list and short_name in asset_types)
+            ):
+                continue
             asset_version_entities.append(asset_version)
             task_ids.add(asset_version["task_id"])
 
