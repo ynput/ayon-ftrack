@@ -88,8 +88,8 @@ class SyncStatusTaskToVersion(BaseSettingsModel):
         title="Status mapping",
         default_factory=list,
     )
-    asset_types_to_skip: list[str] = SettingsField(
-        title="Skip on Asset types (short)",
+    asset_types_filter: list[str] = SettingsField(
+        title="Asset types (short)",
         default_factory=list,
     )
 
