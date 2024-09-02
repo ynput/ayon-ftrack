@@ -81,6 +81,13 @@ class SyncStatusTaskToParent(BaseSettingsModel):
     )
 
 
+def _allow_deny_enum():
+    return [
+        {"value": "allow_list", "label": "Allow list"},
+        {"value": "deny_list", "label": "Deny list"}
+    ]
+
+
 class SyncStatusTaskToVersion(BaseSettingsModel):
     _isGroup = True
     enabled: bool = True
@@ -88,7 +95,12 @@ class SyncStatusTaskToVersion(BaseSettingsModel):
         title="Status mapping",
         default_factory=list,
     )
-    asset_types_filter: list[str] = SettingsField(
+    asset_types_filter_type: str = SettingsField(
+        title="Asset types Allow/Deny",
+        default="allow_list",
+        enum_resolver=_allow_deny_enum,
+    )
+    asset_types: list[str] = SettingsField(
         title="Asset types (short)",
         default_factory=list,
     )
@@ -108,8 +120,13 @@ class SyncStatusVersionToTask(BaseSettingsModel):
         title="Status mapping",
         default_factory=list,
     )
-    asset_types_to_skip: list[str] = SettingsField(
-        title="Skip on Asset types (short)",
+    asset_types_filter_type: str = SettingsField(
+        title="Asset types Allow/Deny",
+        default="deny_list",
+        enum_resolver=_allow_deny_enum,
+    )
+    asset_types: list[str] = SettingsField(
+        title="Asset types (short)",
         default_factory=list,
     )
 
@@ -435,12 +452,14 @@ DEFAULT_SERVICE_HANDLERS_SETTINGS = {
     "status_task_to_version": {
         "enabled": True,
         "mapping": [],
-        "asset_types_filter": []
+        "asset_types_filter_type": "allow_list",
+        "asset_types": []
     },
     "status_version_to_task": {
         "enabled": True,
         "mapping": [],
-        "asset_types_to_skip": []
+        "asset_types_filter_type": "deny_list",
+        "asset_types": []
     },
     "next_task_update": {
         "enabled": True,
