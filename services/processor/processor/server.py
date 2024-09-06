@@ -40,7 +40,19 @@ def get_service_label():
     ])
 
 
+def _cleanup_session():
+    session = _GlobalContext.session
+    _GlobalContext.session = None
+    if session is not None:
+        logging.info("Closing ftrack session.")
+        if session.event_hub.connected is True:
+            session.event_hub.disconnect()
+        session.close()
+
+
 def _create_session():
+    _cleanup_session()
+
     ftrack_settings = ayon_api.get_service_addon_settings()
     ftrack_url = ftrack_settings["ftrack_server"]
     service_settings = ftrack_settings["service_settings"]
@@ -141,7 +153,7 @@ def main_loop():
             time.sleep(10)
             continue
 
-        _GlobalContext.session_fail_logged = False
+        _GlobalContext.session_fail_logged = 0
 
         # Cleanup download root
         cleanup_download_root()
@@ -156,8 +168,11 @@ def main_loop():
             handler_paths.extend(custom_handler_dirs)
             logging.info("Starting listen server")
             server = FtrackServer(handler_paths)
-            server.run_server(session)
-        logging.info("Server stopped.")
+            try:
+                server.run_server(session)
+            finally:
+                logging.info("Server stopped.")
+                _cleanup_session()
     logging.info("Main loop stopped.")
 
 
@@ -172,12 +187,7 @@ def _cleanup_process():
     logging.info("Stopping main loop.")
     if not _GlobalContext.stop_event.is_set():
         _GlobalContext.stop_event.set()
-    session = _GlobalContext.session
-    logging.info("Closing ftrack session.")
-    if session is not None:
-        if session.event_hub.connected is True:
-            session.event_hub.disconnect()
-        session.close()
+    _cleanup_session()
 
 
 def main():
