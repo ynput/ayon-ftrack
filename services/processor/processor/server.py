@@ -150,6 +150,9 @@ def main_loop():
     while not _GlobalContext.stop_event.is_set():
         session = create_session()
         if session is None:
+            logging.info(
+                "Failed to create ftrack session. Will try in 10 seconds."
+            )
             time.sleep(10)
             continue
 
