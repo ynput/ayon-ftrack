@@ -92,15 +92,6 @@ class FtrackServer:
                     exc_info=True
                 )
 
-    def set_handler_paths(self, paths):
-        self.handler_paths = paths
-        if self.is_running:
-            self.stop_session()
-            self.run_server()
-
-        elif not self.stopped:
-            self.run_server()
-
     def run_server(self, session=None, load_files=True):
         self.stopped = False
         self.is_running = True
