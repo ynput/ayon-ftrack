@@ -28,13 +28,13 @@ class FtrackServer:
 
         self.log = logging.getLogger(__name__)
 
-        self.stopped = True
-        self.is_running = False
+        self._stopped = True
+        self._is_running = False
 
         self.handler_paths = handler_paths or []
 
     def stop_session(self):
-        self.stopped = True
+        self._stopped = True
         if self.session.event_hub.connected is True:
             self.session.event_hub.disconnect()
         self.session.close()
@@ -92,18 +92,9 @@ class FtrackServer:
                     exc_info=True
                 )
 
-    def set_handler_paths(self, paths):
-        self.handler_paths = paths
-        if self.is_running:
-            self.stop_session()
-            self.run_server()
-
-        elif not self.stopped:
-            self.run_server()
-
     def run_server(self, session=None, load_files=True):
-        self.stopped = False
-        self.is_running = True
+        self._stopped = False
+        self._is_running = True
         if not session:
             session = ftrack_api.Session(auto_connect_event_hub=True)
 
@@ -131,7 +122,7 @@ class FtrackServer:
                     "Paths to event handlers are not set."
                     " Ftrack server won't launch."
                 ))
-                self.is_running = False
+                self._is_running = False
                 return
 
             self.set_files(self.handler_paths)
@@ -141,5 +132,7 @@ class FtrackServer:
             self.log.info(msg)
 
         # keep event_hub on session running
-        self.session.event_hub.wait()
-        self.is_running = False
+        try:
+            self.session.event_hub.wait()
+        finally:
+            self._is_running = False

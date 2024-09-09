@@ -216,7 +216,7 @@ def downloaded_event_handlers(custom_handlers):
             yield event_handler_dirs
     finally:
         shutil.rmtree(dirpath)
-        print("downloaded_event_handlers end")
+        print("Cleaned up downloaded event handlers")
 
 
 def cleanup_download_root():
