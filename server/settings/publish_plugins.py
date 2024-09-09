@@ -597,7 +597,7 @@ DEFAULT_PUBLISH_SETTINGS = {
     },
     "IntegrateFtrackNote": {
         "enabled": True,
-        "note_template": "{intent}: {comment}",
+        "note_template": "{comment}",
         "note_labels": []
     },
     "IntegrateFtrackDescription": {

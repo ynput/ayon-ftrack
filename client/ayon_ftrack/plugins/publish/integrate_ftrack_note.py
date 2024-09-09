@@ -31,7 +31,7 @@ class IntegrateFtrackNote(plugin.FtrackPublishInstancePlugin):
     # - Allows only `intent` and `comment` keys
     note_template = None
     # Backwards compatibility
-    note_with_intent_template = "{intent}: {comment}"
+    note_with_intent_template = "{comment}"
     # - note label must exist in Ftrack
     note_labels = []
 
