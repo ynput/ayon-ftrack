@@ -72,7 +72,7 @@ class ProcessEventHub(ftrack_api.event.hub.EventHub):
         started = time.time()
         while True:
             if not self.connected:
-                self.reconnect()
+                break
 
             job = None
             empty_queue = False
