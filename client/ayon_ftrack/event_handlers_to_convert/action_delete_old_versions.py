@@ -559,9 +559,3 @@ class DeleteOldVersions(LocalAction):
             return (None, None)
 
         return (os.path.normpath(path), sequence_path)
-
-
-def register(session):
-    '''Register plugin. Called when used as an plugin.'''
-
-    DeleteOldVersions(session).register()

@@ -1838,8 +1838,3 @@ class AutoSyncFromFtrack(BaseEventHandler):
     #         event=self._cur_event
     #     )
     #     return True
-
-
-def register(session):
-    '''Register plugin. Called when used as an plugin.'''
-    AutoSyncFromFtrack(session).register()

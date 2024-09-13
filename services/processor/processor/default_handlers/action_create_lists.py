@@ -836,7 +836,3 @@ class CreateDailyListServerAction(ServerAction):
                 exc_info=True
             )
         return output
-
-
-def register(session):
-    CreateDailyListServerAction(session).register()

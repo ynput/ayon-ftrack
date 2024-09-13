@@ -338,9 +338,3 @@ class TransferHierarchicalValues(ServerAction):
                 return float
             return int
         return None
-
-
-def register(session):
-    '''Register plugin. Called when used as an plugin.'''
-
-    TransferHierarchicalValues(session).register()

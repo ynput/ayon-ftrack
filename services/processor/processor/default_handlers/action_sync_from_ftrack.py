@@ -110,7 +110,3 @@ class SyncFromFtrackAction(ServerAction):
                 ),
                 on_error="ignore"
             )
-
-
-def register(session):
-    SyncFromFtrackAction(session).register()

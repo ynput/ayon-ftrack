@@ -138,8 +138,3 @@ class SyncLinksToAYON(BaseEventHandler):
 
             mongo_id_by_ftrack_id[ftrack_id] = mongo_id
         return mongo_id_by_ftrack_id
-
-
-def register(session):
-    '''Register plugin. Called when used as an plugin.'''
-    SyncLinksToAYON(session).register()

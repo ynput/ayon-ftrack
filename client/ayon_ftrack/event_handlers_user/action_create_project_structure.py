@@ -213,7 +213,3 @@ class CreateProjectFolders(LocalAction):
         new_ent = self.session.create(ent_type, data)
         self.session.commit()
         return new_ent
-
-
-def register(session):
-    CreateProjectFolders(session).register()

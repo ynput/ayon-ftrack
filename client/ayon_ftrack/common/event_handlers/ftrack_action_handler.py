@@ -1,4 +1,5 @@
 import functools
+from typing import Optional, List, Dict, Any, Union
 
 import ftrack_api
 
@@ -28,24 +29,26 @@ class BaseAction(BaseHandler):
 
     Args:
         session (ftrack_api.Session): Connected ftrack session.
+
     """
+    __ignore_handler_class = True
 
-    label = None
-    variant = None
-    identifier = None
-    description = None
-    icon = None
-    handler_type = "Action"
-    preactions = []
+    label: Optional[str] = None
+    variant: Optional[str] = None
+    identifier: Optional[str] = None
+    description: Optional[str] = None
+    icon: Optional[str] = None
+    handler_type: str = "Action"
+    preactions: List[str] = []
 
-    _full_label = None
-    _discover_identifier = None
-    _launch_identifier = None
+    _full_label: Optional[str] = None
+    _discover_identifier: Optional[str] = None
+    _launch_identifier: Optional[str] = None
 
-    settings_frack_subkey = "user_handlers"
-    settings_enabled_key = "enabled"
+    settings_frack_subkey: str = "user_handlers"
+    settings_enabled_key: str = "enabled"
 
-    def __init__(self, session):
+    def __init__(self, session: ftrack_api.Session):
         # Validate minimum requirements
         if not self.label:
             raise ValueError("Action missing 'label'.")
@@ -60,27 +63,27 @@ class BaseAction(BaseHandler):
         self._launch = self.launch_wrapper(self._launch)
 
     @property
-    def discover_identifier(self):
+    def discover_identifier(self) -> str:
         return self.identifier
 
     @property
-    def launch_identifier(self):
+    def launch_identifier(self) -> str:
         return self.identifier
 
     @property
-    def handler_label(self):
+    def handler_label(self) -> str:
         return self.full_label
 
     @property
-    def full_label(self):
+    def full_label(self) -> str:
         """Full label of action.
 
         Value of full label is cached.
 
         Returns:
             str: Label created from 'label' and 'variant' attributes.
-        """
 
+        """
         if self._full_label is None:
             if self.variant:
                 label = "{} {}".format(self.label, self.variant)
@@ -91,7 +94,6 @@ class BaseAction(BaseHandler):
 
     def register(self):
         """Register to ftrack topics to discover and launch action."""
-
         self.session.event_hub.subscribe(
             "topic=ftrack.action.discover",
             self._discover,
@@ -103,9 +105,12 @@ class BaseAction(BaseHandler):
         ).format(self.launch_identifier)
         self.session.event_hub.subscribe(launch_subscription, self._launch)
 
-    def _translate_event(self, event, session=None):
+    def _translate_event(
+        self,
+        event: ftrack_api.event.base.Event,
+        session: Optional[ftrack_api.Session] = None
+    ) -> List[ftrack_api.entity.base.Entity]:
         """Translate event to receive entities based on it's data."""
-
         if session is None:
             session = self.session
 
@@ -126,7 +131,9 @@ class BaseAction(BaseHandler):
 
         return _entities
 
-    def _discover(self, event):
+    def _discover(
+        self, event: ftrack_api.event.base.Event
+    ) -> Optional[Dict[str, Any]]:
         """Decide if and how will be action showed to user in ftrack.
 
         Args:
@@ -137,8 +144,8 @@ class BaseAction(BaseHandler):
             Union[None, Dict[str, Any]]: None if action is not returned
                 otherwise returns items to show in UI (structure of items is
                 defined by ftrack and can be found in documentation).
-        """
 
+        """
         entities = self._translate_event(event)
         if not entities:
             return None
@@ -161,7 +168,12 @@ class BaseAction(BaseHandler):
             }]
         }
 
-    def discover(self, session, entities, event):
+    def discover(
+        self,
+        session: ftrack_api.Session,
+        entities: List[ftrack_api.entity.base.Entity],
+        event: ftrack_api.event.base.Event,
+    ) -> bool:
         """Decide if action is showed to used based on event data.
 
         Action should override the method to implement logic to show the
@@ -177,11 +189,13 @@ class BaseAction(BaseHandler):
 
         Returns:
             bool: True if action should be returned.
-        """
 
+        """
         return False
 
-    def _handle_preactions(self, session, event):
+    def _handle_preactions(
+        self, session: ftrack_api.Session, event: ftrack_api.event.base.Event
+    ) -> bool:
         """Launch actions before launching this action.
 
         Concept came from Pype and got deprecated (and used) over time. Should
@@ -203,8 +217,8 @@ class BaseAction(BaseHandler):
             Preactions are marked as deprecated. Server actions should not
                 use preactions and local actions use local identifier which
                 is hard to handle automatically
-        """
 
+        """
         # If preactions are not set
         if len(self.preactions) == 0:
             return True
@@ -260,7 +274,9 @@ class BaseAction(BaseHandler):
             return output
         return wrapper_func
 
-    def _launch(self, event):
+    def _launch(
+        self, event: ftrack_api.event.base.Event
+    ) -> Optional[Dict[str, Any]]:
         entities = self._translate_event(event)
         if not entities:
             return
@@ -277,7 +293,12 @@ class BaseAction(BaseHandler):
 
         return self._handle_result(response)
 
-    def launch(self, session, entities, event):
+    def launch(
+        self,
+        session: ftrack_api.Session,
+        entities: List[ftrack_api.entity.base.Entity],
+        event: ftrack_api.event.base.Event
+    ) -> Optional[Union[bool, Dict[str, Any]]]:
         """Main part of handling event callback.
 
         Args:
@@ -286,14 +307,18 @@ class BaseAction(BaseHandler):
             event (ftrack_api.Event): Ftrack event to process.
 
         Returns:
-            Union[None, bool, Dict[str, Any]]: None if nothing should be showed
-                to user when done, 'True'/'False' if process succeded/failed
-                or more complex data strucure e.g. to show interface to user.
-        """
+            Union[bool, Dict[str, Any]]: True or false for success or fail,
+                or more complex data structure e.g. to show interface to user.
 
+        """
         raise NotImplementedError()
 
-    def _interface(self, session, entities, event):
+    def _interface(
+        self,
+        session: ftrack_api.Session,
+        entities: List[ftrack_api.entity.base.Entity],
+        event: ftrack_api.event.base.Event
+    ) -> Optional[Dict[str, Any]]:
         interface = self.interface(session, entities, event)
         if not interface:
             return
@@ -319,7 +344,12 @@ class BaseAction(BaseHandler):
             )
         )
 
-    def interface(self, session, entities, event):
+    def interface(
+        self,
+        session: ftrack_api.Session,
+        entities: List[ftrack_api.entity.base.Entity],
+        event: ftrack_api.event.base.Event
+    ) -> Optional[Union[Dict[str, Any], List[Dict[str, Any]]]]:
         """Show an interface to user befor the action is processed.
 
         This is part of launch callback which gives option to return ftrack
@@ -338,13 +368,12 @@ class BaseAction(BaseHandler):
                 should be showed, list of items to show or dictionary with
                 'items' key and possibly additional data
                 (e.g. submit button label).
-        """
 
+        """
         return None
 
-    def _handle_result(self, result):
+    def _handle_result(self, result: Any) -> Optional[Dict[str, Any]]:
         """Validate the returned result from the action callback."""
-
         if not result:
             return None
 
@@ -385,7 +414,11 @@ class BaseAction(BaseHandler):
         return result
 
     @staticmethod
-    def roles_check(settings_roles, user_roles, default=True):
+    def roles_check(
+        settings_roles: List[str],
+        user_roles: List[str],
+        default: Optional[bool] = True
+    ) -> bool:
         """Compare roles from setting and user's roles.
 
         Args:
@@ -396,8 +429,8 @@ class BaseAction(BaseHandler):
         Returns:
             bool: 'True' if user has at least one role from settings or
                 default if 'settings_roles' is empty.
-        """
 
+        """
         if not settings_roles:
             return default
 
@@ -411,7 +444,11 @@ class BaseAction(BaseHandler):
         return False
 
     @classmethod
-    def get_user_entity_from_event(cls, session, event):
+    def get_user_entity_from_event(
+        cls,
+        session: ftrack_api.Session,
+        event: ftrack_api.event.base.Event
+    ) -> Optional[ftrack_api.entity.user.User]:
         """Query user entity from event."""
 
         not_set = object()
@@ -436,15 +473,23 @@ class BaseAction(BaseHandler):
         return user_entity
 
     @classmethod
-    def get_user_roles_from_event(cls, session, event, lower=False):
+    def get_user_roles_from_event(
+        cls,
+        session: ftrack_api.Session,
+        event: ftrack_api.event.base.Event,
+        lower: Optional[bool] = False
+    ) -> List[str]:
         """Get user roles based on data in event.
 
         Args:
             session (ftrack_api.Session): Prepared ftrack session.
             event (ftrack_api.event.Event): Event which is processed.
             lower (Optional[bool]): Lower the role names. Default 'False'.
-        """
 
+        Returns:
+            List[str]: List of user roles.
+
+        """
         not_set = object()
 
         user_roles = event["data"].get("user_roles", not_set)
@@ -460,8 +505,11 @@ class BaseAction(BaseHandler):
         return user_roles
 
     def get_project_name_from_event_with_entities(
-        self, session, event, entities
-    ):
+        self,
+        session: ftrack_api.Session,
+        event: ftrack_api.event.base.Event,
+        entities: List[ftrack_api.entity.base.Entity],
+    ) -> Optional[str]:
         """Load or query and fill project entity from/to event data.
 
         Project data are stored by ftrack id because in most cases it is
@@ -471,8 +519,11 @@ class BaseAction(BaseHandler):
             session (ftrack_api.Session): Current session.
             event (ftrack_api.Event): Processed event by session.
             entities (List[Any]): Ftrack entities of selection.
-        """
 
+        Returns:
+            Optional[str]: Project name from event data.
+
+        """
         # Try to get project entity from event
         project_name = event["data"].get("project_name")
         if not project_name:
@@ -484,7 +535,12 @@ class BaseAction(BaseHandler):
             event["data"]["project_name"] = project_name
         return project_name
 
-    def get_ftrack_settings(self, session, event, entities):
+    def get_ftrack_settings(
+        self,
+        session: ftrack_api.Session,
+        event: ftrack_api.event.base.Event,
+        entities: List[ftrack_api.entity.base.Entity],
+    ) -> Dict[str, Any]:
         project_name = self.get_project_name_from_event_with_entities(
             session, event, entities
         )
@@ -493,12 +549,16 @@ class BaseAction(BaseHandler):
         )
         return project_settings["ftrack"]
 
-    def valid_roles(self, session, entities, event):
+    def valid_roles(
+        self,
+        session: ftrack_api.Session,
+        entities: List[ftrack_api.entity.base.Entity],
+        event: ftrack_api.event.base.Event,
+    ) -> bool:
         """Validate user roles by settings.
 
         Method requires to have set `settings_key` attribute.
         """
-
         ftrack_settings = self.get_ftrack_settings(session, event, entities)
         settings = (
             ftrack_settings[self.settings_frack_subkey][self.settings_key]
@@ -521,10 +581,11 @@ class LocalAction(BaseAction):
 
     Handy for actions where matters if is executed on specific machine.
     """
-    _full_launch_identifier = None
+    __ignore_handler_class: bool = True
+    _full_launch_identifier: bool = None
 
     @property
-    def discover_identifier(self):
+    def discover_identifier(self) -> str:
         if self._discover_identifier is None:
             self._discover_identifier = "{}.{}".format(
                 self.identifier, self.process_identifier()
@@ -532,7 +593,7 @@ class LocalAction(BaseAction):
         return self._discover_identifier
 
     @property
-    def launch_identifier(self):
+    def launch_identifier(self) -> str:
         """Catch all topics with same identifier."""
         if self._launch_identifier is None:
             self._launch_identifier = "{}.*".format(self.identifier)
@@ -552,7 +613,6 @@ class LocalAction(BaseAction):
 
         Filter events to this session user.
         """
-
         # Subscribe to discover topic for user under this session
         self.session.event_hub.subscribe(
             "topic=ftrack.action.discover and source.user.username={}".format(
@@ -572,7 +632,9 @@ class LocalAction(BaseAction):
             self._launch
         )
 
-    def _discover(self, event):
+    def _discover(
+        self, event: ftrack_api.event.base.Event
+    ) -> Optional[Dict[str, Any]]:
         entities = self._translate_event(event)
         if not entities:
             return
@@ -595,7 +657,9 @@ class LocalAction(BaseAction):
             }]
         }
 
-    def _launch(self, event):
+    def _launch(
+        self, event: ftrack_api.event.base.Event
+    ) -> Optional[Dict[str, Any]]:
         event_identifier = event["data"]["actionIdentifier"]
         # Check if identifier is same
         # - show message that acion may not be triggered on this machine
@@ -607,7 +671,7 @@ class LocalAction(BaseAction):
                     " where this action could be launched."
                 )
             }
-        return super(LocalAction, self)._launch(event)
+        return super()._launch(event)
 
 
 class ServerAction(BaseAction):
@@ -616,5 +680,6 @@ class ServerAction(BaseAction):
     Unlike the `BaseAction` roles are not checked on register but on discover.
     For the same reason register is modified to not filter topics by username.
     """
+    __ignore_handler_class: bool = True
 
-    settings_frack_subkey = "service_event_handlers"
+    settings_frack_subkey: str = "service_event_handlers"

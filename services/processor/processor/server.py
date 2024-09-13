@@ -18,6 +18,8 @@ from .download_utils import (
     downloaded_event_handlers,
 )
 
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+
 
 class _GlobalContext:
     stop_event = threading.Event()
@@ -26,11 +28,9 @@ class _GlobalContext:
 
 
 def get_handler_paths() -> list[str]:
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    handler_paths = [
-        os.path.join(current_dir, "default_handlers"),
+    return [
+        os.path.join(CURRENT_DIR, "default_handlers"),
     ]
-    return handler_paths
 
 
 def get_service_label():

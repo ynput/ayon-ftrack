@@ -467,7 +467,3 @@ class StoreThumbnailsToAvalon(LocalAction):
 
         output["representations"] = repre_ents
         return output
-
-
-def register(session):
-    StoreThumbnailsToAvalon(session).register()

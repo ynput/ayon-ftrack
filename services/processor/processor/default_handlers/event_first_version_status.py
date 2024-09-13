@@ -205,9 +205,3 @@ class FirstVersionStatus(BaseEventHandler):
             filtered_entities_info[project_id].append(entity_info)
 
         return filtered_entities_info
-
-
-def register(session):
-    '''Register plugin. Called when used as an plugin.'''
-
-    FirstVersionStatus(session).register()

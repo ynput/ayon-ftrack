@@ -127,7 +127,3 @@ class JobKiller(LocalAction):
             "success": True,
             "message": "All selected jobs were killed Successfully!"
         }
-
-
-def register(session):
-    JobKiller(session).register()

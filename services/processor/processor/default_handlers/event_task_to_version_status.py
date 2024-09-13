@@ -407,7 +407,3 @@ class TaskToVersionStatus(BaseEventHandler):
             last_asset_versions_by_task_id[task_id].append(asset_version)
 
         return last_asset_versions_by_task_id
-
-
-def register(session):
-    TaskToVersionStatus(session).register()

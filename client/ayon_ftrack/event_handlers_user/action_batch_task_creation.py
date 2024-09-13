@@ -159,9 +159,3 @@ class BatchTasksAction(LocalAction):
                 }
             ]
         }
-
-
-def register(session):
-    '''Register action. Called when used as an event plugin.'''
-
-    BatchTasksAction(session).register()

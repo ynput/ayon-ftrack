@@ -73,7 +73,3 @@ class ThumbToParent(LocalAction):
             "success": True,
             "message": "Created job for updating thumbnails!"
         }
-
-
-def register(session):
-    ThumbToParent(session).register()

@@ -246,9 +246,3 @@ class VersionToTaskStatus(BaseEventHandler):
             }
 
         return output
-
-
-def register(session):
-    '''Register plugin. Called when used as an plugin.'''
-
-    VersionToTaskStatus(session).register()

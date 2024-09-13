@@ -76,7 +76,3 @@ class ClientReviewSort(LocalAction):
             "success": True,
             "message": "Client Review sorted!"
         }
-
-
-def register(session):
-    ClientReviewSort(session).register()

@@ -327,8 +327,3 @@ class CreateFolders(LocalAction):
             )
         )
         return os.path.normpath(filled_template.split("{")[0])
-
-
-def register(session):
-    """Register plugin. Called when used as an plugin."""
-    CreateFolders(session).register()

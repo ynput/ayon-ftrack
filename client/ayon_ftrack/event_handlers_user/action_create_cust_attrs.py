@@ -875,7 +875,3 @@ class CustomAttributes(LocalAction):
             "entity_type": entity_type,
             "object_type_id": object_type["id"]
         }
-
-
-def register(session):
-    CustomAttributes(session).register()

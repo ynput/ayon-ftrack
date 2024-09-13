@@ -30,6 +30,8 @@ class ProcessEventHub(ftrack_api.event.hub.EventHub):
     _server_con = None
 
     def get_next_ftrack_event(self):
+        if not self.connected:
+            return None
         return enroll_event_job(
             source_topic="ftrack.leech",
             target_topic="ftrack.proc",
@@ -42,7 +44,7 @@ class ProcessEventHub(ftrack_api.event.hub.EventHub):
         event_id = job["id"]
         source_id = job["dependsOn"]
         source_event = get_event(event_id)
-        print(f"Processing event... {source_id}")
+        print(f"Processed event... {source_id}")
 
         description = f"Processed {source_event['description']}"
 
@@ -71,9 +73,6 @@ class ProcessEventHub(ftrack_api.event.hub.EventHub):
 
         started = time.time()
         while True:
-            if not self.connected:
-                self.reconnect()
-
             job = None
             empty_queue = False
             try:
@@ -89,6 +88,9 @@ class ProcessEventHub(ftrack_api.event.hub.EventHub):
             # Do not do this under except handling to avoid confusing
             #   traceback if something happens
             if empty_queue:
+                if not self.connected:
+                    break
+
                 if not self.load_event_from_jobs():
                     time.sleep(0.1)
                 continue

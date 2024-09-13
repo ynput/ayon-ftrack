@@ -925,13 +925,3 @@ class DeleteEntitiesAction(ServerAction):
             "success": True,
             "message": message
         }
-
-
-def register(session):
-    """
-
-    Args:
-        session (ftrack_api.Session): Ftrack session.
-    """
-
-    DeleteEntitiesAction(session).register()

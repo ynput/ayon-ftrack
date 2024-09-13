@@ -122,9 +122,3 @@ class CloneReviewSession(ServerAction):
             'success': True,
             'message': 'Action completed successfully'
         }
-
-
-def register(session):
-    '''Register action. Called when used as an event plugin.'''
-
-    CloneReviewSession(session).register()

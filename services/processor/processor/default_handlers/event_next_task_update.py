@@ -453,7 +453,3 @@ class NextTaskUpdate(BaseEventHandler):
         # Override values in source object
         for type_id, value in _task_entities_by_type_id.items():
             task_entities_by_type_id[type_id] = value
-
-
-def register(session):
-    NextTaskUpdate(session).register()

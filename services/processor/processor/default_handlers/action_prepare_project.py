@@ -748,7 +748,3 @@ class PrepareProjectServer(ServerAction):
             "message": "Project created in AYON.",
             "success": True
         }
-
-
-def register(session):
-    PrepareProjectServer(session).register()
