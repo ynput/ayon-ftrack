@@ -47,8 +47,3 @@ class DelAvalonIdFromNew(BaseEventHandler):
             except Exception:
                 session.rollback()
                 continue
-
-
-def register(session):
-    '''Register plugin. Called when used as an plugin.'''
-    DelAvalonIdFromNew(session).register()

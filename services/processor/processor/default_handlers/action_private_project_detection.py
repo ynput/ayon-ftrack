@@ -53,9 +53,3 @@ class PrivateProjectDetectionAction(ServerAction):
             ],
             "submit_button_label": "Got it"
         }
-
-
-def register(session):
-    '''Register plugin. Called when used as an plugin.'''
-
-    PrivateProjectDetectionAction(session).register()

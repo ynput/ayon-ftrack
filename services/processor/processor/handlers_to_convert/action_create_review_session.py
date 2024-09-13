@@ -309,8 +309,3 @@ class CreateDailyReviewSessionServerAction(ServerAction):
                 exc_info=True
             )
         return output
-
-
-def register(session):
-    '''Register plugin. Called when used as an plugin.'''
-    CreateDailyReviewSessionServerAction(session).register()

@@ -2728,8 +2728,3 @@ class SyncToAvalonEvent(BaseEventHandler):
         temp_dict[entity_type] = mongo_id_configuration_id
 
         return mongo_id_configuration_id
-
-
-def register(session):
-    '''Register plugin. Called when used as an plugin.'''
-    SyncToAvalonEvent(session).register()

@@ -20,7 +20,3 @@ class TestAction(LocalAction):
         self.log.info(event)
 
         return True
-
-
-def register(session):
-    TestAction(session).register()

@@ -543,7 +543,3 @@ class FillWorkfileAttributeAction(LocalAction):
                         report[NOT_SYNCHRONIZED_TITLE].append(task_path)
 
         return output
-
-
-def register(session):
-    FillWorkfileAttributeAction(session).register()

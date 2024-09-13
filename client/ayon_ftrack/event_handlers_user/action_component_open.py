@@ -66,7 +66,3 @@ class ComponentOpen(LocalAction):
             "success": True,
             "message": "Component folder Opened"
         }
-
-
-def register(session):
-    ComponentOpen(session).register()

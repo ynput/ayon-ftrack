@@ -101,9 +101,3 @@ class CleanHierarchicalAttrsAction(LocalAction):
             session.commit()
 
         return True
-
-
-def register(session):
-    '''Register plugin. Called when used as an plugin.'''
-
-    CleanHierarchicalAttrsAction(session).register()

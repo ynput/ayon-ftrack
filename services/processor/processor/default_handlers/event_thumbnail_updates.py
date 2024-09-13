@@ -160,7 +160,3 @@ class ThumbnailEvents(BaseEventHandler):
                 filtered_entities_info[project_id] = []
             filtered_entities_info[project_id].append(entity_info)
         return filtered_entities_info
-
-
-def register(session):
-    ThumbnailEvents(session).register()

@@ -89,7 +89,3 @@ class ActionWhereIRun(LocalAction):
             items.append(message)
 
         self.show_interface(items, title, event=event)
-
-
-def register(session):
-    ActionWhereIRun(session).register()

@@ -499,7 +499,3 @@ class PushHierValuesToNonHierEvent(BaseEventHandler):
 
         for project_id, entities_info in filtered_entities_info.items():
             self.process_by_project(session, event, project_id, entities_info)
-
-
-def register(session):
-    PushHierValuesToNonHierEvent(session).register()

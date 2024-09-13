@@ -279,8 +279,3 @@ class AppplicationsAction(BaseAction):
     def _get_folder_path(self, session, entity):
         entity_id = entity["id"]
         return get_folder_path_for_entities(session, [entity])[entity_id]
-
-
-def register(session):
-    """Register action. Called when used as an event plugin."""
-    AppplicationsAction(session).register()

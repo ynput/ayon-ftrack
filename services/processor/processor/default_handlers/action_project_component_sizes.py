@@ -473,8 +473,3 @@ class ProjectComponentsSizes(ServerAction):
                 "This may take some time. Look into jobs to check progress."
             )
         }
-
-
-def register(session):
-    ProjectComponentsSizes(session).register()
-    ProjectComponentsSizesCalculator(session).register()

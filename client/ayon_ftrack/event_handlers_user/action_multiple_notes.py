@@ -97,7 +97,3 @@ class MultipleNotes(LocalAction):
             entity["notes"].append(new_note)
             session.commit()
         return True
-
-
-def register(session):
-    MultipleNotes(session).register()

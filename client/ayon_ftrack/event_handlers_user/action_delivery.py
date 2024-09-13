@@ -769,9 +769,3 @@ class Delivery(LocalAction):
                 filtered_versions.append(version_entity)
 
         return filtered_versions
-
-
-def register(session):
-    """Register plugin. Called when used as a plugin."""
-
-    Delivery(session).register()

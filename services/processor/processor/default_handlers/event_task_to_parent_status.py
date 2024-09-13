@@ -434,7 +434,3 @@ class TaskStatusToParent(BaseEventHandler):
             if best_order_status:
                 output[parent_id] = best_order_status
         return output
-
-
-def register(session):
-    TaskStatusToParent(session).register()
