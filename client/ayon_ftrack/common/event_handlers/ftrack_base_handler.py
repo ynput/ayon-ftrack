@@ -15,7 +15,7 @@ import ftrack_api
 from ayon_api import get_addons_settings, get_project
 
 
-class BaseHandler(object, metaclass=ABCMeta):
+class BaseHandler(metaclass=ABCMeta):
     """Base class for handling ftrack events.
 
     Attributes:
@@ -26,8 +26,8 @@ class BaseHandler(object, metaclass=ABCMeta):
 
     Args:
         session (ftrack_api.Session): Connected ftrack session.
-    """
 
+    """
     _log = None
     _process_id = None
     # Default priority is 100
@@ -35,6 +35,8 @@ class BaseHandler(object, metaclass=ABCMeta):
     priority = 100
     handler_type = "Base"
     _handler_label = None
+    # Mark base classes to be ignored for discovery
+    __ignore_handler_class = True
 
     def __init__(self, session):
         if not isinstance(session, ftrack_api.session.Session):
@@ -45,6 +47,19 @@ class BaseHandler(object, metaclass=ABCMeta):
         self._session = session
 
         self.register = self.register_wrapper(self.register)
+
+    @classmethod
+    def ignore_handler_class(cls) -> bool:
+        """Check if handler class should be ignored.
+
+        Do not touch implementation of this method, set
+            '__ignore_handler_class' to 'True' if you want to ignore class.
+
+        """
+        cls_name = cls.__name__
+        if not cls_name.startswith("_"):
+            cls_name = f"_{cls_name}"
+        return getattr(cls, f"{cls_name}__ignore_handler_class", False)
 
     @staticmethod
     def join_filter_values(values):

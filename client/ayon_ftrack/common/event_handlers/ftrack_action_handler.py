@@ -29,6 +29,7 @@ class BaseAction(BaseHandler):
     Args:
         session (ftrack_api.Session): Connected ftrack session.
     """
+    __ignore_handler_class = True
 
     label = None
     variant = None
@@ -521,6 +522,7 @@ class LocalAction(BaseAction):
 
     Handy for actions where matters if is executed on specific machine.
     """
+    __ignore_handler_class = True
     _full_launch_identifier = None
 
     @property
@@ -616,5 +618,6 @@ class ServerAction(BaseAction):
     Unlike the `BaseAction` roles are not checked on register but on discover.
     For the same reason register is modified to not filter topics by username.
     """
+    __ignore_handler_class = True
 
     settings_frack_subkey = "service_event_handlers"

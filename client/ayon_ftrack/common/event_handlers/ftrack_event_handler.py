@@ -9,6 +9,7 @@ class BaseEventHandler(BaseHandler):
     By default is listening to "ftrack.update". To change it override
     'register' method of change 'subscription_topic' attribute.
     """
+    __ignore_handler_class = True
 
     subscription_topic = "ftrack.update"
     handler_type = "Event"
