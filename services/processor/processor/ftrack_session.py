@@ -42,7 +42,7 @@ class ProcessEventHub(ftrack_api.event.hub.EventHub):
         event_id = job["id"]
         source_id = job["dependsOn"]
         source_event = get_event(event_id)
-        print(f"Processing event... {source_id}")
+        print(f"Processed event... {source_id}")
 
         description = f"Processed {source_event['description']}"
 
