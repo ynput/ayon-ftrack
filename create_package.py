@@ -37,6 +37,7 @@ from typing import Optional, Iterable, Pattern, Union, List, Tuple
 import package
 
 FileMapping = Tuple[Union[str, io.BytesIO], str]
+
 ADDON_NAME: str = package.name
 ADDON_VERSION: str = package.version
 ADDON_CLIENT_DIR: Union[str, None] = getattr(package, "client_dir", None)
