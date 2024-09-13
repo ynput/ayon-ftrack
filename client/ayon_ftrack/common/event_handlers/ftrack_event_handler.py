@@ -66,14 +66,14 @@ class BaseEventHandler(BaseHandler):
             self.process(event)
 
         except Exception as exc:
-            self.session.rollback()
-            self.session._configure_locations()
             self.log.error(
                 "Event \"{}\" Failed: {}".format(
                     self.__class__.__name__, str(exc)
                 ),
                 exc_info=True
             )
+            self.session.rollback()
+            self.session._configure_locations()
 
     def _translate_event(self, event, session=None):
         """Receive entity objects based on event.
