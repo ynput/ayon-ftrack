@@ -81,8 +81,10 @@ class FtrackAddon(
 
     def get_plugin_paths(self):
         """Ftrack plugin paths."""
+        plugins_dir = os.path.join(FTRACK_ADDON_DIR, "plugins")
         return {
-            "publish": [os.path.join(FTRACK_ADDON_DIR, "plugins", "publish")]
+            "actions": [os.path.join(plugins_dir, "launcher_actions")],
+            "publish": [os.path.join(plugins_dir, "publish")]
         }
 
     def get_launch_hook_paths(self):
