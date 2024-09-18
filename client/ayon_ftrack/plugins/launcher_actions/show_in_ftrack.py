@@ -50,16 +50,15 @@ class ShowInFtrack(LauncherAction):
         ftrack_addon = self.get_ftrack_addon()
         ftrack_url = ftrack_addon.ftrack_url
 
-        project_name = selection.project_name
+        # Project ftrack id
         project_entity = selection.get_project_entity()
-        if not project_entity:
-            raise ValueError(f"Project {project_name} not found.")
-
         project_ftrack_id = project_entity["attrib"].get(FTRACK_ID_ATTRIB)
         if not project_ftrack_id:
+            project_name = selection.project_name
             raise RuntimeError(
                 f"Project {project_name} has no connected ftrack id.")
 
+        # Folder ftrack id (if selected)
         entity_ftrack_id = None
         folder_entity = selection.get_folder_entity()
         if folder_entity:
