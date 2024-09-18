@@ -1,7 +1,7 @@
 """
 Example Ftrack URL:
 
-https://pype.ftrackapp.com/#slideEntityId=38c5fec4-0aed-11ea-a454-3e41ec9bc0d6&slideEntityType=show&view=tasks&itemId=projects&entityId=38c5fec4-0aed-11ea-a454-3e41ec9bc0d6&entityType=show
+https://<server name>.ftrackapp.com/#slideEntityId=38c5fec4-0aed-11ea-a454-3e41ec9bc0d6&slideEntityType=show&view=tasks&itemId=projects&entityId=38c5fec4-0aed-11ea-a454-3e41ec9bc0d6&entityType=show
 
 # This is required otherwise is url invalid view=tasks&itemId=projects&entityId=38c5fec4-0aed-11ea-a454-3e41ec9bc0d6&entityType=show
 
