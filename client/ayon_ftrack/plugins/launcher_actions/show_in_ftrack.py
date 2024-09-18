@@ -26,6 +26,8 @@ from ayon_core.pipeline import LauncherAction
 from ayon_core.addon import AddonsManager
 from ayon_api import get_project, get_folder_by_path
 
+from ayon_ftrack.common import is_ftrack_enabled_in_settings
+
 
 class ShowInFtrack(LauncherAction):
     name = "showinftrack"
@@ -41,7 +43,9 @@ class ShowInFtrack(LauncherAction):
     def is_compatible(self, selection):
         if not selection.is_project_selected:
             return False
-        return True
+        return is_ftrack_enabled_in_settings(
+            selection.get_project_settings()
+        )
 
     def process(self, selection, **kwargs):
         ftrack_addon = self.get_ftrack_addon()
