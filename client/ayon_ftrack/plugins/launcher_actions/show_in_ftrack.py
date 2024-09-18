@@ -36,7 +36,7 @@ class ShowInFtrack(LauncherAction):
 
     @staticmethod
     def get_ftrack_addon():
-        return AddonsManager().addons_by_name.get("ftrack")
+        return AddonsManager().get("ftrack")
 
     def is_compatible(self, selection):
         if not selection.is_project_selected:
@@ -44,7 +44,6 @@ class ShowInFtrack(LauncherAction):
         return True
 
     def process(self, selection, **kwargs):
-
         ftrack_addon = self.get_ftrack_addon()
         ftrack_url = ftrack_addon.ftrack_url
 
@@ -94,6 +93,4 @@ class ShowInFtrack(LauncherAction):
 
         # Open URL in webbrowser
         self.log.info(f"Opening URL: {url}")
-        webbrowser.open(url,
-                        # Try in new tab
-                        new=2)
+        webbrowser.open_new_tab(url)
