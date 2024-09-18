@@ -108,7 +108,7 @@ class SyncProcess:
         self._ft_std_cust_attrs = None
         self._ft_object_type_name_by_id = None
         self._ft_task_type_name_by_id = None
-        
+
         self._created_entity_by_ftrack_id = {}
         self._hierarchy_changed_by_ftrack_id = {}
         self._remapped_entity_by_ftrack_id = {}

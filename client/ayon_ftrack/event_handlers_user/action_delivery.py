@@ -464,7 +464,7 @@ class Delivery(LocalAction):
 
     def _get_interest_version_ids(self, project_name, session, entities):
         """
-    
+
         Args:
             project_name (str): Project name.
             session (ftrack_api.Session): Ftrack session.

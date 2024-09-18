@@ -289,7 +289,7 @@ class CreateDailyListsModel(BaseSettingsModel):
         title="Create daily lists at",
         description="This may take affect on next day",
         widget="time",
-        regex="(?:[01]\d|2[0123]):(?:[012345]\d):(?:[012345]\d)",
+        regex=r"(?:[01]\d|2[0123]):(?:[012345]\d):(?:[012345]\d)",
         section="Automated execution",
         scope=["studio"],
     )

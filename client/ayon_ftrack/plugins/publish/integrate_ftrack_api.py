@@ -386,7 +386,7 @@ class IntegrateFtrackApi(plugin.FtrackPublishInstancePlugin):
         else:
             # Convert '0' version to string `"0"`
             # - ftrack handles `0` as empty value
-            if version == 0:                
+            if version == 0:
                 version = "0"
 
             new_asset_version_data = {
