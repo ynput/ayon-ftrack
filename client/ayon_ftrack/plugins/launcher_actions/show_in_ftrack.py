@@ -31,7 +31,7 @@ from ayon_ftrack.common import is_ftrack_enabled_in_settings, FTRACK_ID_ATTRIB
 
 class ShowInFtrack(LauncherAction):
     name = "showinftrack"
-    label = "Show in Ftrack"
+    label = "Show in ftrack"
     icon = "external-link-square"
     color = "#e0e1e1"
     order = 10
