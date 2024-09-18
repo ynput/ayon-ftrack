@@ -4,7 +4,7 @@ import platform
 
 from ayon_ftrack.common import LocalAction
 from ayon_ftrack.lib import get_ftrack_icon_url
-from openpype.lib import run_detached_process
+from ayon_core.lib import run_detached_process
 
 
 class ComponentOpen(LocalAction):
@@ -66,7 +66,3 @@ class ComponentOpen(LocalAction):
             "success": True,
             "message": "Component folder Opened"
         }
-
-
-def register(session):
-    ComponentOpen(session).register()

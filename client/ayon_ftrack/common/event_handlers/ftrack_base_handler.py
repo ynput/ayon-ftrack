@@ -9,13 +9,14 @@ import traceback
 import time
 import logging
 from abc import ABCMeta, abstractmethod
+from typing import Optional, Any, Union, Iterable, List, Dict, Tuple
 
 import ftrack_api
 
 from ayon_api import get_addons_settings, get_project
 
 
-class BaseHandler(object, metaclass=ABCMeta):
+class BaseHandler(metaclass=ABCMeta):
     """Base class for handling ftrack events.
 
     Attributes:
@@ -26,15 +27,17 @@ class BaseHandler(object, metaclass=ABCMeta):
 
     Args:
         session (ftrack_api.Session): Connected ftrack session.
-    """
 
-    _log = None
-    _process_id = None
+    """
+    _log: Optional[logging.Logger] = None
+    _process_id: Optional[str] = None
     # Default priority is 100
-    enabled = True
-    priority = 100
-    handler_type = "Base"
-    _handler_label = None
+    enabled: bool = True
+    priority: int = 100
+    handler_type: str = "Base"
+    _handler_label: Optional[str] = None
+    # Mark base classes to be ignored for discovery
+    __ignore_handler_class: bool = True
 
     def __init__(self, session):
         if not isinstance(session, ftrack_api.session.Session):
@@ -46,22 +49,35 @@ class BaseHandler(object, metaclass=ABCMeta):
 
         self.register = self.register_wrapper(self.register)
 
+    @classmethod
+    def ignore_handler_class(cls) -> bool:
+        """Check if handler class should be ignored.
+
+        Do not touch implementation of this method, set
+            '__ignore_handler_class' to 'True' if you want to ignore class.
+
+        """
+        cls_name = cls.__name__
+        if not cls_name.startswith("_"):
+            cls_name = f"_{cls_name}"
+        return getattr(cls, f"{cls_name}__ignore_handler_class", False)
+
     @staticmethod
-    def join_filter_values(values):
+    def join_filter_values(values: Iterable[str]) -> str:
         return ",".join({'"{}"'.format(value) for value in values})
 
     @classmethod
-    def join_query_keys(cls, keys):
+    def join_query_keys(cls, keys: Iterable[str]) -> str:
         return cls.join_filter_values(keys)
 
     @property
-    def log(self):
+    def log(self) -> logging.Logger:
         """Quick access to logger.
 
         Returns:
             logging.Logger: Logger that can be used for logging of handler.
-        """
 
+        """
         if self._log is None:
             # TODO better logging mechanism
             self._log = logging.getLogger(self.__class__.__name__)
@@ -69,35 +85,34 @@ class BaseHandler(object, metaclass=ABCMeta):
         return self._log
 
     @property
-    def handler_label(self):
+    def handler_label(self) -> str:
         if self._handler_label is None:
             self._handler_label = self.__class__.__name__
         return self._handler_label
 
     @property
-    def session(self):
+    def session(self) -> ftrack_api.Session:
         """Fast access to session.
 
         Returns:
             session (ftrack_api.Session): Session which is source of events.
-        """
 
+        """
         return self._session
 
     def reset_session(self):
         """Reset session cache."""
-
         self.session.reset()
 
     @staticmethod
-    def process_identifier():
+    def process_identifier() -> str:
         """Helper property to have unified access to process id.
 
         Todos:
             Use some global approach rather then implementation on
                 'BaseEntity'.
-        """
 
+        """
         if not BaseHandler._process_id:
             BaseHandler._process_id = str(uuid.uuid4())
         return BaseHandler._process_id
@@ -105,7 +120,6 @@ class BaseHandler(object, metaclass=ABCMeta):
     @abstractmethod
     def register(self):
         """Subscribe to event topics."""
-
         pass
 
     def register_wrapper(self, func):
@@ -170,8 +184,8 @@ class BaseHandler(object, metaclass=ABCMeta):
 
         Todos:
             Use object id rather.
-        """
 
+        """
         # Get entity type and make sure it is lower cased. Most places except
         # the component tab in the Sidebar will use lower case notation.
         entity_type = entity.get("entityType").replace("_", "").lower()
@@ -197,15 +211,21 @@ class BaseHandler(object, metaclass=ABCMeta):
             "Unable to translate entity type: {0}.".format(entity_type)
         )
 
-    def show_message(self, event, message, success=False):
+    def show_message(
+        self,
+        event: ftrack_api.event.base.Event,
+        message: str,
+        success: Optional[bool]=False,
+    ):
         """Shows message to user who triggered event.
 
         Args:
-            event (ftrack_api.Event): Event used for source of user id.
+            event (ftrack_api.event.base.Event): Event used for source
+                of user id.
             message (str): Message that will be shown to user.
             success (bool): Define type (color) of message. False -> red color.
-        """
 
+        """
         if not isinstance(success, bool):
             success = False
 
@@ -233,13 +253,13 @@ class BaseHandler(object, metaclass=ABCMeta):
 
     def show_interface(
         self,
-        items,
-        title="",
-        user_id=None,
-        user=None,
-        event=None,
-        username=None,
-        submit_btn_label=None
+        items: List[Dict[str, Any]],
+        title: Optional[str] = "",
+        user_id: Optional[str] = None,
+        user: Optional[Any] = None,
+        event: Optional[ftrack_api.event.base.Event] = None,
+        username: Optional[str] = None,
+        submit_btn_label: Optional[str] = None,
     ):
         """Shows ftrack widgets interface to user.
 
@@ -258,8 +278,8 @@ class BaseHandler(object, metaclass=ABCMeta):
             username (str): Username of user to get it's id. This is slowest
                 way how user id is received.
             submit_btn_label (str): Label of submit button in ftrack widget.
-        """
 
+        """
         if user_id:
             pass
 
@@ -304,7 +324,16 @@ class BaseHandler(object, metaclass=ABCMeta):
             on_error="ignore"
         )
 
-    def show_interface_from_dict(self, messages, *args, **kwargs):
+    def show_interface_from_dict(
+        self,
+        messages: Dict[str, Union[str, List[str]]],
+        title: Optional[str] = "",
+        user_id: Optional[str] = None,
+        user: Optional[Any] = None,
+        event: Optional[ftrack_api.event.base.Event] = None,
+        username: Optional[str] = None,
+        submit_btn_label: Optional[str] = None,
+    ):
         # TODO Find out how and where is this used
         if not messages:
             self.log.debug("No messages to show! (messages dict is empty)")
@@ -315,32 +344,35 @@ class BaseHandler(object, metaclass=ABCMeta):
         for key, value in messages.items():
             if not first:
                 items.append(splitter)
-            else:
-                first = False
+            first = False
 
             items.append({"type": "label", "value": "<h3>{}</h3>".format(key)})
-            if isinstance(value, list):
-                for item in value:
-                    message = {
-                        "type": "label", "value": "<p>{}</p>".format(item)
-                    }
-                    items.append(message)
-            else:
-                message = {"type": "label", "value": "<p>{}</p>".format(value)}
-                items.append(message)
+            if isinstance(value, str):
+                value = [value]
 
-        self.show_interface(items, *args, **kwargs)
+            for item in value:
+                items.append({"type": "label", "value": f"<p>{item}</p>"})
+
+        self.show_interface(
+            items,
+            title=title,
+            user_id=user_id,
+            user=user,
+            event=event,
+            username=username,
+            submit_btn_label=submit_btn_label
+        )
 
     def trigger_action(
         self,
-        action_identifier,
-        event=None,
-        session=None,
-        selection=None,
-        user_data=None,
-        topic="ftrack.action.launch",
-        additional_event_data={},
-        on_error="ignore"
+        action_identifier: str,
+        event: Optional[ftrack_api.event.base.Event] = None,
+        session: Optional[ftrack_api.Session] = None,
+        selection: Optional[List[Dict[str, str]]] = None,
+        user_data: Optional[Dict[str, Any]] = None,
+        topic: Optional[str] = "ftrack.action.launch",
+        additional_event_data: Optional[Dict[str, Any]] = None,
+        on_error: Optional[str] = "ignore"
     ):
         self.log.debug(
             "Triggering action \"{}\" Begins".format(action_identifier))
@@ -388,12 +420,12 @@ class BaseHandler(object, metaclass=ABCMeta):
 
     def trigger_event(
         self,
-        topic,
-        event_data=None,
-        session=None,
-        source=None,
-        event=None,
-        on_error="ignore"
+        topic: str,
+        event_data: Optional[Dict[str, Any]] = None,
+        session: Optional[ftrack_api.Session] = None,
+        source: Optional[Dict[str, Any]] = None,
+        event: Optional[ftrack_api.event.base.Event] = None,
+        on_error: Optional[str] = "ignore"
     ):
         if session is None:
             session = self.session
@@ -415,7 +447,11 @@ class BaseHandler(object, metaclass=ABCMeta):
             "Publishing event: {}"
         ).format(str(event.__dict__)))
 
-    def get_project_from_entity(self, entity, session=None):
+    def get_project_from_entity(
+        self,
+        entity: ftrack_api.entity.base.Entity,
+        session: Optional[ftrack_api.Session] = None
+    ):
         low_entity_type = entity.entity_type.lower()
         if low_entity_type == "project":
             return entity
@@ -449,7 +485,12 @@ class BaseHandler(object, metaclass=ABCMeta):
             "Project where id is {}".format(project_data["id"])
         ).one()
 
-    def get_project_entity_from_event(self, session, event, project_id):
+    def get_project_entity_from_event(
+        self,
+        session: ftrack_api.Session,
+        event: ftrack_api.event.base.Event,
+        project_id: str,
+    ):
         """Load or query and fill project entity from/to event data.
 
         Project data are stored by ftrack id because in most cases it is
@@ -463,8 +504,8 @@ class BaseHandler(object, metaclass=ABCMeta):
         Returns:
             Union[str, None]: Project name based on entities or None if project
                 cannot be defined.
-        """
 
+        """
         if not project_id:
             raise ValueError(
                 "Entered `project_id` is not valid. {} ({})".format(
@@ -486,7 +527,12 @@ class BaseHandler(object, metaclass=ABCMeta):
 
         return project_entity
 
-    def get_project_name_from_event(self, session, event, project_id):
+    def get_project_name_from_event(
+        self,
+        session: ftrack_api.Session,
+        event: ftrack_api.event.base.Event,
+        project_id: str,
+    ):
         """Load or query and fill project entity from/to event data.
 
         Project data are stored by ftrack id because in most cases it is
@@ -500,8 +546,8 @@ class BaseHandler(object, metaclass=ABCMeta):
         Returns:
             Union[str, None]: Project name based on entities or None if project
                 cannot be defined.
-        """
 
+        """
         if not project_id:
             raise ValueError(
                 "Entered `project_id` is not valid. {} ({})".format(
@@ -522,7 +568,11 @@ class BaseHandler(object, metaclass=ABCMeta):
         project_id_mapping[project_id] = project_name
         return project_name
 
-    def get_ayon_project_from_event(self, event, project_name):
+    def get_ayon_project_from_event(
+        self,
+        event: ftrack_api.event.base.Event,
+        project_name: str
+    ):
         """Get AYON project from event.
 
         Args:
@@ -531,8 +581,8 @@ class BaseHandler(object, metaclass=ABCMeta):
 
         Returns:
             Union[dict[str, Any], None]: AYON project.
-        """
 
+        """
         ayon_projects = event["data"].setdefault("ayon_projects", {})
         if project_name in ayon_projects:
             return ayon_projects[project_name]
@@ -543,7 +593,11 @@ class BaseHandler(object, metaclass=ABCMeta):
         ayon_projects[project_name] = project
         return project
 
-    def get_project_settings_from_event(self, event, project_name):
+    def get_project_settings_from_event(
+        self,
+        event: ftrack_api.event.base.Event,
+        project_name: str
+    ):
         """Load or fill AYON's project settings from event data.
 
         Project data are stored by ftrack id because in most cases it is
@@ -552,8 +606,8 @@ class BaseHandler(object, metaclass=ABCMeta):
         Args:
             event (ftrack_api.Event): Processed event by session.
             project_name (str): Project name.
-        """
 
+        """
         project_settings_by_name = event["data"].setdefault(
             "project_settings", {}
         )
@@ -573,19 +627,21 @@ class BaseHandler(object, metaclass=ABCMeta):
         return copy.deepcopy(project_settings)
 
     @staticmethod
-    def get_entity_path(entity):
+    def get_entity_path(entity: ftrack_api.entity.base.Entity) -> str:
         """Return full hierarchical path to entity."""
-
         return "/".join(
             [ent["name"] for ent in entity["link"]]
         )
 
     @classmethod
     def add_traceback_to_job(
-        cls, job, session, exc_info,
-        description=None,
-        component_name=None,
-        job_status=None
+        cls,
+        job: ftrack_api.entity.job.Job,
+        session: ftrack_api.Session,
+        exc_info: Tuple,
+        description: Optional[str] = None,
+        component_name: Optional[str] = None,
+        job_status: Optional[str] = None
     ):
         """Add traceback file to a job.
 
@@ -602,8 +658,8 @@ class BaseHandler(object, metaclass=ABCMeta):
                 not specified.
             job_status (str): Status of job which will be set. By default is
                 set to 'failed'.
-        """
 
+        """
         if description:
             job_data = {
                 "description": description
@@ -639,7 +695,12 @@ class BaseHandler(object, metaclass=ABCMeta):
         os.remove(temp_filepath)
 
     @staticmethod
-    def add_file_component_to_job(job, session, filepath, basename=None):
+    def add_file_component_to_job(
+        job: ftrack_api.entity.job.Job,
+        session: ftrack_api.Session,
+        filepath: str,
+        basename: Optional[str] = None
+    ):
         """Add filepath as downloadable component to job.
 
         Args:
@@ -652,8 +713,8 @@ class BaseHandler(object, metaclass=ABCMeta):
                 user's side. Must be without extension otherwise extension will
                 be duplicated in downloaded name. Basename from entered path
                 used when not entered.
-        """
 
+        """
         # Make sure session's locations are configured
         # - they can be deconfigured e.g. using `rollback` method
         session._configure_locations()

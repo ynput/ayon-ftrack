@@ -9,15 +9,15 @@ from ftrack_common import (
 from openpype.pipeline import AvalonMongoDB
 
 
-class SyncLinksToAvalon(BaseEventHandler):
-    """Synchronize inpug linkts to avalon documents."""
-    # Run after sync to avalon event handler
+class SyncLinksToAYON(BaseEventHandler):
+    """Synchronize input linkts to AYON server."""
+    # Run after sync to AYON event handler
     priority = 110
 
     def __init__(self, session):
         self.dbcon = AvalonMongoDB()
 
-        super(SyncLinksToAvalon, self).__init__(session)
+        super(SyncLinksToAYON, self).__init__(session)
 
     def launch(self, session, event):
         # Try to commit and if any error happen then recreate session
@@ -138,8 +138,3 @@ class SyncLinksToAvalon(BaseEventHandler):
 
             mongo_id_by_ftrack_id[ftrack_id] = mongo_id
         return mongo_id_by_ftrack_id
-
-
-def register(session):
-    '''Register plugin. Called when used as an plugin.'''
-    SyncLinksToAvalon(session).register()

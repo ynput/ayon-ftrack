@@ -1,0 +1,13 @@
+name: 🚀 Release Trigger
+
+on:
+  workflow_dispatch:
+
+jobs:
+  call-release-trigger:
+    # TODO reference proper action
+    uses: ynput/ci-testing/.github/workflows/release_basic.yml@develop
+    secrets:
+      token: ${{ secrets.YNPUT_BOT_TOKEN }}
+      email: ${{ secrets.CI_EMAIL }}
+      user: ${{ secrets.CI_USER }}

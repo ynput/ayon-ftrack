@@ -2,7 +2,9 @@ import os
 import collections
 import copy
 
-from openpype.pipeline import Anatomy
+import ayon_api
+
+from ayon_core.pipeline import Anatomy
 from ayon_ftrack.common import LocalAction
 from ayon_ftrack.lib import get_ftrack_icon_url
 
@@ -98,12 +100,17 @@ class CreateFolders(LocalAction):
         project_entity = self.get_project_from_entity(filtered_entities[0])
 
         project_name = project_entity["full_name"]
+        ayon_project = ayon_api.get_project(project_name)
+        if not ayon_project:
+            return {
+                "success": False,
+                "message": f"Project '{project_name}' was not found in AYON.",
+            }
+
         project_code = project_entity["name"]
 
-        task_entities = []
-        other_entities = []
-        self.get_all_entities(
-            session, entities, task_entities, other_entities
+        task_entities, other_entities = self.get_all_entities(
+            session, entities
         )
         hierarchy = self.get_entities_hierarchy(
             session, task_entities, other_entities
@@ -114,17 +121,14 @@ class CreateFolders(LocalAction):
             for task_type in task_types
         }
 
-        anatomy = Anatomy(project_name)
+        anatomy = Anatomy(project_name, project_entity=ayon_project)
 
-        work_keys = ["work", "folder"]
-        work_template = anatomy.templates
-        for key in work_keys:
-            work_template = work_template[key]
-
-        publish_keys = ["publish", "folder"]
-        publish_template = anatomy.templates
-        for key in publish_keys:
-            publish_template = publish_template[key]
+        work_template = anatomy.get_template_item(
+            "work", "default", "directory"
+        )
+        publish_template = anatomy.get_template_item(
+            "publish", "default", "directory"
+        )
 
         project_data = {
             "project": {
@@ -160,10 +164,10 @@ class CreateFolders(LocalAction):
             if not task_entities:
                 # create path for entity
                 collected_paths.append(self.compute_template(
-                    anatomy, parent_data, work_keys
+                    parent_data, work_template
                 ))
                 collected_paths.append(self.compute_template(
-                    anatomy, parent_data, publish_keys
+                    parent_data, publish_template
                 ))
                 continue
 
@@ -178,12 +182,12 @@ class CreateFolders(LocalAction):
 
                 # Template wok
                 collected_paths.append(self.compute_template(
-                    anatomy, task_data, work_keys
+                    task_data, work_template
                 ))
 
                 # Template publish
                 collected_paths.append(self.compute_template(
-                    anatomy, task_data, publish_keys
+                    task_data, publish_template
                 ))
 
         if len(collected_paths) == 0:
@@ -204,40 +208,72 @@ class CreateFolders(LocalAction):
             "message": "Successfully created project folders."
         }
 
-    def get_all_entities(
-        self, session, entities, task_entities, other_entities
-    ):
-        if not entities:
-            return
+    def get_all_entities(self, session, entities):
+        """
 
-        no_task_entities = []
-        for entity in entities:
-            if entity.entity_type.lower() == "task":
-                task_entities.append(entity)
-            else:
-                no_task_entities.append(entity)
+        Args:
+            session (ftrack_api.session.Session): Ftrack session.
+            entities (list[ftrack_api.entity.base.Entity]): List of entities.
 
-        if not no_task_entities:
-            return task_entities
+        Returns:
+            tuple[list, list]: Tuple where first item is list of task entities
+                and second item is list of entities that are not task
+                entities. All are entities that were passed in and
+                their children.
+        """
 
-        other_entities.extend(no_task_entities)
+        task_entities = []
+        other_entities = []
 
-        no_task_entity_ids = {entity["id"] for entity in no_task_entities}
-        next_entities = session.query(
-            (
-                "select id, parent_id"
-                " from TypedContext where parent_id in ({})"
-            ).format(self.join_query_keys(no_task_entity_ids))
-        ).all()
+        query_queue = collections.deque()
+        query_queue.append(entities)
+        while query_queue:
+            entities = query_queue.popleft()
+            if not entities:
+                continue
 
-        self.get_all_entities(
-            session, next_entities, task_entities, other_entities
-        )
+            no_task_entities = []
+            for entity in entities:
+                if entity.entity_type.lower() == "task":
+                    task_entities.append(entity)
+                else:
+                    no_task_entities.append(entity)
+
+            if not no_task_entities:
+                continue
+
+            other_entities.extend(no_task_entities)
+
+            no_task_entity_ids = {entity["id"] for entity in no_task_entities}
+            next_entities = session.query(
+                (
+                    "select id, parent_id"
+                    " from TypedContext where parent_id in ({})"
+                ).format(self.join_query_keys(no_task_entity_ids))
+            ).all()
+            query_queue.append(next_entities)
+        return task_entities, other_entities
 
     def get_entities_hierarchy(self, session, task_entities, other_entities):
+        """
+
+        Args:
+            session (ftrack_api.session.Session): Ftrack session.
+            task_entities (list[ftrack_api.entity.base.Entity]): List of task
+                entities.
+            other_entities (list[ftrack_api.entity.base.Entity]): List of
+                entities that are not task entities.
+
+        Returns:
+            list[tuple[ftrack_api.entity.base.Entity, list]]: List of tuples
+                where first item is parent entity and second item is list of
+                task entities that are children of parent entity.
+        """
+
+        output = []
         task_entity_ids = {entity["id"] for entity in task_entities}
         if not task_entity_ids:
-            return []
+            return output
 
         full_task_entities = session.query(
             (
@@ -250,21 +286,29 @@ class CreateFolders(LocalAction):
             parent_id = entity["parent_id"]
             task_entities_by_parent_id[parent_id].append(entity)
 
-        output = []
         if not task_entities_by_parent_id:
             return output
 
-        other_ids = {entity["id"] for entity in other_entities}
-        other_ids |= set(task_entities_by_parent_id.keys())
+        parent_ids = set(task_entities_by_parent_id.keys())
 
-        parent_entities = session.query(
-            (
-                "select id, name from TypedContext where id in ({})"
-            ).format(self.join_query_keys(other_ids))
-        ).all()
+        other_entities_by_id = {
+            entity["id"]: entity
+            for entity in other_entities
+        }
+        parent_ids -= set(other_entities_by_id.keys())
 
-        for parent_entity in parent_entities:
-            parent_id = parent_entity["id"]
+        if parent_ids:
+            parent_entities = session.query(
+                (
+                    "select id, name from TypedContext where id in ({})"
+                ).format(self.join_query_keys(parent_ids))
+            ).all()
+            other_entities_by_id.update({
+                entity["id"]: entity
+                for entity in parent_entities
+            })
+
+        for parent_id, parent_entity in other_entities_by_id.items():
             output.append((
                 parent_entity,
                 task_entities_by_parent_id[parent_id]
@@ -272,11 +316,8 @@ class CreateFolders(LocalAction):
 
         return output
 
-    def compute_template(self, anatomy, data, anatomy_keys):
-        filled_template = anatomy.format_all(data)
-        for key in anatomy_keys:
-            filled_template = filled_template[key]
-
+    def compute_template(self, data, template):
+        filled_template = template.format(data)
         if filled_template.solved:
             return os.path.normpath(filled_template)
 
@@ -286,8 +327,3 @@ class CreateFolders(LocalAction):
             )
         )
         return os.path.normpath(filled_template.split("{")[0])
-
-
-def register(session):
-    """Register plugin. Called when used as an plugin."""
-    CreateFolders(session).register()

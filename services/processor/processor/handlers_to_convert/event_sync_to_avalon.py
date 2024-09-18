@@ -1772,7 +1772,6 @@ class SyncToAvalonEvent(BaseEventHandler):
                 continue
 
             new_parent_id = ent_info["changes"]["parent_id"]["new"]
-            old_parent_id = ent_info["changes"]["parent_id"]["old"]
 
             mongo_id = avalon_ent["_id"]
             if self.changeability_by_mongo_id[mongo_id]:
@@ -2729,8 +2728,3 @@ class SyncToAvalonEvent(BaseEventHandler):
         temp_dict[entity_type] = mongo_id_configuration_id
 
         return mongo_id_configuration_id
-
-
-def register(session):
-    '''Register plugin. Called when used as an plugin.'''
-    SyncToAvalonEvent(session).register()

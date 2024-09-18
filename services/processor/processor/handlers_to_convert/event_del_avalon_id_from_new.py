@@ -1,6 +1,6 @@
 from ftrack_common import BaseEventHandler, CUST_ATTR_KEY_SERVER_ID
 
-from openpype_modules.ftrack.event_handlers_server.event_sync_to_avalon import (
+from ayon_ftrack.event_handlers_server.event_sync_to_avalon import (
     SyncToAvalonEvent
 )
 
@@ -47,8 +47,3 @@ class DelAvalonIdFromNew(BaseEventHandler):
             except Exception:
                 session.rollback()
                 continue
-
-
-def register(session):
-    '''Register plugin. Called when used as an plugin.'''
-    DelAvalonIdFromNew(session).register()

@@ -10,7 +10,7 @@ import json
 
 import six
 import pyblish.api
-from openpype.lib import StringTemplate
+from ayon_core.lib import StringTemplate
 
 from ayon_ftrack.pipeline import plugin
 
@@ -18,7 +18,7 @@ from ayon_ftrack.pipeline import plugin
 class IntegrateFtrackDescription(plugin.FtrackPublishInstancePlugin):
     """Add description to AssetVersions in Ftrack."""
 
-    # Must be after integrate asset new
+    # Must be after IntegrateAsset plugin in ayon_core
     order = pyblish.api.IntegratorOrder + 0.4999
     label = "Integrate Ftrack description"
     families = ["ftrack"]

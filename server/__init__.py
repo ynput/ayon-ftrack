@@ -1,11 +1,17 @@
+from typing import Type, Any
+
 import semver
-from typing import Type
+from fastapi import Query
+from nxtools import logging
 
 from ayon_server.addons import BaseServerAddon, AddonLibrary
 from ayon_server.lib.postgres import Postgres
 
-from .settings import FtrackSettings, DEFAULT_VALUES
-from .version import __version__
+from .settings import (
+    FtrackSettings,
+    DEFAULT_VALUES,
+    convert_settings_overrides,
+)
 from .constants import (
     FTRACK_ID_ATTRIB,
     FTRACK_PATH_ATTRIB,
@@ -13,14 +19,7 @@ from .constants import (
 
 
 class FtrackAddon(BaseServerAddon):
-    name = "ftrack"
-    title = "Ftrack"
-    version = __version__
     settings_model: Type[FtrackSettings] = FtrackSettings
-    services = {
-        "leecher": {"image": f"ynput/ayon-ftrack-leecher:{__version__}"},
-        "processor": {"image": f"ynput/ayon-ftrack-processor:{__version__}"}
-    }
 
     async def get_default_settings(self):
         settings_model_cls = self.get_settings_model()
@@ -51,6 +50,63 @@ class FtrackAddon(BaseServerAddon):
         need_restart = await self.create_ftrack_attributes()
         if need_restart:
             self.request_server_restart()
+
+    def initialize(self) -> None:
+        self.add_endpoint(
+            "/customProcessorHandlers",
+            self.get_custom_processor_handlers,
+            method="GET",
+        )
+
+    async def get_custom_processor_handlers(
+        self,
+        variant: str = Query("production"),
+    ) -> {}:
+        bundles = await Postgres.fetch(
+            "SELECT name, is_production, is_staging,"
+            " is_dev, data->'addons' as addons FROM bundles"
+        )
+        bundles_by_variant = {
+            "production": None,
+            "staging": None
+        }
+        for bundle in bundles:
+            if bundle["is_dev"]:
+                bundles_by_variant[bundle["name"]] = bundle
+                continue
+
+            if bundle["is_production"]:
+                bundles_by_variant["production"] = bundle
+
+            if bundle["is_staging"]:
+                bundles_by_variant["staging"] = bundle
+
+        handlers = []
+        output = {"custom_handlers": handlers}
+        if variant not in bundles_by_variant:
+            return output
+        addons = bundles_by_variant[variant]["addons"]
+        addon_library = AddonLibrary.getinstance()
+        for addon_name, addon_version in addons.items():
+            addons_mapping = addon_library.get(addon_name) or {}
+            addon = addons_mapping.get(addon_version)
+            if not hasattr(addon, "get_custom_ftrack_handlers_endpoint"):
+                continue
+            try:
+                endpoint = addon.get_custom_ftrack_handlers_endpoint()
+                if endpoint:
+                    handlers.append({
+                        "addon_name": addon_name,
+                        "addon_version": addon_version,
+                        "endpoint": endpoint,
+                    })
+            except BaseException as exc:
+                logging.warning(
+                    f"Failed to receive ftrack handlers from addon"
+                    f" {addon_name} {addon_version}. {exc}"
+                )
+
+        return output
 
     async def _empty_create_ftrack_attributes(self):
         return False
@@ -137,3 +193,12 @@ class FtrackAddon(BaseServerAddon):
             )
         return True
 
+    async def convert_settings_overrides(
+        self,
+        source_version: str,
+        overrides: dict[str, Any],
+    ) -> dict[str, Any]:
+        convert_settings_overrides(source_version, overrides)
+        return await super().convert_settings_overrides(
+            source_version, overrides
+        )

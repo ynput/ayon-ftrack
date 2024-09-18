@@ -129,9 +129,10 @@ class NextTaskUpdate(BaseEventHandler):
             ))
             return
 
-        mod_mapping = {}
-        for item in event_settings["mapping"]:
-            mod_mapping[item["name"]] = item["value"]
+        mod_mapping = {
+            item["name"]: item["value"]
+            for item in event_settings["mapping"]
+        }
         event_settings["mapping"] = mod_mapping
 
         statuses = session.query("Status").all()
@@ -452,7 +453,3 @@ class NextTaskUpdate(BaseEventHandler):
         # Override values in source object
         for type_id, value in _task_entities_by_type_id.items():
             task_entities_by_type_id[type_id] = value
-
-
-def register(session):
-    NextTaskUpdate(session).register()

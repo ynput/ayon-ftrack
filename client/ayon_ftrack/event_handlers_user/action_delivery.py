@@ -9,6 +9,7 @@ from ayon_api import (
     get_folders,
     get_products,
     get_versions,
+    get_representations,
 )
 
 from ayon_ftrack.common import (
@@ -19,11 +20,10 @@ from ayon_ftrack.common import (
 )
 from ayon_ftrack.lib import get_ftrack_icon_url
 
-from openpype.client import get_representations
-from openpype.lib.dateutils import get_datetime_data
-from openpype.pipeline import Anatomy
-from openpype.pipeline.load import get_representation_path_with_anatomy
-from openpype.pipeline.delivery import (
+from ayon_core.lib.dateutils import get_datetime_data
+from ayon_core.pipeline import Anatomy
+from ayon_core.pipeline.load import get_representation_path_with_anatomy
+from ayon_core.pipeline.delivery import (
     get_format_dict,
     check_destination_path,
     deliver_single_file,
@@ -322,8 +322,8 @@ class Delivery(LocalAction):
 
         datetime_data = get_datetime_data()
         for repre in repres_to_deliver:
-            source_path = repre.get("data", {}).get("path")
-            debug_msg = "Processing representation {}".format(repre["_id"])
+            source_path = repre["attrib"]["path"]
+            debug_msg = "Processing representation {}".format(repre["id"])
             if source_path:
                 debug_msg += " with published path {}.".format(source_path)
             self.log.debug(debug_msg)
@@ -351,7 +351,7 @@ class Delivery(LocalAction):
                 anatomy_data["folder"] = folder_value
 
             repre_report_items = check_destination_path(
-                repre["_id"],
+                repre["id"],
                 anatomy,
                 anatomy_data,
                 datetime_data,
@@ -687,10 +687,10 @@ class Delivery(LocalAction):
             if not products_by_name:
                 continue
 
-            subset_name = asset["name"]
-            subset_doc = products_by_name.get(subset_name)
-            if subset_doc:
-                output.append(subset_doc)
+            product_name = asset["name"]
+            product_entity = products_by_name.get(product_name)
+            if product_entity:
+                output.append(product_entity)
         return output
 
     def _get_version_entities(
@@ -769,9 +769,3 @@ class Delivery(LocalAction):
                 filtered_versions.append(version_entity)
 
         return filtered_versions
-
-
-def register(session):
-    """Register plugin. Called when used as a plugin."""
-
-    Delivery(session).register()

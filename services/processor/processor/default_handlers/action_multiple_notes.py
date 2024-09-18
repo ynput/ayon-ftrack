@@ -159,9 +159,3 @@ class MultipleNotesServer(ServerAction):
             entity["notes"].append(new_note)
             session.commit()
         return True
-
-
-def register(session):
-    '''Register plugin. Called when used as an plugin.'''
-
-    MultipleNotesServer(session).register()

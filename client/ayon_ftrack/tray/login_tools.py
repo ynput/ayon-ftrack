@@ -1,18 +1,20 @@
-from http.server import BaseHTTPRequestHandler, HTTPServer
-from urllib import parse
-import webbrowser
 import functools
 import threading
-from openpype import resources
+from urllib import parse
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+import webbrowser
+
+from ayon_ftrack.resources import get_resource
 
 
 class LoginServerHandler(BaseHTTPRequestHandler):
-    '''Login server handler.'''
+    """Login server handler."""
 
-    message_filepath = resources.get_resource("ftrack", "sign_in_message.html")
+    message_filepath = get_resource("sign_in_message.html")
 
     def __init__(self, login_callback, *args, **kw):
-        '''Initialise handler.'''
+        """Initialise handler."""
         self.login_callback = login_callback
         BaseHTTPRequestHandler.__init__(self, *args, **kw)
 
@@ -29,17 +31,17 @@ class LoginServerHandler(BaseHTTPRequestHandler):
         ))
 
     def do_GET(self):
-        '''Override to handle requests ourselves.'''
+        """Override to handle requests ourselves."""
         parsed_path = parse.urlparse(self.path)
         query = parsed_path.query
 
         api_user = None
         api_key = None
         login_credentials = None
-        if 'api_user' and 'api_key' in query:
+        if "api_user" and "api_key" in query:
             login_credentials = parse.parse_qs(query)
-            api_user = login_credentials['api_user'][0]
-            api_key = login_credentials['api_key'][0]
+            api_user = login_credentials["api_user"][0]
+            api_key = login_credentials["api_key"][0]
 
             with open(self.message_filepath, "r") as message_file:
                 sign_in_message = message_file.read()
@@ -68,7 +70,7 @@ class LoginServerHandler(BaseHTTPRequestHandler):
 
 
 class LoginServerThread(threading.Thread):
-    '''Login server thread.'''
+    """Login server thread."""
 
     def __init__(self, url, callback):
         self.url = url
@@ -77,7 +79,7 @@ class LoginServerThread(threading.Thread):
         super(LoginServerThread, self).__init__()
 
     def _handle_login(self, api_user, api_key):
-        '''Login to server with *api_user* and *api_key*.'''
+        """Login to server with *api_user* and *api_key*."""
         self.callback(api_user, api_key)
 
     def stop(self):
@@ -85,19 +87,16 @@ class LoginServerThread(threading.Thread):
             self._server.server_close()
 
     def run(self):
-        '''Listen for events.'''
+        """Listen for events."""
         self._server = HTTPServer(
-            ('localhost', 0),
+            ("localhost", 0),
             functools.partial(
                 LoginServerHandler, self._handle_login
             )
         )
-        unformated_url = (
-            '{0}/user/api_credentials?''redirect_url=http://localhost:{1}'
+        url = (
+            f"{self.url}/user/api_credentials"
+            f"?redirect_url=http://localhost:{self._server.server_port}"
         )
-        webbrowser.open_new_tab(
-            unformated_url.format(
-                self.url, self._server.server_port
-            )
-        )
+        webbrowser.open_new_tab(url)
         self._server.handle_request()

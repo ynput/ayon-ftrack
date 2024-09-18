@@ -5,18 +5,21 @@ import threading
 
 import ftrack_api
 from qtpy import QtCore, QtWidgets, QtGui
+from aiohttp.web import Response, json_response
 
-from openpype import resources
-from openpype.lib import Logger
+from ayon_core import resources
+from ayon_core.lib import Logger
+
 from ayon_ftrack import resolve_ftrack_url, FTRACK_ADDON_DIR
 from ayon_ftrack.lib import credentials
+
 from . import login_dialog
 from .user_server import SocketThread
 
 
 class FtrackTrayWrapper:
-    def __init__(self, module):
-        self.module = module
+    def __init__(self, addon):
+        self._addon = addon
         self.log = Logger.get_logger(self.__class__.__name__)
 
         self.thread_action_server = None
@@ -28,7 +31,7 @@ class FtrackTrayWrapper:
         self.bool_action_thread_running = False
         self.bool_timer_event = False
 
-        self.widget_login = login_dialog.CredentialsDialog(module)
+        self.widget_login = login_dialog.TrayCredentialsDialog(addon)
         self.widget_login.login_changed.connect(self.on_login_change)
         self.widget_login.logout_signal.connect(self.on_logout)
 
@@ -41,39 +44,73 @@ class FtrackTrayWrapper:
             resources.get_resource("icons", "circle_orange.png")
         )
 
+    def webserver_initialization(self, web_manager):
+        web_manager.add_addon_route(
+            self._addon.name,
+            "credentials",
+            "POST",
+            self._web_credentials_change
+        )
+        web_manager.add_addon_route(
+            self._addon.name,
+            "credentials",
+            "GET",
+            self._web_get_credentials
+        )
+
+    async def _web_credentials_change(self, request):
+        data = await request.json()
+        username = data.get("username")
+        api_key = data.get("api_key")
+        self.set_credentials(username, api_key)
+        return Response(status=200)
+
+    async def _web_get_credentials(self, _):
+        username = api_key = None
+        if self.bool_logged:
+            username = self.widget_login.username
+            api_key = self.widget_login.api_key
+
+        return json_response({
+            "username": username,
+            "api_key": api_key
+        })
+
     def show_login_widget(self):
         self.widget_login.show()
         self.widget_login.activateWindow()
         self.widget_login.raise_()
 
     def show_ftrack_browser(self):
-        QtGui.QDesktopServices.openUrl(self.module.ftrack_url)
+        QtGui.QDesktopServices.openUrl(self._addon.ftrack_url)
 
     def validate(self):
-        validation = False
         cred = credentials.get_credentials()
-        ft_user = cred.get("username")
-        ft_api_key = cred.get("api_key")
-        validation = credentials.check_credentials(ft_user, ft_api_key)
+        validation = self.set_credentials(
+            cred.get("username"), cred.get("api_key")
+        )
+        if not validation:
+            self.log.info("Please sign in to Ftrack")
+            self.bool_logged = False
+            self.show_login_widget()
+            self.set_menu_visibility()
+
+        return validation
+
+    def set_credentials(self, username, api_key):
+        validation = credentials.check_credentials(username, api_key)
         if validation:
-            self.widget_login.set_credentials(ft_user, ft_api_key)
-            self.module.set_credentials_to_env(ft_user, ft_api_key)
+            self.widget_login.set_credentials(username, api_key)
+            self._addon.set_credentials_to_env(username, api_key)
             self.log.info("Connected to Ftrack successfully")
             self.on_login_change()
 
-            return validation
-
-        if not validation and ft_user and ft_api_key:
+        if not validation and username and api_key:
+            server = self._addon.get_ftrack_url()
             self.log.warning(
-                "Current Ftrack credentials are not valid. {}: {} - {}".format(
-                    str(os.environ.get("FTRACK_SERVER")), ft_user, ft_api_key
-                )
+                f"Current Ftrack credentials are not valid. {server}:"
+                f" {username} - {api_key}"
             )
-
-        self.log.info("Please sign in to Ftrack")
-        self.bool_logged = False
-        self.show_login_widget()
-        self.set_menu_visibility()
 
         return validation
 
@@ -83,10 +120,9 @@ class FtrackTrayWrapper:
 
         if self.action_credentials:
             self.action_credentials.setIcon(self.icon_logged)
+            username, _ = self.widget_login.get_credentials()
             self.action_credentials.setToolTip(
-                "Logged as user \"{}\"".format(
-                    self.widget_login.user_input.text()
-                )
+                f"Logged as user \"{username}\""
             )
 
         self.set_menu_visibility()
@@ -119,7 +155,7 @@ class FtrackTrayWrapper:
         self.bool_action_server_running = True
         self.bool_action_thread_running = False
 
-        ftrack_url = self.module.ftrack_url
+        ftrack_url = self._addon.ftrack_url
         os.environ["FTRACK_SERVER"] = ftrack_url
 
         min_fail_seconds = 5
@@ -344,7 +380,7 @@ class FtrackTrayWrapper:
 
     def changed_user(self):
         self.stop_action_server()
-        self.module.set_credentials_to_env(None, None)
+        self._addon.set_credentials_to_env(None, None)
         self.validate()
 
     def start_timer_manager(self, data):
@@ -356,10 +392,10 @@ class FtrackTrayWrapper:
             self.thread_timer.ftrack_stop_timer()
 
     def timer_started(self, data):
-        self.module.timer_started(data)
+        self._addon.timer_started(data)
 
     def timer_stopped(self):
-        self.module.timer_stopped()
+        self._addon.timer_stopped()
 
 
 class FtrackEventsThread(QtCore.QThread):

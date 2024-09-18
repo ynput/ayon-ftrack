@@ -1,6 +1,5 @@
 import os
 import sys
-import logging
 import argparse
 import subprocess
 import time
@@ -9,7 +8,8 @@ from ayon_api.constants import (
     DEFAULT_VARIANT_ENV_KEY,
 )
 
-ADDON_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+ADDON_DIR = os.path.dirname(CURRENT_DIR)
 
 
 def run_both():
@@ -65,6 +65,13 @@ def main():
     if opts.variant:
         os.environ[DEFAULT_VARIANT_ENV_KEY] = opts.variant
 
+    # Set download root for service tools inside service tools
+    download_root = os.getenv("AYON_FTRACK_DOWNLOAD_ROOT")
+    if not download_root:
+        os.environ["AYON_FTRACK_DOWNLOAD_ROOT"] = os.path.join(
+            CURRENT_DIR, "downloads"
+        )
+
     service_name = opts.service
     if service_name == "both":
         return run_both()
@@ -88,5 +95,4 @@ def main():
 
 
 if __name__ == "__main__":
-    logging.basicConfig()
     main()

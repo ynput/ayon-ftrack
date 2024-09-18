@@ -18,7 +18,7 @@ from openpype.client import (
     get_version_by_name,
     get_representations
 )
-from openpype.pipeline import AvalonMongoDB, Anatomy
+from ayon_core.pipeline import AvalonMongoDB, Anatomy
 
 
 class StoreThumbnailsToAvalon(LocalAction):
@@ -467,7 +467,3 @@ class StoreThumbnailsToAvalon(LocalAction):
 
         output["representations"] = repre_ents
         return output
-
-
-def register(session):
-    StoreThumbnailsToAvalon(session).register()

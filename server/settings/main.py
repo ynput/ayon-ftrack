@@ -1,6 +1,10 @@
-from pydantic import Field, validator
+from pydantic import validator
 
-from ayon_server.settings import BaseSettingsModel, ensure_unique_names
+from ayon_server.settings import (
+    BaseSettingsModel,
+    ensure_unique_names,
+    SettingsField,
+)
 from ayon_server.settings.enum import secrets_enum
 
 from .service_handlers import (
@@ -29,33 +33,33 @@ class FtrackServiceSettings(BaseSettingsModel):
     so you can see which changes happened from service.
     """
 
-    username: str = Field(
+    username: str = SettingsField(
         enum_resolver=secrets_enum,
         title="Ftrack user name"
     )
-    api_key: str = Field(
+    api_key: str = SettingsField(
         enum_resolver=secrets_enum,
         title="Ftrack API key"
     )
 
 
 class PostLaunchHookMapping(BaseSettingsModel):
-    name: str = Field("", title="New status")
-    value: list[str] = Field(default_factory=list, title="From statuses")
+    name: str = SettingsField("", title="New status")
+    value: list[str] = SettingsField(default_factory=list, title="From statuses")
 
 
 class PostLaunchHookSettings(BaseSettingsModel):
     """Change task status on application launch.
 
-    Changeo of status is based on mapping. Each item in mapping define new
-    status which is used based on current status/es. Special value for current
-    statuses is '__any__', in that case the new status is always used. And if
-    new status name is '__ignore__', the change of status is skipped if current
+    Change of status is based on mapping. Each item in mapping defines new
+    status which is used based on current status(es). Special value for current
+    statuses is `__any__`, in that case the new status is always used. And if
+    new status name is `__ignore__`, the change of status is skipped if current
     status is in current statuses list.
     """
 
     enabled: bool = True
-    mapping: list[PostLaunchHookMapping] = Field(default_factory=list)
+    mapping: list[PostLaunchHookMapping] = SettingsField(default_factory=list)
 
     @validator("mapping")
     def ensure_unique_names(cls, value):
@@ -68,35 +72,35 @@ class PostLaunchHookSettings(BaseSettingsModel):
 class FtrackSettings(BaseSettingsModel):
     """Ftrack addon settings."""
 
-    enabled: bool = Field(True)
-    ftrack_server: str = Field(
+    enabled: bool = SettingsField(True)
+    ftrack_server: str = SettingsField(
         "",
         title="Ftrack server url",
         scope=["studio"],
     )
-    service_settings: FtrackServiceSettings = Field(
+    service_settings: FtrackServiceSettings = SettingsField(
         default_factory=FtrackServiceSettings,
         title="Service settings",
         scope=["studio"],
     )
 
-    service_event_handlers: FtrackServiceHandlers = Field(
+    service_event_handlers: FtrackServiceHandlers = SettingsField(
         default_factory=FtrackServiceHandlers,
         title="Server Actions/Events",
     )
-    post_launch_hook: PostLaunchHookSettings = Field(
+    post_launch_hook: PostLaunchHookSettings = SettingsField(
         default_factory=PostLaunchHookSettings,
         title="Status change on application launch"
     )
-    user_handlers: FtrackDesktopAppHandlers = Field(
+    user_handlers: FtrackDesktopAppHandlers = SettingsField(
         default_factory=FtrackDesktopAppHandlers,
         title="User Actions/Events",
     )
-    publish: FtrackPublishPlugins = Field(
+    publish: FtrackPublishPlugins = SettingsField(
         default_factory=FtrackPublishPlugins,
         title="Publish plugins"
     )
-    custom_attributes: CustomAttributesModel = Field(
+    custom_attributes: CustomAttributesModel = SettingsField(
         title="Custom Attributes",
         default_factory=CustomAttributesModel
     )
@@ -132,5 +136,6 @@ DEFAULT_VALUES = {
             }
         ]
     },
-    "publish": DEFAULT_PUBLISH_SETTINGS
+    "publish": DEFAULT_PUBLISH_SETTINGS,
+    "custom_attributes": DEFAULT_CUSTOM_ATTRIBUTES_SETTINGS,
 }

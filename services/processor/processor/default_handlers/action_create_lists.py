@@ -204,6 +204,10 @@ class CreateDailyListServerAction(ServerAction):
         self._cycle_timer.start()
 
     def _timer_callback(self):
+        # Stop chrono callbacks if session is closed
+        if self.session.closed:
+            return
+
         service_settings = get_service_addon_settings()
         action_settings = (
             service_settings
@@ -832,7 +836,3 @@ class CreateDailyListServerAction(ServerAction):
                 exc_info=True
             )
         return output
-
-
-def register(session):
-    CreateDailyListServerAction(session).register()

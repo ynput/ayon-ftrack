@@ -1,19 +1,20 @@
 import json
-from pydantic import Field, validator
+from pydantic import validator
 
 from ayon_server.settings import (
     BaseSettingsModel,
+    SettingsField,
     ensure_unique_names,
 )
 
 
 class CollectFamilyAdvancedFilterModel(BaseSettingsModel):
     _layout = "expanded"
-    families: list[str] = Field(
+    families: list[str] = SettingsField(
         default_factory=list,
         title="Additional Families"
     )
-    add_ftrack_family: bool = Field(
+    add_ftrack_family: bool = SettingsField(
         True,
         title="Add Ftrack Family"
     )
@@ -21,27 +22,27 @@ class CollectFamilyAdvancedFilterModel(BaseSettingsModel):
 
 class CollectFamilyProfile(BaseSettingsModel):
     _layout = "expanded"
-    host_names: list[str] = Field(
+    host_names: list[str] = SettingsField(
         default_factory=list,
         title="Host names",
     )
-    product_types: list[str] = Field(
+    product_types: list[str] = SettingsField(
         default_factory=list,
         title="Families",
     )
-    task_types: list[str] = Field(
+    task_types: list[str] = SettingsField(
         default_factory=list,
         title="Task types",
     )
-    task_names: list[str] = Field(
+    task_names: list[str] = SettingsField(
         default_factory=list,
         title="Task names",
     )
-    add_ftrack_family: bool = Field(
+    add_ftrack_family: bool = SettingsField(
         True,
         title="Add Ftrack Family",
     )
-    advanced_filtering: list[CollectFamilyAdvancedFilterModel] = Field(
+    advanced_filtering: list[CollectFamilyAdvancedFilterModel] = SettingsField(
         title="Advanced adding if additional families present",
         default_factory=list,
     )
@@ -50,7 +51,7 @@ class CollectFamilyProfile(BaseSettingsModel):
 class CollectFtrackFamilyPlugin(BaseSettingsModel):
     _isGroup = True
     enabled: bool = True
-    profiles: list[CollectFamilyProfile] = Field(
+    profiles: list[CollectFamilyProfile] = SettingsField(
         default_factory=list,
         title="Profiles",
     )
@@ -59,7 +60,7 @@ class CollectFtrackFamilyPlugin(BaseSettingsModel):
 class CollectFtrackCustomAttributeDataModel(BaseSettingsModel):
     _isGroup = True
     enabled: bool = True
-    custom_attribute_keys: list[str] = Field(
+    custom_attribute_keys: list[str] = SettingsField(
         title="Custom attribute keys",
         default_factory=list,
     )
@@ -68,7 +69,7 @@ class CollectFtrackCustomAttributeDataModel(BaseSettingsModel):
 class ValidateFtrackAttributesModel(BaseSettingsModel):
     _isGroup = True
     enabled: bool = True
-    ftrack_custom_attributes: str = Field(
+    ftrack_custom_attributes: str = SettingsField(
         "{}",
         title="Custom attributes to validate",
         widget="textarea",
@@ -88,28 +89,28 @@ class ValidateFtrackAttributesModel(BaseSettingsModel):
 
 class IntegrateHierarchyProfile(BaseSettingsModel):
     _layout = "expanded"
-    task_types: list[str] = Field(
+    task_types: list[str] = SettingsField(
         default_factory=list,
         title="Task types",
     )
-    task_names: list[str] = Field(
+    task_names: list[str] = SettingsField(
         default_factory=list,
         title="Task names",
     )
-    status_name: str = Field("", title="Status name")
+    status_name: str = SettingsField("", title="Status name")
 
 
 class IntegrateHierarchyToFtrackModel(BaseSettingsModel):
     _isGroup = True
-    create_task_status_profiles: list[IntegrateHierarchyProfile] = Field(
-        default_factory=list,
+    create_task_status_profiles: list[IntegrateHierarchyProfile] = (
+        SettingsField(default_factory=list)
     )
 
 
 class IntegrateFtrackNoteModel(BaseSettingsModel):
     _isGroup = True
     enabled: bool = True
-    note_template: str = Field(
+    note_template: str = SettingsField(
         "",
         title="Note template",
         description=(
@@ -118,7 +119,7 @@ class IntegrateFtrackNoteModel(BaseSettingsModel):
             " <b>app_label</b>, <b>published_paths</b> and <b>source</b>."
         )
     )
-    note_labels: list[str] = Field(
+    note_labels: list[str] = SettingsField(
         title="Note labels",
         default_factory=list,
     )
@@ -127,9 +128,9 @@ class IntegrateFtrackNoteModel(BaseSettingsModel):
 class IntegrateFtrackDescriptionModel(BaseSettingsModel):
     _isGroup = True
     enabled: bool = True
-    optional: bool = Field(False, title="Optional")
-    active: bool = Field(True, title="Active")
-    description_template: str = Field(
+    optional: bool = SettingsField(False, title="Optional")
+    active: bool = SettingsField(True, title="Active")
+    description_template: str = SettingsField(
         "",
         title="Description template",
         description=(
@@ -146,32 +147,33 @@ class IntegrateFtrackComponentOverwriteModel(BaseSettingsModel):
 
 class AssetVersionStatusProfile(BaseSettingsModel):
     _layout = "expanded"
-    host_names: list[str] = Field(
+    host_names: list[str] = SettingsField(
         default_factory=list,
         title="Host names",
     )
-    product_types: list[str] = Field(
+    product_types: list[str] = SettingsField(
         default_factory=list,
         title="Families",
     )
-    task_types: list[str] = Field(
+    task_types: list[str] = SettingsField(
         default_factory=list,
         title="Task types",
     )
-    status: str = Field(
+    status: str = SettingsField(
         "",
         title="Status name",
     )
 
 
 class IntegrateFtrackFamilyMapping(BaseSettingsModel):
-    name: str = Field("", title="Family")
-    asset_type: str = Field("", title="Asset Type")
+    name: str = SettingsField("", title="Family")
+    asset_type: str = SettingsField("", title="Asset Type")
 
 
 def integrate_ftrack_metadata_enum():
     return [
-        {"value": "openpype_version", "label": "OpenPype version"},
+        {"value": "ayon_ftrack_version", "label": "AYON ftrack version"},
+        {"value": "ayon_launcher_version", "label": "AYON launcher version"},
         {"value": "frame_start", "label": "Frame start"},
         {"value": "frame_end", "label": "Frame end"},
         {"value": "duration", "label": "Duration"},
@@ -184,19 +186,21 @@ def integrate_ftrack_metadata_enum():
 
 class IntegrateFtrackInstanceModel(BaseSettingsModel):
     _isGroup = True
-    product_type_mapping: list[IntegrateFtrackFamilyMapping] = Field(
-        title="Family Mapping",
+    product_type_mapping: list[IntegrateFtrackFamilyMapping] = SettingsField(
+        title="Product type Mapping",
         default_factory=list,
     )
-    keep_first_product_name_for_review: bool = Field(
+    keep_first_product_name_for_review: bool = SettingsField(
         True,
         title="Make product name as first asset name",
     )
-    asset_versions_status_profiles: list[AssetVersionStatusProfile] = Field(
-        title="AssetVersion status on publish",
-        default_factory=list,
+    asset_versions_status_profiles: list[AssetVersionStatusProfile] = (
+        SettingsField(
+            title="AssetVersion status on publish",
+            default_factory=list,
+        )
     )
-    additional_metadata_keys: list[str] = Field(
+    additional_metadata_keys: list[str] = SettingsField(
         default_factory=list,
         title="Additional metadata keys on components",
         enum_resolver=integrate_ftrack_metadata_enum
@@ -210,27 +214,27 @@ class IntegrateFtrackInstanceModel(BaseSettingsModel):
 
 class IntegrateFarmStartusProfile(BaseSettingsModel):
     _layout = "expanded"
-    host_names: list[str] = Field(
+    host_names: list[str] = SettingsField(
         default_factory=list,
         title="Host names",
     )
-    task_types: list[str] = Field(
+    task_types: list[str] = SettingsField(
         default_factory=list,
         title="Task types",
     )
-    task_names: list[str] = Field(
+    task_names: list[str] = SettingsField(
         default_factory=list,
         title="Task names",
     )
-    product_types: list[str] = Field(
+    product_types: list[str] = SettingsField(
         default_factory=list,
         title="Product types",
     )
-    product_names: list[str] = Field(
+    product_names: list[str] = SettingsField(
         title="Product names",
         default_factory=list,
     )
-    status_name: str = Field(
+    status_name: str = SettingsField(
         "",
         title="Status name"
     )
@@ -238,7 +242,7 @@ class IntegrateFarmStartusProfile(BaseSettingsModel):
 
 class IntegrateFtrackFarmStatusModel(BaseSettingsModel):
     _isGroup = True
-    farm_status_profiles: list[IntegrateFarmStartusProfile] = Field(
+    farm_status_profiles: list[IntegrateFarmStartusProfile] = SettingsField(
         title="Farm status profiles",
         default_factory=list,
     )
@@ -246,27 +250,27 @@ class IntegrateFtrackFarmStatusModel(BaseSettingsModel):
 
 class FtrackTaskStatusProfile(BaseSettingsModel):
     _layout = "expanded"
-    host_names: list[str] = Field(
+    host_names: list[str] = SettingsField(
         default_factory=list,
         title="Host names",
     )
-    task_types: list[str] = Field(
+    task_types: list[str] = SettingsField(
         default_factory=list,
         title="Task types",
     )
-    task_names: list[str] = Field(
+    task_names: list[str] = SettingsField(
         default_factory=list,
         title="Task names",
     )
-    families: list[str] = Field(
+    product_types: list[str] = SettingsField(
         default_factory=list,
-        title="Families",
+        title="Product types",
     )
-    subset_names: list[str] = Field(
+    product_names: list[str] = SettingsField(
         default_factory=list,
-        title="Subset names",
+        title="Product names",
     )
-    status_name: str = Field(
+    status_name: str = SettingsField(
         "",
         title="Status name"
     )
@@ -274,7 +278,7 @@ class FtrackTaskStatusProfile(BaseSettingsModel):
 
 class FtrackTaskStatusLocalModel(BaseSettingsModel):
     _isGroup = True
-    status_profiles: list[FtrackTaskStatusProfile] = Field(
+    status_profiles: list[FtrackTaskStatusProfile] = SettingsField(
         title="Status profiles",
         default_factory=list,
         description="Change status of task when is integrated locally"
@@ -283,18 +287,18 @@ class FtrackTaskStatusLocalModel(BaseSettingsModel):
 
 class FtrackTaskStatusOnFarmModel(BaseSettingsModel):
     _isGroup = True
-    status_profiles: list[FtrackTaskStatusProfile] = Field(
+    status_profiles: list[FtrackTaskStatusProfile] = SettingsField(
         title="Status profiles",
         default_factory=list,
         description=(
-            "Change status of task when it's subset is integrated on farm"
+            "Change status of task when it's product is integrated on farm"
         )
     )
 
 
 class IntegrateFtrackTaskStatusModel(BaseSettingsModel):
     _isGroup = True
-    after_version_statuses: bool = Field(
+    after_version_statuses: bool = SettingsField(
         True,
         title="After version integration",
         description=(
@@ -308,12 +312,12 @@ class IntegrateFtrackTaskStatusModel(BaseSettingsModel):
 class FtrackPublishPlugins(BaseSettingsModel):
     """Settings for event handlers running in ftrack service."""
 
-    CollectFtrackFamily: CollectFtrackFamilyPlugin = Field(
+    CollectFtrackFamily: CollectFtrackFamilyPlugin = SettingsField(
         title="Collect Ftrack Family",
         default_factory=CollectFtrackFamilyPlugin,
     )
     CollectFtrackCustomAttributeData: CollectFtrackCustomAttributeDataModel = (
-        Field(
+        SettingsField(
             title="Collect Custom Attribute Data",
             default_factory=CollectFtrackCustomAttributeDataModel,
             description=(
@@ -322,51 +326,59 @@ class FtrackPublishPlugins(BaseSettingsModel):
             )
         )
     )
-    ValidateFtrackAttributes: ValidateFtrackAttributesModel = Field(
+    ValidateFtrackAttributes: ValidateFtrackAttributesModel = SettingsField(
         title="Validate Ftrack Attributes",
         default_factory=ValidateFtrackAttributesModel,
     )
-    IntegrateHierarchyToFtrack: IntegrateHierarchyToFtrackModel = Field(
-        title="Integrate Hierarchy to ftrack",
-        default_factory=IntegrateHierarchyToFtrackModel,
-        description=(
-            "Set task status on new task creation."
-            " Ftrack's default status is used otherwise."
+    IntegrateHierarchyToFtrack: IntegrateHierarchyToFtrackModel = (
+        SettingsField(
+            title="Integrate Hierarchy to ftrack",
+            default_factory=IntegrateHierarchyToFtrackModel,
+            description=(
+                "Set task status on new task creation."
+                " Ftrack's default status is used otherwise."
+            )
         )
     )
-    IntegrateFtrackNote: IntegrateFtrackNoteModel = Field(
+    IntegrateFtrackNote: IntegrateFtrackNoteModel = SettingsField(
         title="Integrate Ftrack Note",
         default_factory=IntegrateFtrackNoteModel,
     )
-    IntegrateFtrackDescription: IntegrateFtrackDescriptionModel = Field(
-        title="Integrate Ftrack Description",
-        default_factory=IntegrateFtrackDescriptionModel,
-        description="Add description to integrated AssetVersion.",
+    IntegrateFtrackDescription: IntegrateFtrackDescriptionModel = (
+        SettingsField(
+            title="Integrate Ftrack Description",
+            default_factory=IntegrateFtrackDescriptionModel,
+            description="Add description to integrated AssetVersion.",
+        )
     )
-    IntegrateFtrackComponentOverwrite: IntegrateFtrackComponentOverwriteModel = Field(
+    IntegrateFtrackComponentOverwrite: IntegrateFtrackComponentOverwriteModel = SettingsField(
         title="Integrate Ftrack Component Overwrite",
         default_factory=IntegrateFtrackComponentOverwriteModel,
     )
-    IntegrateFtrackInstance: IntegrateFtrackInstanceModel = Field(
+    IntegrateFtrackInstance: IntegrateFtrackInstanceModel = SettingsField(
         title="Integrate Ftrack Instance",
         default_factory=IntegrateFtrackInstanceModel,
     )
-    IntegrateFtrackFarmStatus: IntegrateFtrackFarmStatusModel = Field(
+    IntegrateFtrackFarmStatus: IntegrateFtrackFarmStatusModel = SettingsField(
         title="Integrate Ftrack Farm Status",
         default_factory=IntegrateFtrackFarmStatusModel,
         description=(
-            "Change status of task when it's subset is submitted to farm"
+            "Change status of task when it's product is submitted to farm"
         ),
     )
-    ftrack_task_status_local_publish: FtrackTaskStatusLocalModel = Field(
-        default_factory=FtrackTaskStatusLocalModel,
-        title="Ftrack Status Local Integration",
+    ftrack_task_status_local_publish: FtrackTaskStatusLocalModel = (
+        SettingsField(
+            default_factory=FtrackTaskStatusLocalModel,
+            title="Ftrack Status Local Integration",
+        )
     )
-    ftrack_task_status_on_farm_publish: FtrackTaskStatusOnFarmModel = Field(
-        default_factory=FtrackTaskStatusOnFarmModel,
-        title="Ftrack Status On Farm Integration",
+    ftrack_task_status_on_farm_publish: FtrackTaskStatusOnFarmModel = (
+        SettingsField(
+            default_factory=FtrackTaskStatusOnFarmModel,
+            title="Ftrack Status On Farm Integration",
+        )
     )
-    IntegrateFtrackTaskStatus: IntegrateFtrackTaskStatusModel = Field(
+    IntegrateFtrackTaskStatus: IntegrateFtrackTaskStatusModel = SettingsField(
         default_factory=IntegrateFtrackTaskStatusModel,
         title="Integrate Ftrack Task Status"
     )
@@ -585,7 +597,7 @@ DEFAULT_PUBLISH_SETTINGS = {
     },
     "IntegrateFtrackNote": {
         "enabled": True,
-        "note_template": "{intent}: {comment}",
+        "note_template": "{comment}",
         "note_labels": []
     },
     "IntegrateFtrackDescription": {
@@ -708,15 +720,15 @@ DEFAULT_PUBLISH_SETTINGS = {
     "IntegrateFtrackFarmStatus": {
         "farm_status_profiles": [
             {
-                "hosts": [
+                "host_names": [
                     "celaction"
                 ],
                 "task_types": [],
                 "task_names": [],
-                "families": [
+                "product_types": [
                     "render"
                 ],
-                "subsets": [],
+                "product_names": [],
                 "status_name": "Render"
             }
         ]

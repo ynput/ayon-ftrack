@@ -3,7 +3,7 @@ ifneq (,$(wildcard ./.env))
 		export
 endif
 
-VERSION=$(shell python -c "import os;import sys;content={};f=open('$(CURDIR)/../version.py');exec(f.read(),content);f.close();print(content['__version__'])")
+VERSION=$(shell python -c "import os;import sys;content={};f=open('$(CURDIR)/../package.py');exec(f.read(),content);f.close();print(content['version'])")
 
 define HELP_INFO
 

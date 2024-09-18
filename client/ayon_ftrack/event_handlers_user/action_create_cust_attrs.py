@@ -104,9 +104,20 @@ Example:
 }
 ```
 """
-
+import os
+import sys
 import json
+import traceback
+import tempfile
+import datetime
+
 import arrow
+
+from ayon_core.settings import get_studio_settings
+try:
+    from ayon_applications import ApplicationManager
+except ImportError:
+    ApplicationManager = None
 
 from ayon_ftrack.common import (
     LocalAction,
@@ -127,12 +138,177 @@ from ayon_ftrack.common import (
 )
 from ayon_ftrack.lib import get_ftrack_icon_url
 
-from openpype.settings import get_system_settings
-from openpype.lib import ApplicationManager
-
 
 class CustAttrException(Exception):
     pass
+
+
+class CreateUpdateContext:
+    def __init__(self, session, app_manager):
+        self.app_manager = app_manager
+        self._session = session
+        self._types_per_name = None
+        self._security_roles = None
+        self._object_types = None
+        self._object_types_by_name = None
+        self._ftrack_settings = None
+        self._attrs_settings = None
+
+        self._groups = None
+
+        self._generic_error = None
+        self._failed_attributes = {}
+
+    @property
+    def session(self):
+        return self._session
+
+    @property
+    def attrs_settings(self):
+        if self._attrs_settings is not None:
+            return self._attrs_settings
+        ftrack_settings = self._get_ftrack_settings()
+        output = {}
+        attr_settings = ftrack_settings["custom_attributes"]
+        for entity_type, attr_data in attr_settings.items():
+            # Lower entity type
+            entity_type = entity_type.lower()
+            # Just store if entity type is not "task"
+            if entity_type != "task":
+                output[entity_type] = attr_data
+                continue
+
+            # Prepare empty dictionary for entity type if not set yet
+            if entity_type not in output:
+                output[entity_type] = {}
+
+            # Store presets per lowered object type
+            for obj_type, _preset in attr_data.items():
+                output[entity_type][obj_type.lower()] = _preset
+        self._attrs_settings = output
+        return self._attrs_settings
+
+    def get_custom_attribute_type(self, type_name):
+        if self._types_per_name is None:
+            session = self._session
+            self._types_per_name = {
+                attr_type["name"].lower(): attr_type
+                for attr_type in session.query("CustomAttributeType").all()
+            }
+        return self._types_per_name.get(type_name.lower())
+
+    def get_security_roles(self, security_roles):
+        if self._security_roles is None:
+            self._security_roles = {
+                role["name"].lower(): role
+                for role in self._session.query("SecurityRole").all()
+            }
+
+        security_roles_lowered = [
+            name.lower() for name in security_roles
+        ]
+        if (
+            len(security_roles_lowered) == 0
+            or "all" in security_roles_lowered
+        ):
+            return list(self._security_roles.values())
+
+        output = []
+        if security_roles_lowered[0] == "except":
+            excepts = set(security_roles_lowered[1:])
+            for role_name, role in self._security_roles.items():
+                if role_name not in excepts:
+                    output.append(role)
+
+        else:
+            for role_name in set(security_roles_lowered):
+                if role_name not in self._security_roles:
+                    raise CustAttrException((
+                        "Securit role \"{}\" was not found in Ftrack."
+                    ).format(role_name))
+                output.append(self._security_roles[role_name])
+        return output
+
+    def get_group(self, group_name):
+        if not group_name:
+            return None
+
+        if self._groups is None:
+            self._groups = {
+                group["name"].lower(): group
+                for group in self._session.query(
+                    f"CustomAttributeGroup where name is \"{group_name}\""
+                ).all()
+            }
+
+        group_name = group_name.lower()
+        if group_name in self._groups:
+            return self._groups[group_name]
+
+        groups = self._session.query(
+            f"CustomAttributeGroup where name is \"{group_name}\""
+        ).all()
+
+        if len(groups) > 1:
+            raise CustAttrException(
+                "Found more than one group \"{}\"".format(group_name)
+            )
+
+        if len(groups) == 1:
+            group = next(iter(groups))
+            self._groups[group_name] = group
+            return group
+
+        self.session.create(
+            "CustomAttributeGroup",
+            {"name": group_name}
+        )
+        self.session.commit()
+        self._groups[group_name] = self._session.query(
+            f"CustomAttributeGroup where name is \"{group_name}\""
+        ).first()
+
+        return self._groups[group_name]
+
+    def get_object_type_by_name(self, object_type_name):
+        if self._object_types_by_name is None:
+            self._object_types_by_name = {
+                object_type["name"].lower(): object_type
+                for object_type in self._get_object_types()
+            }
+        object_type_name_low = object_type_name.lower()
+        return self._object_types_by_name.get(object_type_name_low)
+
+    def _get_object_types(self):
+        if self._object_types is None:
+            self._object_types = self._session.query("ObjectType").all()
+        return self._object_types
+
+    def _get_ftrack_settings(self):
+        if self._ftrack_settings is None:
+            self._ftrack_settings = get_studio_settings()["ftrack"]
+        return self._ftrack_settings
+
+    def job_failed(self):
+        return self._failed_attributes or self._generic_error
+
+    def add_failed_attribute(self, attr_name, message):
+        self._failed_attributes[attr_name] = message
+
+    def set_generic_error(self, message, traceback_message):
+        self._generic_error = "\n".join([message, traceback_message])
+
+    def get_report_text(self):
+        if not self.job_failed():
+            return None
+
+        output_messages = []
+        if self._generic_error:
+            output_messages.append(self._generic_error)
+
+        for attr_name, message in self._failed_attributes.items():
+            output_messages.append(f"Attribute \"{attr_name}\": {message}")
+        return "\n\n".join(output_messages)
 
 
 class CustomAttributes(LocalAction):
@@ -182,53 +358,65 @@ class CustomAttributes(LocalAction):
         session.commit()
 
         # TODO how to get custom attributes from different addons?
-        self.app_manager = ApplicationManager()
+        app_manager = None
+        if ApplicationManager is not None:
+            app_manager = ApplicationManager()
+        else:
+            self.log.info("Applications addon is not available.")
 
+        context = CreateUpdateContext(session, app_manager)
+
+        generic_message = "Custom attributes creation failed."
         try:
-            self.prepare_global_data(session)
-            self.create_ayon_attributes(event)
-            self.applications_attribute(event)
-            self.tools_attribute(event)
+            self.create_ayon_attributes(context, event)
+            self.applications_attribute(context, event)
+            self.tools_attribute(context, event)
             # self.intent_attribute(event)
-            self.custom_attributes_from_file(event)
-
-            job["status"] = "done"
-            session.commit()
+            self.create_default_custom_attributes(context, event)
 
         except Exception:
-            session.rollback()
-            job["status"] = "failed"
-            session.commit()
-            self.log.error(
-                "Creating custom attributes failed ({})", exc_info=True
+            traceback_message = "".join(
+                traceback.format_exception(*sys.exc_info())
             )
+            context.set_generic_error(generic_message, traceback_message)
 
-        return True
+        finally:
+            job_status = "done"
+            output = True
+            if context.job_failed():
+                job_status = "failed"
+                output = {
+                    "success": False,
+                    "message": generic_message
+                }
+                session.rollback()
+                report_text = context.get_report_text()
+                self._upload_report(session, job, report_text)
 
-    def prepare_global_data(self, session):
-        self.types_per_name = {
-            attr_type["name"].lower(): attr_type
-            for attr_type in session.query("CustomAttributeType").all()
-        }
 
-        self.security_roles = {
-            role["name"].lower(): role
-            for role in session.query("SecurityRole").all()
-        }
+            job["status"] = job_status
 
-        object_types = session.query("ObjectType").all()
-        self.object_types_per_id = {
-            object_type["id"]: object_type for object_type in object_types
-        }
-        self.object_types_per_name = {
-            object_type["name"].lower(): object_type
-            for object_type in object_types
-        }
+            session.commit()
 
-        self.groups = {}
+        return output
 
-        self.ftrack_settings = get_system_settings()["modules"]["ftrack"]
-        self.attrs_settings = self.prepare_attribute_settings()
+    def _upload_report(self, session, job, report_text):
+        with tempfile.NamedTemporaryFile(
+            mode="w", prefix="ayon_ftrack_", suffix=".txt", delete=False
+        ) as temp_obj:
+            temp_obj.write(report_text)
+            temp_filepath = temp_obj.name
+
+        # Upload file with traceback to ftrack server and add it to job
+        component_name = "{}_{}".format(
+            self.__class__.__name__,
+            datetime.datetime.now().strftime("%y-%m-%d-%H%M")
+        )
+        self.add_file_component_to_job(
+            job, session, temp_filepath, component_name
+        )
+        # Delete temp file
+        os.remove(temp_filepath)
 
     def prepare_attribute_settings(self):
         output = {}
@@ -251,7 +439,7 @@ class CustomAttributes(LocalAction):
 
         return output
 
-    def create_ayon_attributes(self, event):
+    def create_ayon_attributes(self, context, event):
         # Set security roles for attribute
 
         for item in [
@@ -279,8 +467,7 @@ class CustomAttributes(LocalAction):
                 "type": "boolean",
                 "default": False,
                 "group": CUST_ATTR_GROUP,
-                "is_hierarchical": True,
-                "config": {"markdown": False}
+                "is_hierarchical": True
             },
             {
                 "key": CUST_ATTR_AUTO_SYNC,
@@ -291,10 +478,13 @@ class CustomAttributes(LocalAction):
                 "entity_type": "show"
             }
         ]:
-            self.process_attr_data(item, event)
+            self.process_attr_data(context, item, event)
 
-    def applications_attribute(self, event):
-        apps_data = app_definitions_from_app_manager(self.app_manager)
+    def applications_attribute(self, context, event):
+        if context.app_manager is None:
+            return
+
+        apps_data = app_definitions_from_app_manager(context.app_manager)
 
         applications_custom_attr_data = {
             "label": "Applications",
@@ -307,10 +497,13 @@ class CustomAttributes(LocalAction):
                 "data": apps_data
             }
         }
-        self.process_attr_data(applications_custom_attr_data, event)
+        self.process_attr_data(context, applications_custom_attr_data, event)
 
-    def tools_attribute(self, event):
-        tools_data = tool_definitions_from_app_manager(self.app_manager)
+    def tools_attribute(self, context, event):
+        if context.app_manager is None:
+            return
+
+        tools_data = tool_definitions_from_app_manager(context.app_manager)
 
         tools_custom_attr_data = {
             "label": "Tools",
@@ -323,10 +516,10 @@ class CustomAttributes(LocalAction):
                 "data": tools_data
             }
         }
-        self.process_attr_data(tools_custom_attr_data, event)
+        self.process_attr_data(context, tools_custom_attr_data, event)
 
-    def intent_attribute(self, event):
-        intent_key_values = self.ftrack_settings["intent"]["items"]
+    def intent_attribute(self, context, event):
+        intent_key_values = context.ftrack_settings["intent"]["items"]
 
         intent_values = []
         for key, label in intent_key_values.items():
@@ -353,9 +546,9 @@ class CustomAttributes(LocalAction):
                 "data": intent_values
             }
         }
-        self.process_attr_data(intent_custom_attr_data, event)
+        self.process_attr_data(context, intent_custom_attr_data, event)
 
-    def custom_attributes_from_file(self, event):
+    def create_default_custom_attributes(self, context, event):
         # Load json with custom attributes configurations
         cust_attr_def = default_custom_attributes_definition()
         attrs_data = []
@@ -388,9 +581,9 @@ class CustomAttributes(LocalAction):
         for cust_attr_data in attrs_data:
             # Add group
             cust_attr_data["group"] = CUST_ATTR_GROUP
-            self.process_attr_data(cust_attr_data, event)
+            self.process_attr_data(context, cust_attr_data, event)
 
-    def presets_for_attr_data(self, attr_data):
+    def presets_for_attr_data(self, context, attr_data):
         output = {}
 
         attr_key = attr_data["key"]
@@ -399,7 +592,7 @@ class CustomAttributes(LocalAction):
         else:
             entity_key = attr_data["entity_type"]
 
-        entity_settings = self.attrs_settings.get(entity_key) or {}
+        entity_settings = context.attrs_settings.get(entity_key) or {}
         if entity_key.lower() == "task":
             object_type = attr_data["object_type"]
             entity_settings = entity_settings.get(object_type.lower()) or {}
@@ -410,38 +603,50 @@ class CustomAttributes(LocalAction):
                 output[key] = value
         return output
 
-    def process_attr_data(self, cust_attr_data, event):
-        attr_settings = self.presets_for_attr_data(cust_attr_data)
+    def process_attr_data(self, context, cust_attr_data, event):
+        attr_settings = self.presets_for_attr_data(context, cust_attr_data)
         cust_attr_data.update(attr_settings)
 
         try:
             data = {}
             # Get key, label, type
-            data.update(self.get_required(cust_attr_data))
+            data.update(self.get_required(context, cust_attr_data))
             # Get hierachical/ entity_type/ object_id
-            data.update(self.get_entity_type(cust_attr_data))
+            data.update(self.get_entity_type(context, cust_attr_data))
             # Get group, default, security roles
-            data.update(self.get_optional(cust_attr_data))
+            data.update(self.get_optional(context, cust_attr_data))
             # Process data
             self.process_attribute(data)
 
-        except CustAttrException as cae:
-            cust_attr_name = cust_attr_data.get("label", cust_attr_data["key"])
+        except Exception as exc:
+            traceback_message = None
+            if not isinstance(exc, CustAttrException):
+                traceback_message = "".join(
+                    traceback.format_exception(*sys.exc_info())
+                )
+
+            cust_attr_name = cust_attr_data.get(
+                "label", cust_attr_data["key"]
+            )
 
             if cust_attr_name:
                 msg = "Custom attribute error \"{}\" - {}".format(
-                    cust_attr_name, str(cae)
+                    cust_attr_name, str(exc)
                 )
             else:
-                msg = "Custom attribute error - {}".format(str(cae))
+                msg = "Custom attribute error - {}".format(str(exc))
             self.log.warning(msg, exc_info=True)
             self.show_message(event, msg)
+            if traceback_message:
+                msg = "\n".join([msg, traceback_message])
+            context.add_failed_attribute(cust_attr_name, msg)
 
     def process_attribute(self, data):
         existing_attrs = self.session.query((
             "select is_hierarchical, key, type, entity_type, object_type_id"
             " from CustomAttributeConfiguration"
         )).all()
+
         matching = []
         is_hierarchical = data.get("is_hierarchical", False)
         for attr in existing_attrs:
@@ -495,7 +700,7 @@ class CustomAttributes(LocalAction):
                 "Custom attribute is duplicated. Key: \"{}\" Type: \"{}\""
             ).format(data["key"], data["type"]["name"]))
 
-    def get_required(self, attr):
+    def get_required(self, context, attr):
         for key in self.required_keys:
             if key not in attr:
                 raise CustAttrException(
@@ -512,7 +717,7 @@ class CustomAttributes(LocalAction):
         output = {
             "key": attr["key"],
             "label": attr["label"],
-            "type": self.types_per_name[type_name_l]
+            "type": context.get_custom_attribute_type(type_name_l)
         }
 
         config = None
@@ -523,17 +728,28 @@ class CustomAttributes(LocalAction):
         elif type_name == "enumerator":
             config = self.get_enumerator_config(attr)
 
-        if config is not None:
-            output["config"] = config
+        # Fake empty config
+        if config is None:
+            config = json.dumps({})
+        output["config"] = config
 
         return output
 
     def get_number_config(self, attr):
-        is_decimal = attr.get("config", {}).get("isdecimal")
+        config = attr.get("config", {})
+        is_decimal = config.get("isdecimal")
         if is_decimal is None:
             is_decimal = False
 
-        return json.dumps({"isdecimal": is_decimal})
+        config_data = {
+            "isdecimal": is_decimal,
+        }
+        if is_decimal:
+            precision = config.get("precision")
+            if precision is not None:
+                config_data["precision"] = precision
+
+        return json.dumps(config_data)
 
     def get_text_config(self, attr):
         markdown = attr.get("config", {}).get("markdown")
@@ -549,12 +765,11 @@ class CustomAttributes(LocalAction):
 
         data = []
         for item in attr["config"]["data"]:
-            item_data = {}
             for key in item:
-                # TODO key check by regex
-                item_data["menu"] = item[key]
-                item_data["value"] = key
-                data.append(item_data)
+                data.append({
+                    "menu": item[key],
+                    "value": key,
+                })
 
         multi_selection = False
         for key, value in attr["config"].items():
@@ -568,62 +783,6 @@ class CustomAttributes(LocalAction):
             "multiSelect": multi_selection,
             "data": json.dumps(data)
         })
-
-        return config
-
-    def get_group(self, attr):
-        if isinstance(attr, dict):
-            group_name = attr["group"].lower()
-        else:
-            group_name = attr
-        if group_name in self.groups:
-            return self.groups[group_name]
-
-        query = "CustomAttributeGroup where name is \"{}\"".format(group_name)
-        groups = self.session.query(query).all()
-
-        if len(groups) > 1:
-            raise CustAttrException(
-                "Found more than one group \"{}\"".format(group_name)
-            )
-
-        if len(groups) == 1:
-            group = next(iter(groups))
-            self.groups[group_name] = group
-            return group
-
-        group = self.session.create(
-            "CustomAttributeGroup",
-            {"name": group_name}
-        )
-        self.session.commit()
-
-        return group
-
-    def get_security_roles(self, security_roles):
-        security_roles_lowered = tuple(name.lower() for name in security_roles)
-        if (
-            len(security_roles_lowered) == 0
-            or "all" in security_roles_lowered
-        ):
-            return list(self.security_roles.values())
-
-        output = []
-        if security_roles_lowered[0] == "except":
-            excepts = security_roles_lowered[1:]
-            for role_name, role in self.security_roles.items():
-                if role_name not in excepts:
-                    output.append(role)
-
-        else:
-            for role_name in security_roles_lowered:
-                if role_name in self.security_roles:
-                    output.append(self.security_roles[role_name])
-                else:
-                    raise CustAttrException((
-                        "Securit role \"{}\" was not found in Ftrack."
-                    ).format(role_name))
-        return output
 
     def get_default(self, attr):
         attr_type = attr["type"]
@@ -673,25 +832,22 @@ class CustomAttributes(LocalAction):
 
         return default
 
-    def get_optional(self, attr):
+    def get_optional(self, context, attr):
         output = {}
         if "group" in attr:
-            output["group"] = self.get_group(attr)
+            output["group"] = context.get_group(attr["group"])
         if "default" in attr:
             output["default"] = self.get_default(attr)
 
-        roles_read = []
-        roles_write = []
-        if "read_security_roles" in attr:
-            roles_read = attr["read_security_roles"]
-        if "write_security_roles" in attr:
-            roles_write = attr["write_security_roles"]
-
-        output["read_security_roles"] = self.get_security_roles(roles_read)
-        output["write_security_roles"] = self.get_security_roles(roles_write)
+        output["read_security_roles"] = context.get_security_roles(
+            attr.get("read_security_roles") or []
+        )
+        output["write_security_roles"] = context.get_security_roles(
+            attr.get("write_security_roles") or []
+        )
         return output
 
-    def get_entity_type(self, attr):
+    def get_entity_type(self, context, attr):
         if attr.get("is_hierarchical", False):
             return {
                 "is_hierarchical": True,
@@ -709,8 +865,7 @@ class CustomAttributes(LocalAction):
         if not object_type_name:
             raise CustAttrException("Missing object_type")
 
-        object_type_name_low = object_type_name.lower()
-        object_type = self.object_types_per_name.get(object_type_name_low)
+        object_type = context.get_object_type_by_name(object_type_name)
         if not object_type:
             raise CustAttrException((
                 "Object type with name \"{}\" don't exist"
@@ -720,7 +875,3 @@ class CustomAttributes(LocalAction):
             "entity_type": entity_type,
             "object_type_id": object_type["id"]
         }
-
-
-def register(session):
-    CustomAttributes(session).register()

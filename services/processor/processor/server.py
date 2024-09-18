@@ -5,6 +5,7 @@ import time
 import logging
 import signal
 import traceback
+import atexit
 
 import ayon_api
 import ftrack_api
@@ -12,6 +13,12 @@ import ftrack_api
 from ftrack_common import FtrackServer
 
 from .ftrack_session import AYONServerSession
+from .download_utils import (
+    cleanup_download_root,
+    downloaded_event_handlers,
+)
+
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 class _GlobalContext:
@@ -21,11 +28,9 @@ class _GlobalContext:
 
 
 def get_handler_paths() -> list[str]:
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    handler_paths = [
-        os.path.join(current_dir, "default_handlers"),
+    return [
+        os.path.join(CURRENT_DIR, "default_handlers"),
     ]
-    return handler_paths
 
 
 def get_service_label():
@@ -35,7 +40,19 @@ def get_service_label():
     ])
 
 
+def _cleanup_session():
+    session = _GlobalContext.session
+    _GlobalContext.session = None
+    if session is not None:
+        logging.info("Closing ftrack session.")
+        if session.event_hub.connected is True:
+            session.event_hub.disconnect()
+        session.close()
+
+
 def _create_session():
+    _cleanup_session()
+
     ftrack_settings = ayon_api.get_service_addon_settings()
     ftrack_url = ftrack_settings["ftrack_server"]
     service_settings = ftrack_settings["service_settings"]
@@ -83,14 +100,16 @@ def create_session():
 
     session = _GlobalContext.session
     if session is not None:
-        print("Created ftrack session")
+        logging.info("Created ftrack session")
         return session
 
     if not error_message:
         error_message = error_summary
-    print(error_message)
+
+    log_msg = error_message
     if tb_content:
-        print(tb_content)
+        log_msg += f"\n{tb_content}"
+    logging.error(log_msg)
     if (
         (tb_content is not None and _GlobalContext.session_fail_logged == 2)
         or (tb_content is None and _GlobalContext.session_fail_logged == 1)
@@ -121,23 +140,65 @@ def create_session():
 
 
 def main_loop():
+    addon_name = ayon_api.get_service_addon_name()
+    addon_version = ayon_api.get_service_addon_version()
+    variant = ayon_api.get_default_settings_variant()
+    handlers_url = (
+        f"addons/{addon_name}/{addon_version}/customProcessorHandlers"
+        f"?variant={variant}"
+    )
     while not _GlobalContext.stop_event.is_set():
         session = create_session()
         if session is None:
+            logging.info(
+                "Failed to create ftrack session. Will try in 10 seconds."
+            )
             time.sleep(10)
             continue
 
-        _GlobalContext.session_fail_logged = False
+        _GlobalContext.session_fail_logged = 0
+
+        # Cleanup download root
+        cleanup_download_root()
+
+        response = ayon_api.get(handlers_url)
+        custom_handlers = []
+        if response.status_code == 200:
+            custom_handlers = response.data["custom_handlers"]
 
         handler_paths = get_handler_paths()
+        with downloaded_event_handlers(custom_handlers) as custom_handler_dirs:
+            handler_paths.extend(custom_handler_dirs)
+            logging.info("Starting listen server")
+            server = FtrackServer(handler_paths)
+            try:
+                server.run_server(session)
+            finally:
+                logging.info("Server stopped.")
+                _cleanup_session()
+    logging.info("Main loop stopped.")
 
-        server = FtrackServer(handler_paths)
-        print("Starting listening loop")
-        server.run_server(session)
+
+def _cleanup_process():
+    """Cleanup timer threads on exit."""
+    logging.info("Process stop requested. Terminating process.")
+    logging.info("Canceling threading timers.")
+    for thread in threading.enumerate():
+        if isinstance(thread, threading.Timer):
+            thread.cancel()
+
+    logging.info("Stopping main loop.")
+    if not _GlobalContext.stop_event.is_set():
+        _GlobalContext.stop_event.set()
+    _cleanup_session()
 
 
 def main():
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(
+        format="%(asctime)s %(levelname)-8s %(message)s",
+        level=logging.INFO,
+        datefmt="%Y-%m-%d %H:%M:%S"
+    )
 
     try:
         ayon_api.init_service()
@@ -146,7 +207,7 @@ def main():
         connected = False
 
     if not connected:
-        print("Failed to connect to AYON server.")
+        logging.warning("Failed to connect to AYON server.")
         # Sleep for 10 seconds, so it is possible to see the message in
         #   docker
         # NOTE: Becuase AYON connection failed, there's no way how to log it
@@ -154,21 +215,17 @@ def main():
         time.sleep(10)
         sys.exit(1)
 
-    print("Connected to AYON server.")
+    logging.info("Connected to AYON server.")
 
     # Register interrupt signal
     def signal_handler(sig, frame):
-        print("Process stop requested. Terminating process.")
-        _GlobalContext.stop_event.set()
-        session = _GlobalContext.session
-        if session is not None:
-            if session.event_hub.connected is True:
-                session.event_hub.disconnect()
-            session.close()
-        print("Termination finished.")
+        _cleanup_process()
         sys.exit(0)
 
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
-
-    main_loop()
+    atexit.register(_cleanup_process)
+    try:
+        main_loop()
+    finally:
+        _cleanup_process()

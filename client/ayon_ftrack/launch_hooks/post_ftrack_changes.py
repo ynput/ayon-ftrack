@@ -8,25 +8,18 @@ from ayon_ftrack.common import (
     is_ftrack_enabled_in_settings,
 )
 
-from openpype.settings import get_project_settings
-from openpype.lib.applications import PostLaunchHook
-try:
-    # Backwards compatibility
-    # TODO remove in next minor version bump (after 0.3.x)
-    from openpype.lib.applications import LaunchTypes
-    local_launch_type = LaunchTypes.local
-except Exception:
-    local_launch_type = "local"
+from ayon_core.settings import get_project_settings
+from ayon_applications import PostLaunchHook, LaunchTypes
 
 
 class PostFtrackHook(PostLaunchHook):
     order = None
-    launch_types = {local_launch_type}
+    launch_types = {LaunchTypes.local}
 
     def execute(self):
         project_name = self.data.get("project_name")
         project_settings = self.data.get("project_settings")
-        folder_path = self.data.get("asset_name")
+        folder_path = self.data.get("folder_path")
         task_name = self.data.get("task_name")
 
         missing_context_keys = [
@@ -114,36 +107,43 @@ class PostFtrackHook(PostLaunchHook):
             )
             return
 
-        actual_status = entity["status"]["name"].lower()
+        current_status = entity["status"]["name"].lower()
         already_tested = set()
         ent_path = "/".join(
             [ent["name"] for ent in entity["link"]]
         )
+
+        statuses = session.query("select id, name from Status").all()
+        statuses_by_low_name = {
+            status["name"].lower(): status
+            for status in statuses
+        }
         # TODO refactor
         while True:
             next_status_name = None
             for item in status_mapping:
-                new_status = item["name"]
+                new_status = item["name"].lower()
                 if new_status in already_tested:
                     continue
 
-                from_statuses = item["value"]
-                if (
-                    actual_status in from_statuses
-                    or "__any__" in from_statuses
-                ):
-                    if new_status != "__ignore__":
-                        next_status_name = new_status
-                        already_tested.add(new_status)
-                    break
                 already_tested.add(new_status)
+
+                found_match = False
+                for from_status in item["value"]:
+                    from_status = from_status.lower()
+                    if from_status in (current_status, "__any__"):
+                        found_match = True
+                        if new_status != "__ignore__":
+                            next_status_name = new_status
+                        break
+
+                if found_match:
+                    break
 
             if next_status_name is None:
                 break
 
-            status = session.query(
-                f"Status where name is \"{next_status_name}\""
-            ).first()
+            status = statuses_by_low_name.get(next_status_name)
             if status is None:
                 self.log.warning(
                     f"Status '{next_status_name}' not found in ftrack."

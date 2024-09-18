@@ -2,7 +2,7 @@
 
 This project provides three elements for the AYON pipeline:
  * server - The AYON backend Addon.
- * client - The AYON (currently OpenPype) desktop integration.
+ * client - The AYON desktop integration.
  * services - Standalone dockerized daemons that act based on events (aka `leecher` and `processors`).
 
 There is a common code that can be re-used for `server`, `client` and `services`. Is located inside client code for developer mode `./client/ayon_ftrack/common/`.
@@ -32,6 +32,46 @@ To create a "server-ready" package of the `server` folder, on a terminal, run `p
 As mentioned there are 2 services `leecher` and `processor`. Both services have docker images that can be started from AYON server. For that there must be running a docker worker called ASH (AYON service host). Once ASH is running you can run services from AYON web UI. This is recommended approach how to run services in production.
 
 To run services locally (recommended only for development purposes), there are 2 possible approaches. One is by running docker image, or using prepared service tools.
+
+- `leecher` - Service that listens to ftrack events and stores them in the AYON database.
+- `processor` - Service that is processing ftrack events stored in the AYON database. Only one event is processed at a time.
+
+### Processor
+Processor contains multiple event handlers that handle synchronization or basic automations helpers. It also provides a way to add custom event handlers from other addons. The addon must be loaded into the server, and must be available in bundle based on variant that service is running in ("production", "staging" or dev bundle).
+The addon also must have prepared archive file that can be downloaded from the server.
+
+#### Archive file
+The archive file can be a zip or tar, must contain `manifest.json` file that describes the content. The archive file must be uploaded to the server and must be available for download. The addon must implement `get_custom_ftrack_handlers_endpoint` method that returns URL to the archive file.
+
+```python
+class SomeAddon(BaseServerAddon):
+    name = "some_addon"
+    version = "1.0.0"
+    
+    def get_custom_ftrack_handlers_endpoint(self) -> str:
+        return "addons/{self.name}/{self.version}/private/ftrack_handlers.tar.gz"
+```
+
+#### Manifest file
+Manifest file is a JSON file that describes the content of the archive file. It is used to load the content of the archive file into the processor. The file must be named `manifest.json` and must be in the root of the archive file.
+
+```json
+{
+    "version": "1.0.0",
+    "handler_subfolders": [
+        "event_handlers"
+    ],
+    "python_path_subfolders": [
+        "common"
+    ]
+}
+```
+Content of manifect may change in future, to be able to track changes and keep backwards compatibilit a `"version"` was added. Current version is `"1.0.0"`.
+
+<b>1.0.0</b>
+- `handler_subfolders` - List of subfolder, relative to manifest.json where files with event handlers can be found. Processor will go through all of the subfolders and import all python files that are in the subfolder. It is recommended to have only one subfolder.
+- `python_path_subfolders` - Optional list of subfolders, relative to manifest.json. These paths are added to `sys.path` so content inside can be imported. Can be used for "common" code for the event handlers. It is not recommended to add python modules because of possible conflicts with other addons, but is possible.
+
 
 ### Start as docker
 Both services have prepared scripts to build and run docker images. There are 2 scripts `manage.ps1` for Windows and `Makefile` for Linux. Both scripts are doing the same thing and have same commands.

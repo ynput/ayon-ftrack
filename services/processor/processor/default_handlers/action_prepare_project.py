@@ -82,7 +82,7 @@ class PrepareProjectServer(ServerAction):
                 "label": item["label"],
                 "name": name,
                 "value": value in default
-           })
+            })
         output.append({
             "type": "hidden",
             "value": json.dumps(mapping),
@@ -450,7 +450,7 @@ class PrepareProjectServer(ServerAction):
         )
         if repeated:
             intro_message = (
-                f"Entered values are <b>not valid</b>.<br/><br/>"
+                "Entered values are <b>not valid</b>.<br/><br/>"
             ) + intro_message
 
         items = [
@@ -543,6 +543,50 @@ class PrepareProjectServer(ServerAction):
             "items": items,
         }
 
+    def _convert_value_for_attr_conf(
+        self, value, attr_conf, attr_type_names_by_id
+    ):
+        # TODO validate all value types
+        if not isinstance(value, list):
+            return value
+
+        attr_name = attr_conf["key"]
+        attr_type_name = attr_type_names_by_id[attr_conf["type_id"]]
+        attr_config = json.loads(attr_conf["config"])
+        # Skip if value is not multiselection enumerator
+        if (
+            attr_type_name != "enumerator"
+            or attr_config["multiSelect"] is False
+        ):
+            self.log.info(
+                f"Skipped attribute '{attr_name}' because value"
+                f" type (list) does not match"
+                f" ftrack attribute type ({attr_type_name})."
+            )
+            return None
+
+        attr_config_data = attr_config["data"]
+        if isinstance(attr_config_data, str):
+            attr_config_data = json.loads(attr_config_data)
+
+        available_values = {
+            item["value"]
+            for item in attr_config_data
+        }
+        new_value = [
+            item
+            for item in value
+            if item in available_values
+        ]
+        value_diff = set(value) - set(new_value)
+        if value_diff:
+            joined_values = ", ".join({f'"{item}"'for item in value_diff})
+            self.log.info(
+                f"Skipped invalid '{attr_name}' enumerator"
+                f" values {joined_values}."
+            )
+        return new_value
+
     def _set_ftrack_attributes(self, session, project_entity, values):
         custom_attrs, hier_custom_attrs = get_ayon_attr_configs(session)
         project_attrs = [
@@ -573,6 +617,12 @@ class PrepareProjectServer(ServerAction):
             attr_id = value_item["configuration_id"]
             values_by_attr_id[attr_id] = value
 
+        attr_type_names_by_id = {
+            attr_type["id"]: attr_type["name"]
+            for attr_type in session.query(
+                "select id, name from CustomAttributeType"
+            ).all()
+        }
         for attr_name, attr_value in values.items():
             attrs = [
                 attrs_by_name.get(attr_name),
@@ -581,6 +631,12 @@ class PrepareProjectServer(ServerAction):
             for attr in attrs:
                 if attr is None:
                     continue
+                attr_value = self._convert_value_for_attr_conf(
+                    attr_value, attr, attr_type_names_by_id
+                )
+                if attr_value is None:
+                    continue
+
                 attr_id = attr["id"]
                 is_new = attr_id not in values_by_attr_id
                 current_value = values_by_attr_id.get(attr_id)
@@ -692,7 +748,3 @@ class PrepareProjectServer(ServerAction):
             "message": "Project created in AYON.",
             "success": True
         }
-
-
-def register(session):
-    PrepareProjectServer(session).register()

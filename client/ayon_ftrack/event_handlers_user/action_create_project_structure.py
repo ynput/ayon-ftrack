@@ -1,6 +1,8 @@
 import re
 
-from openpype.pipeline.project_folders import (
+import ayon_api
+
+from ayon_core.pipeline.project_folders import (
     get_project_basic_paths,
     create_project_folders,
 )
@@ -11,9 +13,7 @@ from ayon_ftrack.lib import get_ftrack_icon_url
 class CreateProjectFolders(LocalAction):
     """Action create folder structure and may create hierarchy in Ftrack.
 
-    Creation of folder structure and hierarchy in Ftrack is based on presets.
-    These presets are located in:
-    `~/pype-config/presets/tools/project_folder_structure.json`
+    Creation of folder structure and hierarchy in Ftrack is based on settings.
 
     Example of content:
     ```json
@@ -76,6 +76,13 @@ class CreateProjectFolders(LocalAction):
         # Get project entity
         project_entity = self.get_project_from_entity(entities[0])
         project_name = project_entity["full_name"]
+        ayon_project = ayon_api.get_project(project_name)
+        if not ayon_project:
+            return {
+                "success": False,
+                "message": f"Project '{project_name}' was not found in AYON.",
+            }
+
         try:
             # Get paths based on presets
             basic_paths = get_project_basic_paths(project_name)
@@ -206,7 +213,3 @@ class CreateProjectFolders(LocalAction):
         new_ent = self.session.create(ent_type, data)
         self.session.commit()
         return new_ent
-
-
-def register(session):
-    CreateProjectFolders(session).register()

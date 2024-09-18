@@ -3,107 +3,79 @@ import time
 import logging
 import traceback
 import types
+import inspect
 
 import ftrack_api
 
 from .python_module_tools import modules_from_path
+from .event_handlers import BaseHandler
 
 
 class FtrackServer:
+    """Helper wrapper to run ftrack server with event handlers.
+
+    Handlers are discovered based on a list of paths. Each path is scanned for
+    python files which are imported as modules. Each module is checked for
+    'register' function or classes inheriting from 'BaseHandler'. If class
+    inheriting from 'BaseHandler' is found it is instantiated and 'register'
+    method is called. If 'register' function is found it is called with
+    ftrack session as argument and 'BaseHandler' from the file are ignored.
+
+    Function 'register' tells discovery system to skip looking for classes.
+
+    Classes that start with '_' are ignored. It is possible to define
+    attribute `__ignore_handler_class = True` on class definition to mark
+    a "base class" that will be ignored on discovery, so you can safely import
+    custom base classes in the files.
+    """
     def __init__(self, handler_paths=None):
-        """
-            - 'type' is by default set to 'action' - Runs Action server
-            - enter 'event' for Event server
-
-            EXAMPLE FOR EVENT SERVER:
-                ...
-                server = FtrackServer()
-                server.run_server()
-                ..
-        """
-
         # set Ftrack logging to Warning only - OPTIONAL
         ftrack_log = logging.getLogger("ftrack_api")
         ftrack_log.setLevel(logging.WARNING)
 
         self.log = logging.getLogger(__name__)
 
-        self.stopped = True
-        self.is_running = False
+        self._stopped = True
+        self._is_running = False
 
-        self.handler_paths = handler_paths or []
+        if handler_paths is None:
+            handler_paths = []
+
+        self._handler_paths = handler_paths
+
+        self._session = None
+        self._cached_modules = []
+        self._cached_objects = []
 
     def stop_session(self):
-        self.stopped = True
-        if self.session.event_hub.connected is True:
-            self.session.event_hub.disconnect()
-        self.session.close()
-        self.session = None
+        session = self._session
+        self._session = None
+        self._stopped = True
+        if session.event_hub.connected is True:
+            session.event_hub.disconnect()
+        session.close()
 
-    def set_files(self, paths):
-        # Iterate all paths
-        register_functions = []
-        for path in paths:
-            # Try to format path with environments
-            try:
-                path = path.format(**os.environ)
-            except BaseException:
-                pass
+    def get_session(self):
+        return self._session
 
-            # Get all modules with functions
-            modules, crashed = modules_from_path(path)
-            for filepath, exc_info in crashed:
-                self.log.warning("Filepath load crashed {}.\n{}".format(
-                    filepath, "".join(traceback.format_exception(*exc_info))
-                ))
-
-            for filepath, module in modules:
-                register_function = None
-                for name, attr in module.__dict__.items():
-                    if (
-                        name == "register"
-                        and isinstance(attr, types.FunctionType)
-                    ):
-                        register_function = attr
-                        break
-
-                if not register_function:
-                    self.log.warning(
-                        "\"{}\" - Missing register method".format(filepath)
-                    )
-                    continue
-
-                register_functions.append(
-                    (filepath, register_function)
-                )
-
-        if not register_functions:
-            self.log.warning((
-                "There are no events with `register` function"
-                " in registered paths: \"{}\""
-            ).format("| ".join(paths)))
-
-        for filepath, register_func in register_functions:
-            try:
-                register_func(self.session)
-            except Exception:
-                self.log.warning(
-                    "\"{}\" - register was not successful".format(filepath),
-                    exc_info=True
-                )
+    def get_handler_paths(self):
+        return self._handler_paths
 
     def set_handler_paths(self, paths):
-        self.handler_paths = paths
-        if self.is_running:
-            self.stop_session()
-            self.run_server()
+        if self._is_running:
+            raise ValueError(
+                "Cannot change handler paths when server is running."
+            )
+        self._handler_paths = paths
 
-        elif not self.stopped:
-            self.run_server()
+    session = property(get_session)
+    handler_paths = property(get_handler_paths, set_handler_paths)
 
-    def run_server(self, session=None, load_files=True):
-        self.stopped = False
-        self.is_running = True
+    def run_server(self, session=None):
+        if self._is_running:
+            raise ValueError("Server is already running.")
+        self._stopped = False
+        self._is_running = True
         if not session:
             session = ftrack_api.Session(auto_connect_event_hub=True)
 
@@ -124,22 +96,115 @@ class FtrackServer:
             self.log.info("Connecting event hub")
             session.event_hub.connect()
 
-        self.session = session
-        if load_files:
-            if not self.handler_paths:
-                self.log.warning((
-                    "Paths to event handlers are not set."
-                    " Ftrack server won't launch."
-                ))
-                self.is_running = False
-                return
+        self._session = session
+        if not self._handler_paths:
+            self.log.warning((
+                "Paths to event handlers are not set."
+                " Ftrack server won't launch."
+            ))
+            self._is_running = False
+            return
 
-            self.set_files(self.handler_paths)
+        self._load_handlers()
 
-            msg = "Registration of event handlers has finished!"
-            self.log.info(len(msg) * "*")
-            self.log.info(msg)
+        msg = "Registration of event handlers has finished!"
+        self.log.info(len(msg) * "*")
+        self.log.info(msg)
 
         # keep event_hub on session running
-        self.session.event_hub.wait()
-        self.is_running = False
+        try:
+            session.event_hub.wait()
+        finally:
+            self._is_running = False
+            self._cached_modules = []
+
+    def _load_handlers(self):
+        register_functions = []
+        handler_classes = []
+
+        # Iterate all paths
+        paths = self._handler_paths
+        for path in paths:
+            # Try to format path with environments
+            try:
+                path = path.format(**os.environ)
+            except BaseException:
+                pass
+
+            # Get all modules with functions
+            modules, crashed = modules_from_path(path)
+            for filepath, exc_info in crashed:
+                self.log.warning("Filepath load crashed {}.\n{}".format(
+                    filepath, "".join(traceback.format_exception(*exc_info))
+                ))
+
+            for filepath, module in modules:
+                self._cached_modules.append(module)
+                register_function = getattr(module, "register", None)
+                if register_function is not None:
+                    if isinstance(register_function, types.FunctionType):
+                        register_functions.append(
+                            (filepath, register_function)
+                        )
+                    else:
+                        self.log.warning(
+                            f"\"{filepath}\""
+                            " - Found 'register' but it is not a function."
+                        )
+                    continue
+
+                for attr_name in dir(module):
+                    if attr_name.startswith("_"):
+                        self.log.debug(
+                            f"Skipping private class '{attr_name}'"
+                        )
+                        continue
+
+                    attr = getattr(module, attr_name, None)
+                    if (
+                        not inspect.isclass(attr)
+                        or not issubclass(attr, BaseHandler)
+                        or attr.ignore_handler_class()
+                    ):
+                        continue
+
+                    if inspect.isabstract(attr):
+                        self.log.warning(
+                            f"Skipping abstract class '{attr_name}'."
+                        )
+                        continue
+                    handler_classes.append(attr)
+
+                if not handler_classes:
+                    self.log.warning(
+                        f"\"{filepath}\""
+                        " - No 'register' function"
+                        " or 'BaseHandler' classes found."
+                    )
+
+        if not register_functions and not handler_classes:
+            self.log.warning((
+                "There are no files with `register` function or 'BaseHandler'"
+                " classes in registered paths:\n- \"{}\""
+            ).format("- \n".join(paths)))
+
+        for filepath, register_func in register_functions:
+            try:
+                register_func(self._session)
+            except Exception:
+                self.log.warning(
+                    f"\"{filepath}\" - register was not successful",
+                    exc_info=True
+                )
+
+        for handler_class in handler_classes:
+            try:
+                obj = handler_class(self._session)
+                obj.register()
+                self._cached_objects.append(obj)
+
+            except Exception:
+                self.log.warning(
+                    f"\"{handler_class}\" - register was not successful",
+                    exc_info=True
+                )

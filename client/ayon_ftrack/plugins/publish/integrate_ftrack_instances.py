@@ -1,18 +1,24 @@
 import os
 import json
 import copy
+
 import pyblish.api
 
-from openpype.pipeline.publish import get_publish_repre_path
-from openpype.lib.openpype_version import get_openpype_version
-from openpype.lib.transcoding import (
+from ayon_core.pipeline.publish import get_publish_repre_path
+from ayon_core.lib.ayon_info import get_ayon_launcher_version
+from ayon_core.lib.transcoding import (
     get_ffprobe_streams,
     convert_ffprobe_fps_to_float,
 )
-from openpype.lib.profiles_filtering import filter_profiles
-from openpype.lib.transcoding import VIDEO_EXTENSIONS
+from ayon_core.lib.profiles_filtering import filter_profiles
+from ayon_core.lib.transcoding import VIDEO_EXTENSIONS, IMAGE_EXTENSIONS
 
+from ayon_ftrack import __version__
 from ayon_ftrack.pipeline import plugin
+from ayon_ftrack.common.constants import (
+    CUST_ATTR_KEY_SERVER_ID,
+    CUST_ATTR_KEY_SERVER_PATH,
+)
 
 
 class IntegrateFtrackInstance(plugin.FtrackPublishInstancePlugin):
@@ -26,7 +32,8 @@ class IntegrateFtrackInstance(plugin.FtrackPublishInstancePlugin):
     families = ["ftrack"]
 
     metadata_keys_to_label = {
-        "openpype_version": "OpenPype version",
+        "ayon_ftrack_version": "AYON ftrack version",
+        "ayon_launcher_version": "AYON launcher version",
         "frame_start": "Frame start",
         "frame_end": "Frame end",
         "duration": "Duration",
@@ -79,17 +86,15 @@ class IntegrateFtrackInstance(plugin.FtrackPublishInstancePlugin):
 
         version_number = int(instance_version)
 
-        family = instance.data["family"]
+        product_type = instance.data["productType"]
 
         # Perform case-insensitive family mapping
-        family_low = family.lower()
+        product_type_low = product_type.lower()
         asset_type = instance.data.get("ftrackFamily")
         if not asset_type:
             for item in self.product_type_mapping:
-                map_family = item["name"]
-                map_value = item["asset_type"]
-                if map_family.lower() == family_low:
-                    asset_type = map_value
+                if item["name"].lower() == product_type_low:
+                    asset_type = item["asset_type"]
                     break
 
         if not asset_type:
@@ -97,23 +102,37 @@ class IntegrateFtrackInstance(plugin.FtrackPublishInstancePlugin):
 
         self.log.debug(
             "Family: {}\nMapping: {}".format(
-                family_low, self.product_type_mapping)
+                product_type_low, self.product_type_mapping)
         )
         status_name = self._get_asset_version_status_name(instance)
 
         # Base of component item data
         # - create a copy of this object when want to use it
+        version_entity = instance.data.get("versionEntity")
+        av_custom_attributes = {}
+        if version_entity:
+            version_path = "/".join([
+                instance.data["folderPath"],
+                instance.data["productName"],
+                "v{:0>3}".format(version_entity["version"])
+            ])
+            av_custom_attributes.update({
+                CUST_ATTR_KEY_SERVER_ID: version_entity["id"],
+                CUST_ATTR_KEY_SERVER_PATH: version_path,
+            })
+
         base_component_item = {
             "assettype_data": {
                 "short": asset_type,
             },
             "asset_data": {
-                "name": instance.data["subset"],
+                "name": instance.data["productName"],
             },
             "assetversion_data": {
                 "version": version_number,
                 "comment": instance.context.data.get("comment") or "",
-                "status_name": status_name
+                "status_name": status_name,
+                "custom_attributes": av_custom_attributes
             },
             "component_overwrite": False,
             # This can be change optionally
@@ -140,11 +159,12 @@ class IntegrateFtrackInstance(plugin.FtrackPublishInstancePlugin):
             self.log.debug("Representation {}".format(repre))
 
             # include only thumbnail representations
+            repre_path = get_publish_repre_path(instance, repre, False)
             if repre.get("thumbnail") or "thumbnail" in repre_tags:
                 thumbnail_representations.append(repre)
 
             # include only review representations
-            elif "ftrackreview" in repre_tags:
+            elif "ftrackreview" in repre_tags and repre_path:
                 review_representations.append(repre)
                 if self._is_repre_video(repre):
                     has_movie_review = True
@@ -185,6 +205,7 @@ class IntegrateFtrackInstance(plugin.FtrackPublishInstancePlugin):
         thumbnail_data_items = []
 
         # Create thumbnail components
+        thumbnail_item = None
         for repre in thumbnail_representations:
             # get repre path from representation
             # and return published_path if available
@@ -240,6 +261,13 @@ class IntegrateFtrackInstance(plugin.FtrackPublishInstancePlugin):
             # Add item to component list
             thumbnail_data_items.append(current_item_data)
 
+        # Filter out image reviews if there is a movie review
+        review_representations = [
+            repre
+            for repre in review_representations
+            if not has_movie_review or self._is_repre_video(repre)
+        ]
+
         # Create review components
         # Change asset name of each new component for review
         multiple_reviewable = len(review_representations) > 1
@@ -250,14 +278,6 @@ class IntegrateFtrackInstance(plugin.FtrackPublishInstancePlugin):
                     "Movie repre has priority from {}".format(repre)
                 )
                 continue
-
-            repre_path = get_publish_repre_path(instance, repre, False)
-            if not repre_path:
-                self.log.warning(
-                    "Published path is not set and source was removed."
-                )
-                continue
-
             # Create copy of base comp item and append it
             review_item = copy.deepcopy(base_component_item)
 
@@ -304,6 +324,7 @@ class IntegrateFtrackInstance(plugin.FtrackPublishInstancePlugin):
             if sync_thumbnail_item_src:
                 component_list.append(copy.deepcopy(sync_thumbnail_item_src))
 
+            repre_path = get_publish_repre_path(instance, repre, False)
             # add metadata to review component
             if self._is_repre_video(repre):
                 component_name = "ftrackreview-mp4"
@@ -346,6 +367,9 @@ class IntegrateFtrackInstance(plugin.FtrackPublishInstancePlugin):
                     os.path.splitext(filename)[0]
                 )
                 component_list.append(origin_name_component)
+
+        if not review_representations and thumbnail_item:
+            component_list.append(thumbnail_item)
 
         # Add others representations as component
         for repre in other_representations:
@@ -514,7 +538,7 @@ class IntegrateFtrackInstance(plugin.FtrackPublishInstancePlugin):
         anatomy_data = instance.data["anatomyData"]
         task_type = anatomy_data.get("task", {}).get("type")
         filtering_criteria = {
-            "product_types": instance.data["family"],
+            "product_types": instance.data["productType"],
             "host_names": instance.context.data["hostName"],
             "task_types": task_type
         }
@@ -530,19 +554,43 @@ class IntegrateFtrackInstance(plugin.FtrackPublishInstancePlugin):
     def _prepare_component_metadata(
         self, instance, repre, component_path, is_review=None
     ):
+        """Return representation file metadata, like width, height, fps.
+
+        This will only return any data for file formats matching a known
+        video or image extension and may pass with only a warning if it
+        was unable to retrieve the metadata from the image of video file.
+
+        Args:
+            instance (pyblish.api.Instance): Pyblish instance.
+            repre (dict[str, Any]): Representation.
+            component_path (str): Path to a representation file.
+            is_review (Optional[bool]): Component is a review component.
+
+        Returns:
+            dict[str, Any]: Component metadata.
+        """
+
         if self._is_repre_video(repre):
             return self._prepare_video_component_metadata(
                 instance, repre, component_path, is_review
             )
-        return self._prepare_image_component_metadata(repre, component_path)
+        if self._is_repre_image(repre):
+            return self._prepare_image_component_metadata(
+                repre, component_path
+            )
+        return {}
 
     def _prepare_video_component_metadata(
         self, instance, repre, component_path, is_review=None
     ):
         metadata = {}
-        if "openpype_version" in self.additional_metadata_keys:
-            label = self.metadata_keys_to_label["openpype_version"]
-            metadata[label] = get_openpype_version()
+        for key, value in (
+            ("ayon_ftrack_version", __version__),
+            ("ayon_launcher_version", get_ayon_launcher_version()),
+        ):
+            if key in self.additional_metadata_keys:
+                label = self.metadata_keys_to_label[key]
+                metadata[label] = value
 
         extension = os.path.splitext(component_path)[-1]
         streams = []
@@ -559,10 +607,10 @@ class IntegrateFtrackInstance(plugin.FtrackPublishInstancePlugin):
             for stream in streams
             if stream["codec_type"] == "video"
         ]
-        # Skip if there are not video streams
+        # Skip if there are no video streams
         #   - exr is special case which can have issues with reading through
-        #       ffmpegh but we want to set fps for it
-        if not video_streams and extension not in [".exr"]:
+        #       ffmpeg, but we want to set fps for it
+        if not video_streams and extension != ".exr":
             return metadata
 
         stream_width = None
@@ -702,3 +750,7 @@ class IntegrateFtrackInstance(plugin.FtrackPublishInstancePlugin):
     def _is_repre_video(self, repre):
         repre_ext = ".{}".format(repre["ext"])
         return repre_ext in VIDEO_EXTENSIONS
+
+    def _is_repre_image(self, repre):
+        repre_ext = ".{}".format(repre["ext"])
+        return repre_ext in IMAGE_EXTENSIONS

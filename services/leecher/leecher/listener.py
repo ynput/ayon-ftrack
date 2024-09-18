@@ -4,7 +4,7 @@ import signal
 import logging
 import threading
 import traceback
-from typing import Any, Union
+from typing import Any
 
 import ftrack_api
 import ayon_api
@@ -176,8 +176,11 @@ def main_loop():
 
 
 def main():
-    logging.basicConfig(level=logging.INFO)
-
+    logging.basicConfig(
+        format="%(asctime)s %(levelname)-8s %(message)s",
+        level=logging.INFO,
+        datefmt="%Y-%m-%d %H:%M:%S"
+    )
     try:
         ayon_api.init_service()
         connected = True

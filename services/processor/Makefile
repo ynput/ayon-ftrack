@@ -1,5 +1,5 @@
 include .env
-VERSION=$(shell python -c "import os;import sys;content={};f=open('$(CURDIR)/../../version.py');exec(f.read(),content);f.close();print(content['__version__'])")
+VERSION=$(shell python -c "import os;import sys;content={};f=open('$(CURDIR)/../../package.py');exec(f.read(),content);f.close();print(content['version'])")
 BASE_NAME := ayon-ftrack-processor
 IMAGE := ynput/$(BASE_NAME):$(VERSION)
 BASH_CONTAINER_NAME := $(BASE_NAME)-bash-$(VERSION)

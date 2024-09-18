@@ -550,7 +550,3 @@ class PushHierValuesToNonHier(ServerAction):
                             session.commit()
 
         session.commit()
-
-
-def register(session):
-    PushHierValuesToNonHier(session).register()

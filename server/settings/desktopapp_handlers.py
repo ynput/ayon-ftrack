@@ -1,13 +1,17 @@
-from pydantic import Field, validator
+from pydantic import validator
 
-from ayon_server.settings import BaseSettingsModel, ensure_unique_names
+from ayon_server.settings import (
+    BaseSettingsModel,
+    SettingsField,
+    ensure_unique_names,
+)
 
 from .common import DictWithStrList, ROLES_TITLE
 
 
 class SimpleAction(BaseSettingsModel):
     enabled: bool = True
-    role_list: list[str] = Field(
+    role_list: list[str] = SettingsField(
         title=ROLES_TITLE,
         default_factory=list,
     )
@@ -19,11 +23,11 @@ class ApplicationLaunchStatuses(BaseSettingsModel):
     Change task's status to left side if current task status is in list on right side
     """
     enabled: bool = True
-    ignored_statuses: list[str] = Field(
+    ignored_statuses: list[str] = SettingsField(
         default_factory=list,
         title="Do not change status if current status is",
     )
-    status_change: list[DictWithStrList] = Field(
+    status_change: list[DictWithStrList] = SettingsField(
         title="Status change",
         default_factory=list,
     )
@@ -37,14 +41,14 @@ class ApplicationLaunchStatuses(BaseSettingsModel):
 
 
 class CreateUpdateCustomAttributesAction(BaseSettingsModel):
-    role_list: list[str] = Field(
+    role_list: list[str] = SettingsField(
         title=ROLES_TITLE,
         default_factory=list,
     )
 
 
 class PrepareProjectAction(SimpleAction):
-    create_project_structure_checked: bool = Field(
+    create_project_structure_checked: bool = SettingsField(
         True,
         description="Check \"Create project structure\" by default",
         title="Create project structure",
@@ -53,7 +57,7 @@ class PrepareProjectAction(SimpleAction):
 
 class FillWorkfileAttr(BaseSettingsModel):
     enabled: bool = True
-    custom_attribute_key: str = Field(
+    custom_attribute_key: str = SettingsField(
         "",
         title="Custom attribute key",
         description=(
@@ -61,7 +65,7 @@ class FillWorkfileAttr(BaseSettingsModel):
             " type added to <b>Task</b> entity type"
         ),
     )
-    role_list: list[str] = Field(
+    role_list: list[str] = SettingsField(
         title=ROLES_TITLE,
         default_factory=list,
     )
@@ -70,38 +74,36 @@ class FillWorkfileAttr(BaseSettingsModel):
 class FtrackDesktopAppHandlers(BaseSettingsModel):
     """Settings for event handlers running in ftrack service."""
 
-    create_update_attributes: CreateUpdateCustomAttributesAction = Field(
-        title="Create/Update Custom Attributes",
-        default_factory=CreateUpdateCustomAttributesAction,
+    create_update_attributes: CreateUpdateCustomAttributesAction = (
+        SettingsField(
+            title="Create/Update Custom Attributes",
+            default_factory=CreateUpdateCustomAttributesAction,
+        )
     )
-    prepare_project: PrepareProjectAction = Field(
+    prepare_project: PrepareProjectAction = SettingsField(
         title="Prepare Project",
         default_factory=PrepareProjectAction,
     )
-    clean_hierarchical_attr: SimpleAction = Field(
+    clean_hierarchical_attr: SimpleAction = SettingsField(
         title="Clean hierarchical custom attributes",
         default_factory=SimpleAction
     )
-    delete_old_versions: SimpleAction = Field(
+    delete_old_versions: SimpleAction = SettingsField(
         title="Delete old versions",
         default_factory=SimpleAction,
     )
-    delivery_action: SimpleAction = Field(
+    delivery_action: SimpleAction = SettingsField(
         title="Delivery action",
         default_factory=SimpleAction,
     )
-    job_killer: SimpleAction = Field(
+    job_killer: SimpleAction = SettingsField(
         title="Job Killer",
         default_factory=SimpleAction,
     )
-    fill_workfile_attribute: FillWorkfileAttr = Field(
+    fill_workfile_attribute: FillWorkfileAttr = SettingsField(
         title="Fill workfile Custom attribute",
         default_factory=FillWorkfileAttr,
     )
-    # Removed settings
-    # - seed_project
-    # - sync_to_avalon_local
-    # - store_thubmnail_to_avalon
 
 
 DEFAULT_DESKTOP_HANDLERS_SETTINGS = {
