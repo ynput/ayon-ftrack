@@ -25,14 +25,14 @@ import webbrowser
 from ayon_core.pipeline import LauncherAction
 from ayon_core.addon import AddonsManager
 
+from ayon_ftrack.resources import get_resource
 from ayon_ftrack.common import is_ftrack_enabled_in_settings, FTRACK_ID_ATTRIB
 
 
 class ShowInFtrack(LauncherAction):
     name = "showinftrack"
     label = "Show in ftrack"
-    icon = "external-link-square"
-    color = "#e0e1e1"
+    icon = get_resource("ftrack_icon.png")
     order = 10
 
     @staticmethod
