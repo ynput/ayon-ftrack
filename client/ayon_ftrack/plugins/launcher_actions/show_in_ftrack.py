@@ -26,7 +26,7 @@ from ayon_core.pipeline import LauncherAction
 from ayon_core.addon import AddonsManager
 from ayon_api import get_project, get_folder_by_path
 
-from ayon_ftrack.common import is_ftrack_enabled_in_settings
+from ayon_ftrack.common import is_ftrack_enabled_in_settings, FTRACK_ID_ATTRIB
 
 
 class ShowInFtrack(LauncherAction):
@@ -56,7 +56,7 @@ class ShowInFtrack(LauncherAction):
         if not project_entity:
             raise ValueError(f"Project {project_name} not found.")
 
-        project_ftrack_id = project_entity["attrib"].get("ftrackId")
+        project_ftrack_id = project_entity["attrib"].get(FTRACK_ID_ATTRIB)
         if not project_ftrack_id:
             raise RuntimeError(
                 f"Project {project_name} has no connected ftrack id.")
@@ -64,7 +64,7 @@ class ShowInFtrack(LauncherAction):
         entity_ftrack_id = None
         folder_entity = selection.get_folder_entity()
         if folder_entity:
-            entity_ftrack_id = folder_entity["attrib"].get("ftrackId")
+            entity_ftrack_id = folder_entity["attrib"].get(FTRACK_ID_ATTRIB)
 
         # TODO: implement task entity support?
 
