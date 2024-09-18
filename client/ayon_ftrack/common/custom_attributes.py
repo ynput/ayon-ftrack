@@ -18,7 +18,7 @@ def get_ayon_attr_configs(session, query_keys=None, split_hierarchical=True):
             into 2 lists if enabled.
 
     Returns:
-        Union[List[Any], Tuple[List[Any], List[Any]]: Ftrack custom attributes.
+        Union[List[Any], Tuple[List[Any], List[Any]]: ftrack custom attributes.
     """
 
     custom_attributes = []

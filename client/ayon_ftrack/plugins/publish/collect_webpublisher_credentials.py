@@ -1,4 +1,4 @@
-"""Translates uploader's user email to Ftrack username.
+"""Translates uploader's user email to ftrack username.
 
 Should run before 'CollectAnatomyContextData' so the user on context is
 changed before it's stored to context anatomy data or instance anatomy data.
@@ -24,10 +24,10 @@ from ayon_ftrack.pipeline import plugin
 
 class CollectWebpublisherCredentials(plugin.FtrackPublishContextPlugin):
     """
-        Translates uploader's user email to Ftrack username.
+        Translates uploader's user email to ftrack username.
 
-    It expects that user email in Ftrack is same as user email in Ayon server,
-    Ftrack username is needed to load data to Ftrack.
+    It expects that user email in ftrack is same as user email in Ayon server,
+    ftrack username is needed to load data to ftrack.
 
     Resets `context.data["user"] to correctly populate `version.author` and
     `representation.context.username`
@@ -54,7 +54,7 @@ class CollectWebpublisherCredentials(plugin.FtrackPublishContextPlugin):
         os.environ["FTRACK_API_USER"] = username
 
     def _get_ftrack_username(self, user_email):
-        """Queries Ftrack api for user with 'user_email'.
+        """Queries ftrack api for user with 'user_email'.
 
         Raises:
             ValueError: if user not found
@@ -71,7 +71,7 @@ class CollectWebpublisherCredentials(plugin.FtrackPublishContextPlugin):
         return username
 
     def _get_user_email(self, context):
-        """Collect uploader's email address to lookup user in Ftrack"""
+        """Collect uploader's email address to lookup user in ftrack"""
         # for publishes with studio processing
         user_email = os.environ.get("USER_EMAIL")
         self.log.debug("Email from env:: {}".format(user_email))

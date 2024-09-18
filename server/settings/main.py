@@ -26,7 +26,7 @@ from .custom_attributes import (
 
 
 class FtrackServiceSettings(BaseSettingsModel):
-    """Ftrack service cares about handling ftrack event and synchronization.
+    """ftrack service cares about handling ftrack event and synchronization.
 
     To be able do that work it is required to listen and process events as one
     of ftrack users. It is recommended to use special user for that purposes
@@ -35,11 +35,11 @@ class FtrackServiceSettings(BaseSettingsModel):
 
     username: str = SettingsField(
         enum_resolver=secrets_enum,
-        title="Ftrack user name"
+        title="ftrack user name"
     )
     api_key: str = SettingsField(
         enum_resolver=secrets_enum,
-        title="Ftrack API key"
+        title="ftrack API key"
     )
 
 
@@ -70,12 +70,12 @@ class PostLaunchHookSettings(BaseSettingsModel):
 
 
 class FtrackSettings(BaseSettingsModel):
-    """Ftrack addon settings."""
+    """ftrack addon settings."""
 
     enabled: bool = SettingsField(True)
     ftrack_server: str = SettingsField(
         "",
-        title="Ftrack server url",
+        title="ftrack server url",
         scope=["studio"],
     )
     service_settings: FtrackServiceSettings = SettingsField(

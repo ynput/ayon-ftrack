@@ -24,7 +24,7 @@ class CollectFtrackCustomAttributeData(plugin.FtrackPublishContextPlugin):
     """
 
     order = pyblish.api.CollectorOrder + 0.4992
-    label = "Collect Ftrack Custom Attribute Data"
+    label = "Collect ftrack Custom Attribute Data"
 
     # Name of custom attributes for which will be look for
     custom_attribute_keys = []
@@ -59,7 +59,7 @@ class CollectFtrackCustomAttributeData(plugin.FtrackPublishContextPlugin):
             instances_by_entity_id[entity_id].append(instance)
 
         if not ftrack_entities_by_id:
-            self.log.info("Ftrack entities are not set. Skipping")
+            self.log.info("ftrack entities are not set. Skipping")
             return
 
         session = context.data["ftrackSession"]

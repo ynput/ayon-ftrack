@@ -212,7 +212,7 @@ class CreateFolders(LocalAction):
         """
 
         Args:
-            session (ftrack_api.session.Session): Ftrack session.
+            session (ftrack_api.session.Session): ftrack session.
             entities (list[ftrack_api.entity.base.Entity]): List of entities.
 
         Returns:
@@ -258,7 +258,7 @@ class CreateFolders(LocalAction):
         """
 
         Args:
-            session (ftrack_api.session.Session): Ftrack session.
+            session (ftrack_api.session.Session): ftrack session.
             task_entities (list[ftrack_api.entity.base.Entity]): List of task
                 entities.
             other_entities (list[ftrack_api.entity.base.Entity]): List of

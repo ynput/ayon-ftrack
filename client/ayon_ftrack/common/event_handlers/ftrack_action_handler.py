@@ -184,7 +184,7 @@ class BaseAction(BaseHandler):
             session (ftrack_api.Session): Session which triggered callback of
                 the event.
             entities (List[Any]): Prepared list of entities from event data.
-            event (ftrack_api.Event): Ftrack event which caused this callback
+            event (ftrack_api.Event): ftrack event which caused this callback
                 is triggered.
 
         Returns:
@@ -206,7 +206,7 @@ class BaseAction(BaseHandler):
                 be removed in the future.
 
         Args:
-            session (ftrack_api.Session): Ftrack sesison.
+            session (ftrack_api.Session): ftrack session.
             event (ftrack_api.Event): Event which triggered launch of this
                 action.
 
@@ -304,7 +304,7 @@ class BaseAction(BaseHandler):
         Args:
             session (ftrack_api.Session): Session which queried entities.
             entities (List[Any]): Prequeried entities based on event data.
-            event (ftrack_api.Event): Ftrack event to process.
+            event (ftrack_api.Event): ftrack event to process.
 
         Returns:
             Union[bool, Dict[str, Any]]: True or false for success or fail,
@@ -518,7 +518,7 @@ class BaseAction(BaseHandler):
         Args:
             session (ftrack_api.Session): Current session.
             event (ftrack_api.Event): Processed event by session.
-            entities (List[Any]): Ftrack entities of selection.
+            entities (List[Any]): ftrack entities of selection.
 
         Returns:
             Optional[str]: Project name from event data.

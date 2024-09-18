@@ -1,5 +1,5 @@
 """
-Example Ftrack URL:
+Example ftrack URL:
 
 https://<server name>.ftrackapp.com/#slideEntityId=38c5fec4-0aed-11ea-a454-3e41ec9bc0d6&slideEntityType=show&view=tasks&itemId=projects&entityId=38c5fec4-0aed-11ea-a454-3e41ec9bc0d6&entityType=show
 

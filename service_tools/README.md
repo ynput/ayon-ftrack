@@ -15,7 +15,7 @@ AYON_API_KEY={AYON server api key (ideally service user)}
 - `services` - start both leecher and processor services (experimental)
 
 ### Leecher 
-Ftrack leecher postpone ftrack events into Ayon event database. Is separated from processor to be able restart or have different ftrack processors for different purposes loading events from single place. Using Ayon server as middle-ware helps to know which event was already processed or is processing. In theory one event should not be processed multiple times. 
+Leecher postpone ftrack events into Ayon event database. Is separated from processor to be able restart or have different ftrack processors for different purposes loading events from single place. Using Ayon server as middle-ware helps to know which event was already processed or is processing. In theory one event should not be processed multiple times. 
 
 ### Processor
 Processor of ftrack events. Is not loading events from ftrack but from Ayon database. Can get only one ftrack event at once and if there is other running processor processing events under same identifier it won't continue to process next events until that is finished. That is due to race condition issues that may happen. Processor requires to have running **leecher**.

@@ -439,7 +439,7 @@ class Delivery(LocalAction):
 
         Args:
             project_name (str): Project name.
-            session (ftrack_api.Session): Ftrack session.
+            session (ftrack_api.Session): ftrack session.
             entities (list[ftrack_api.entity.base.Entity]): List of entities.
 
         Returns:
@@ -467,7 +467,7 @@ class Delivery(LocalAction):
     
         Args:
             project_name (str): Project name.
-            session (ftrack_api.Session): Ftrack session.
+            session (ftrack_api.Session): ftrack session.
             entities (list[ftrack_api.entity.base.Entity]): List of entities.
 
         Returns:
@@ -562,7 +562,7 @@ class Delivery(LocalAction):
 
         Args:
             project_name (str): Project name.
-            session (ftrack_api.Session): Ftrack session.
+            session (ftrack_api.Session): ftrack session.
             parent_ids (set[str]): Set of ftrack ids parents to Asset.
 
         Returns:
@@ -645,9 +645,9 @@ class Delivery(LocalAction):
             folders_by_ftrack_id (dict[str, dict[str, Any]]): Folder entities
                 by ftrack id.
             product_names (set[str]): Set of product names.
-            asset_versions (list[dict[str, Any]]): Ftrack AssetVersion
+            asset_versions (list[dict[str, Any]]): ftrack AssetVersion
                 entities.
-            assets_by_id (dict[str, dict[str, Any]]): Ftrack Asset entities
+            assets_by_id (dict[str, dict[str, Any]]): ftrack Asset entities
                 by id.
 
         Returns:
@@ -710,9 +710,9 @@ class Delivery(LocalAction):
                 by ftrack id.
             product_entities (list[dict[str, Any]]): Product entities.
             version_nums (set[str]): Set of version numbers.
-            asset_versions (list[dict[str, Any]]): Ftrack AssetVersion
+            asset_versions (list[dict[str, Any]]): ftrack AssetVersion
                 entities.
-            assets_by_id (dict[str, dict[str, Any]]): Ftrack Asset entities
+            assets_by_id (dict[str, dict[str, Any]]): ftrack Asset entities
                 by id.
 
         Returns:

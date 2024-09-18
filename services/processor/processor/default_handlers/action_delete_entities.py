@@ -63,9 +63,9 @@ class DeleteEntitiesAction(ServerAction):
         """
 
         Args:
-            session (ftrack_api.Session): Ftrack session processing event.
+            session (ftrack_api.Session): ftrack session processing event.
             entities (list[ftrack_api.entity.base.Entity]): List of entities
-                selected in Ftrack.
+                selected in ftrack.
             event (ftrack_api.event.base.Event): Event data.
 
         Returns:
@@ -131,7 +131,7 @@ class DeleteEntitiesAction(ServerAction):
         """Take event values and convert them to hidden items.
 
         Args:
-            values (dict[str, Any]): Ftrack event values.
+            values (dict[str, Any]): ftrack event values.
 
         Returns:
             list[dict[str, Any]]: List of hidden items.
@@ -254,7 +254,7 @@ class DeleteEntitiesAction(ServerAction):
 
         Args:
             entities (list[ftrack_api.entity.base.Entity]): List of entities
-                selected in Ftrack.
+                selected in ftrack.
             event (ftrack_api.event.base.Event): Event data.
 
         Returns:
@@ -294,9 +294,9 @@ class DeleteEntitiesAction(ServerAction):
         """Get folders from selection.
 
         Args:
-            session (ftrack_api.Session): Ftrack session processing event.
+            session (ftrack_api.Session): ftrack session processing event.
             entities (list[ftrack_api.entity.base.Entity]): List of entities
-                selected in Ftrack.
+                selected in ftrack.
             ftrack_ids (set[str]): Selected ftrack ids.
 
         Returns:
@@ -363,9 +363,9 @@ class DeleteEntitiesAction(ServerAction):
         """Interface for folder entities.
 
         Args:
-            session (ftrack_api.Session): Ftrack session processing event.
+            session (ftrack_api.Session): ftrack session processing event.
             entities (list[ftrack_api.entity.base.Entity]): List of entities
-                selected in Ftrack.
+                selected in ftrack.
             event (ftrack_api.event.base.Event): Event data.
             ftrack_ids (set[str]): Selected ftrack ids.
 
@@ -396,9 +396,9 @@ class DeleteEntitiesAction(ServerAction):
         """
 
         Args:
-            session (ftrack_api.Session): Ftrack session processing event.
+            session (ftrack_api.Session): ftrack session processing event.
             entities (list[ftrack_api.entity.base.Entity]): List of entities
-                selected in Ftrack.
+                selected in ftrack.
             event (ftrack_api.event.base.Event): Event data.
             ftrack_ids (set[str]): Selected ftrack ids.
 
@@ -475,9 +475,9 @@ class DeleteEntitiesAction(ServerAction):
         """Interface for product entities.
 
         Args:
-            session (ftrack_api.Session): Ftrack session processing event.
+            session (ftrack_api.Session): ftrack session processing event.
             entities (list[ftrack_api.entity.base.Entity]): List of entities
-                selected in Ftrack.
+                selected in ftrack.
             event (ftrack_api.event.base.Event): Event data.
         """
 
@@ -529,9 +529,9 @@ class DeleteEntitiesAction(ServerAction):
             or products.
 
         Args:
-            session (ftrack_api.Session): Ftrack session processing event.
+            session (ftrack_api.Session): ftrack session processing event.
             entities (list[ftrack_api.entity.base.Entity]): List of entities
-                selected in Ftrack.
+                selected in ftrack.
             event (ftrack_api.event.base.Event): Event data.
 
         Returns:
@@ -565,7 +565,7 @@ class DeleteEntitiesAction(ServerAction):
                 {
                     "type": "label",
                     "value": (
-                        "This action will delete entities from Ftrack"
+                        "This action will delete entities from ftrack"
                         " and archive or delete them from AYON."
                         "<br/><br/>NOTE: Does not remove files on disk."
                     )
@@ -631,7 +631,7 @@ class DeleteEntitiesAction(ServerAction):
         """Query ftrack hierarchy entities with all children.
 
         Args:
-            session (ftrack_api.Session): Ftrack session processing event.
+            session (ftrack_api.Session): ftrack session processing event.
             ftrack_ids (set[str]): Selected ftrack ids.
             fields (Optional[Iterable[str]]): Fields to query.
 
@@ -767,9 +767,9 @@ class DeleteEntitiesAction(ServerAction):
         """Delete folders in AYON and ftrack.
 
         Args:
-            session (ftrack_api.Session): Ftrack session processing event.
+            session (ftrack_api.Session): ftrack session processing event.
             entities (list[ftrack_api.entity.base.Entity]): List of entities
-                selected in Ftrack.
+                selected in ftrack.
             event (ftrack_api.event.base.Event): Event data.
             ftrack_ids (set[str]): Selected ftrack ids.
         """
@@ -875,9 +875,9 @@ class DeleteEntitiesAction(ServerAction):
         """Delete or archive products in AYON and ftrack.
 
         Args:
-            session (ftrack_api.Session): Ftrack session processing event.
+            session (ftrack_api.Session): ftrack session processing event.
             entities (list[ftrack_api.entity.base.Entity]): List of entities
-                selected in Ftrack.
+                selected in ftrack.
             event (ftrack_api.event.base.Event): Event data.
             ftrack_ids (set[str]): Selected ftrack ids.
         """

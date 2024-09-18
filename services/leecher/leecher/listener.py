@@ -92,7 +92,7 @@ def _create_session():
 
     if not username or not api_key:
         return (
-            "Missing Ftrack Username or Ftrack API in settings."
+            "Missing ftrack Username or ftrack API in settings."
             f" Please check your settings of {get_service_label()}."
         )
 
@@ -111,7 +111,7 @@ def create_session():
         error_message = _create_session()
     except ftrack_api.exception.ServerError:
         error_message = (
-            "Ftrack Username or ftrack API in settings are not valid."
+            "ftrack Username or ftrack API in settings are not valid."
             f" Please check your settings of {get_service_label()}."
         )
     except Exception:

@@ -29,7 +29,7 @@ class FtrackServer:
     custom base classes in the files.
     """
     def __init__(self, handler_paths=None):
-        # set Ftrack logging to Warning only - OPTIONAL
+        # set ftrack logging to Warning only - OPTIONAL
         ftrack_log = logging.getLogger("ftrack_api")
         ftrack_log.setLevel(logging.WARNING)
 
@@ -88,7 +88,7 @@ class FtrackServer:
             while not session.event_hub.connected:
                 if (time.time() - started) > timeout:
                     raise RuntimeError((
-                        "Connection to Ftrack was not created in {} seconds"
+                        "Connection to ftrack was not created in {} seconds"
                     ).format(timeout))
                 time.sleep(0.1)
 
@@ -100,7 +100,7 @@ class FtrackServer:
         if not self._handler_paths:
             self.log.warning((
                 "Paths to event handlers are not set."
-                " Ftrack server won't launch."
+                " ftrack server won't launch."
             ))
             self._is_running = False
             return

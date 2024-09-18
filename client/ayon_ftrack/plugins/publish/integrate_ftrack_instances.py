@@ -28,7 +28,7 @@ class IntegrateFtrackInstance(plugin.FtrackPublishInstancePlugin):
     """
 
     order = pyblish.api.IntegratorOrder + 0.48
-    label = "Integrate Ftrack Component"
+    label = "Integrate ftrack Component"
     families = ["ftrack"]
 
     metadata_keys_to_label = {
@@ -707,7 +707,7 @@ class IntegrateFtrackInstance(plugin.FtrackPublishInstancePlugin):
         if not frame_out:
             frame_out = duration
 
-        # Ftrack documentation says that it is required to have
+        # ftrack documentation says that it is required to have
         #   'width' and 'height' in review component. But with those values
         #   review video does not play.
         metadata["ftr_meta"] = json.dumps({

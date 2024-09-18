@@ -496,7 +496,7 @@ class SyncToAvalonEvent(BaseEventHandler):
         self.ftrack_removed = {}
 
         # set of ftrack ids with modified tasks
-        # handled separately by full wipeout and replace from FTrack
+        # handled separately by full wipeout and replace from ftrack
         self.modified_tasks_ftrackids = set()
 
         self.moved_in_avalon = []
@@ -574,11 +574,11 @@ class SyncToAvalonEvent(BaseEventHandler):
 
     def get_ent_path(self, ftrack_id):
         """
-            Looks for entity in FTrack with 'ftrack_id'. If found returns
+            Looks for entity in ftrack with 'ftrack_id'. If found returns
             concatenated paths from its 'link' elemenent's names. Describes
             location of entity in tree.
         Args:
-            ftrack_id (string): entityId of FTrack entity
+            ftrack_id (string): entityId of ftrack entity
 
         Returns:
             (string) - example : "/test_project/assets/my_asset"
@@ -602,9 +602,9 @@ class SyncToAvalonEvent(BaseEventHandler):
             Goes through event (can contain multiple changes) and decides if
             the event is interesting for us (interest_entTypes).
             It separates changes into add|remove|update.
-            All task changes are handled together by refresh from Ftrack.
+            All task changes are handled together by refresh from ftrack.
         Args:
-            session (object): session to Ftrack
+            session (object): session to ftrack
             event (dictionary): event content
 
         Returns:
@@ -983,7 +983,7 @@ class SyncToAvalonEvent(BaseEventHandler):
                     ent_path_items.append(avalon_entity["name"])
                     ent_path = "/".join(ent_path_items)
 
-                    error_msg = "Couldn't recreate entity in Ftrack"
+                    error_msg = "Couldn't recreate entity in ftrack"
                     report_msg = (
                         "{}||Trying to recreate because it or its children"
                         " contain published data"
@@ -1021,7 +1021,7 @@ class SyncToAvalonEvent(BaseEventHandler):
                     self.process_session.rolback()
                     error_msg = (
                         "Couldn't update custom attributes after recreation"
-                        " of entity in Ftrack"
+                        " of entity in ftrack"
                     )
                     report_msg = (
                         "{}||Entity was recreated because it or its children"
@@ -1695,7 +1695,7 @@ class SyncToAvalonEvent(BaseEventHandler):
             # TODO logging
             msg = (
                 "Could not set value of Custom attribute, where mongo id"
-                " is stored, to empty string. Ftrack ids: \"{}\""
+                " is stored, to empty string. ftrack ids: \"{}\""
             ).format(", ".join(ent_infos.keys()))
             self.log.warning(msg, exc_info=True)
 
@@ -1941,7 +1941,7 @@ class SyncToAvalonEvent(BaseEventHandler):
                 obj_type_id = ent_info["objectTypeId"]
                 ent_cust_attrs = cust_attrs_by_obj_id.get(obj_type_id)
 
-            # Ftrack's entity_type does not have defined custom attributes
+            # ftrack's entity_type does not have defined custom attributes
             if ent_cust_attrs is None:
                 ent_cust_attrs = {}
 

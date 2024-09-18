@@ -90,7 +90,7 @@ class FtrackTrayWrapper:
             cred.get("username"), cred.get("api_key")
         )
         if not validation:
-            self.log.info("Please sign in to Ftrack")
+            self.log.info("Please sign in to ftrack")
             self.bool_logged = False
             self.show_login_widget()
             self.set_menu_visibility()
@@ -102,13 +102,13 @@ class FtrackTrayWrapper:
         if validation:
             self.widget_login.set_credentials(username, api_key)
             self._addon.set_credentials_to_env(username, api_key)
-            self.log.info("Connected to Ftrack successfully")
+            self.log.info("Connected to ftrack successfully")
             self.on_login_change()
 
         if not validation and username and api_key:
             server = self._addon.get_ftrack_url()
             self.log.warning(
-                f"Current Ftrack credentials are not valid. {server}:"
+                f"Current ftrack credentials are not valid. {server}:"
                 f" {username} - {api_key}"
             )
 
@@ -136,7 +136,7 @@ class FtrackTrayWrapper:
             self.action_credentials.setIcon(self.icon_not_logged)
             self.action_credentials.setToolTip("Logged out")
 
-        self.log.info("Logged out of Ftrack")
+        self.log.info("Logged out of ftrack")
         self.bool_logged = False
         self.set_menu_visibility()
 
@@ -185,15 +185,15 @@ class FtrackTrayWrapper:
                 self.log.debug("Action server was pushed to stop.")
                 break
 
-            # Check if accessible Ftrack and Mongo url
+            # Check if accessible ftrack
             if not ftrack_accessible:
                 ftrack_accessible = resolve_ftrack_url(ftrack_url)
 
-            # Run threads only if Ftrack is accessible
+            # Run threads only if ftrack is accessible
             if not ftrack_accessible:
                 if not printed_ftrack_error:
                     self.log.warning(
-                        "Can't access Ftrack {}".format(ftrack_url)
+                        "Can't access ftrack {}".format(ftrack_url)
                     )
 
                 if self.thread_socket_server is not None:
@@ -237,7 +237,7 @@ class FtrackTrayWrapper:
                 ).seconds > wait_time_after_max_fail):
                     failed_count = 0
 
-            # If thread failed test Ftrack and Mongo connection
+            # If thread failed test ftrack
             elif not self.thread_socket_server.is_alive():
                 self.thread_socket_server.join()
                 self.thread_socket_server = None
@@ -276,7 +276,7 @@ class FtrackTrayWrapper:
                 self.thread_action_server.join()
                 self.thread_action_server = None
 
-            self.log.info("Ftrack action server was forced to stop")
+            self.log.info("ftrack action server was forced to stop")
 
         except Exception:
             self.log.warning(
@@ -287,7 +287,7 @@ class FtrackTrayWrapper:
     # Definition of Tray menu
     def tray_menu(self, parent_menu):
         # Menu for Tray App
-        tray_menu = QtWidgets.QMenu("Ftrack", parent_menu)
+        tray_menu = QtWidgets.QMenu("ftrack", parent_menu)
 
         # Actions - basic
         action_credentials = QtWidgets.QAction("Credentials", tray_menu)
@@ -323,8 +323,8 @@ class FtrackTrayWrapper:
 
         self.tray_server_menu = tray_server_menu
 
-        # Ftrack Browser
-        browser_open = QtWidgets.QAction("Open Ftrack...", tray_menu)
+        # ftrack Browser
+        browser_open = QtWidgets.QAction("Open ftrack...", tray_menu)
         browser_open.triggered.connect(self.show_ftrack_browser)
         tray_menu.addAction(browser_open)
         self.browser_open = browser_open

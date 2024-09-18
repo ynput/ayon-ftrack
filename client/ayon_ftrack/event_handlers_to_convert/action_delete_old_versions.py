@@ -387,7 +387,7 @@ class DeleteOldVersions(LocalAction):
             ftrack_asset = ftrack_assets_by_name.get(product_name)
             if not ftrack_asset:
                 self.log.warning((
-                    "Could not find Ftrack asset with name `{}`"
+                    "Could not find ftrack asset with name `{}`"
                 ).format(product_name))
                 continue
 

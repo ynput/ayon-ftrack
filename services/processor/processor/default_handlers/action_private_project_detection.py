@@ -39,7 +39,7 @@ class PrivateProjectDetectionAction(ServerAction):
 
         title = "# Private project (missing permissions) #"
         msg = (
-            "User ({}) or API Key used on Ftrack event server"
+            "User ({}) or API Key used on ftrack event server"
             " does not have permissions to access this private project."
         ).format(self.session.api_user)
         return {

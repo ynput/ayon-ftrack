@@ -317,7 +317,7 @@ class PrepareProjectServer(ServerAction):
         """
 
         Args:
-            session (ftrack_api.Session): Ftrack session.
+            session (ftrack_api.Session): ftrack session.
             event (ftrack_api.event.base.Event): Event entity.
             project_entity (ftrack_api.entity.base.Entity): Project entity.
 
@@ -366,7 +366,7 @@ class PrepareProjectServer(ServerAction):
         """
 
         Args:
-            session (ftrack_api.Session): Ftrack session.
+            session (ftrack_api.Session): ftrack session.
             event (ftrack_api.event.base.Event): Event entity.
             project_entity (ftrack_api.entity.base.Entity): Project entity.
 

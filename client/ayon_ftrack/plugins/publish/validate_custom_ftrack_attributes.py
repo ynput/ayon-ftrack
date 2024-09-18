@@ -31,12 +31,12 @@ class ValidateFtrackAttributes(plugin.FtrackPublishInstancePlugin):
     variable `out` in your expression.
     """
 
-    label = "Validate Custom Ftrack Attributes"
+    label = "Validate Custom ftrack Attributes"
     order = ValidateContentsOrder
     families = ["ftrack"]
     optional = True
 
-    # Ignore standalone host, because it does not have an Ftrack entity
+    # Ignore standalone host, because it does not have an ftrack entity
     # associated.
     hosts = [
         "blender",
@@ -57,7 +57,7 @@ class ValidateFtrackAttributes(plugin.FtrackPublishInstancePlugin):
         task = context.data.get('ftrackTask', False)
         if not task:
             self._raise(AttributeError,
-                        "Missing FTrack Task entity in context")
+                        "Missing ftrack Task entity in context")
 
         host = pyblish.api.current_host()
         to_check = self.ftrack_custom_attributes.get(host, {})

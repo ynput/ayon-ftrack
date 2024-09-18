@@ -9,7 +9,7 @@ This action creates/updates custom attributes.
 File location: `./common/custom_attributes.json`
 
 Data in json file is nested dictionary. Keys in first dictionary level
-represents Ftrack entity type (task, show, assetversion, user, list, asset)
+represents ftrack entity type (task, show, assetversion, user, list, asset)
 and dictionary value define attribute.
 
 There is special key for hierchical attributes `is_hierarchical`.
@@ -224,7 +224,7 @@ class CreateUpdateContext:
             for role_name in set(security_roles_lowered):
                 if role_name not in self._security_roles:
                     raise CustAttrException((
-                        "Securit role \"{}\" was not found in Ftrack."
+                        "Securit role \"{}\" was not found in ftrack."
                     ).format(role_name))
                 output.append(self._security_roles[role_name])
         return output

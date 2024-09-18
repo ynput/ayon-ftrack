@@ -24,7 +24,7 @@ def is_ftrack_enabled_in_settings(project_settings):
     server handlers.
 
     Args:
-        project_settings (dict[str, Any]): Ftrack project settings.
+        project_settings (dict[str, Any]): ftrack project settings.
 
     Returns:
         bool: True if ftrack is enabled in project settings.

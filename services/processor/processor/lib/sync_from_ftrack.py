@@ -117,8 +117,8 @@ class SyncFromFtrack:
             Add statuses sync.
 
         Args:
-            ft_project (ftrack_api.entity.Entity): Ftrack project entity.
-            ft_session (ftrack_api.Session): Ftrack session.
+            ft_project (ftrack_api.entity.Entity): ftrack project entity.
+            ft_session (ftrack_api.Session): ftrack session.
 
         Returns:
             tuple[list, list]: Tuple of object types and task types.
@@ -261,7 +261,7 @@ class SyncFromFtrack:
             joined_attrs = ", ".join([f'"{attr}"'for attr in missing_attrs])
             msg = (
                 f"Hierarchical attribute{attr_end} {joined_attrs}"
-                f" {was_were} not found in Ftrack"
+                f" {was_were} not found in ftrack"
             )
 
             self.log.warning(msg)
@@ -554,7 +554,7 @@ class SyncFromFtrack:
                 but also by type (right now task == folder).
 
         Args:
-            ft_project (ftrack_api.Entity): Ftrack project entity.
+            ft_project (ftrack_api.Entity): ftrack project entity.
             ft_entities_by_parent_id (dict[str, list[ftrack_api.Entity]]): Map
                 of ftrack entities by their parent ids.
             ft_object_type_name_by_id (Dict[str, str]): Mapping of ftrack
@@ -591,7 +591,7 @@ class SyncFromFtrack:
             if ft_entity_id in self._processed_ftrack_ids:
                 _add_children_to_queue(ft_entity_id)
                 self.log.debug(
-                    f"{ft_entity_path} - Ftrack id already processed")
+                    f"{ft_entity_path} - ftrack id already processed")
                 continue
 
             if parent_entity is None:
@@ -707,7 +707,7 @@ class SyncFromFtrack:
             ])
             entity.attribs[FTRACK_ID_ATTRIB] = ftrack_id
             entity.attribs[FTRACK_PATH_ATTRIB] = path
-            # Ftrack id can not be available if ftrack entity was recreated
+            # ftrack id can not be available if ftrack entity was recreated
             #   during immutable entity processing
             attribute_values = cust_attr_value_by_entity_id[ftrack_id]
             is_project = entity.entity_type == "project"

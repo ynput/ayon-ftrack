@@ -22,7 +22,7 @@ class _CredentialsDialog(QtWidgets.QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
 
-        self.setWindowTitle("AYON - Ftrack Login")
+        self.setWindowTitle("AYON - ftrack Login")
         self.setWindowIcon(QtGui.QIcon(get_ayon_icon_filepath()))
         self.setWindowFlags(
             QtCore.Qt.WindowCloseButtonHint
@@ -35,7 +35,7 @@ class _CredentialsDialog(QtWidgets.QDialog):
 
         # Inputs - user filling values
         inputs_widget = QtWidgets.QWidget(self)
-        url_label = QtWidgets.QLabel("Ftrack URL:", inputs_widget)
+        url_label = QtWidgets.QLabel("ftrack URL:", inputs_widget)
         user_label = QtWidgets.QLabel("Username:", inputs_widget)
         api_label = QtWidgets.QLabel("API Key:", inputs_widget)
 
@@ -91,8 +91,8 @@ class _CredentialsDialog(QtWidgets.QDialog):
             "Set Username and API Key with entered values"
         )
 
-        btn_ftrack_login = QtWidgets.QPushButton("Ftrack login", bts_widget)
-        btn_ftrack_login.setToolTip("Open browser for Login to Ftrack")
+        btn_ftrack_login = QtWidgets.QPushButton("ftrack login", bts_widget)
+        btn_ftrack_login.setToolTip("Open browser for Login to ftrack")
 
         btn_logout = QtWidgets.QPushButton("Logout", bts_widget)
 
@@ -342,7 +342,7 @@ class _CredentialsDialog(QtWidgets.QDialog):
             self._set_widget_state(self._user_input, False)
             self._set_widget_state(self._api_input, False)
             self._set_error(
-                "We're unable to sign in to Ftrack with these credentials"
+                "We're unable to sign in to ftrack with these credentials"
             )
 
     def _login_with_credentials(self, username, api_key):
@@ -394,7 +394,7 @@ class _CredentialsDialog(QtWidgets.QDialog):
         if not self._login_with_credentials(username, api_key):
             self._set_widget_state(self._api_input, False)
             self._set_error((
-                "Somthing happened with Ftrack login."
+                "Somthing happened with ftrack login."
                 " Try enter Username and API key manually."
             ))
 
@@ -411,7 +411,7 @@ class _CredentialsDialog(QtWidgets.QDialog):
         url = self._get_source_ftrack_url()
         if url is None:
             self._set_error(
-                "Specified URL does not lead to a valid Ftrack server."
+                "Specified URL does not lead to a valid ftrack server."
             )
             return
 
@@ -432,7 +432,7 @@ class _CredentialsDialog(QtWidgets.QDialog):
             or "FTRACK_VERSION" not in result.headers
         ):
             self._set_error(
-                "Specified URL does not lead to a valid Ftrack server."
+                "Specified URL does not lead to a valid ftrack server."
             )
             return
         return url
@@ -472,7 +472,7 @@ class TrayCredentialsDialog(_CredentialsDialog):
         settings_url = self._addon.settings_ftrack_url
         if not settings_url:
             self._set_error(
-                "Ftrack URL is not defined in settings!"
+                "ftrack URL is not defined in settings!"
             )
             return
 
