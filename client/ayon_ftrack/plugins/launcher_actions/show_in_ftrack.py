@@ -24,7 +24,6 @@ import webbrowser
 
 from ayon_core.pipeline import LauncherAction
 from ayon_core.addon import AddonsManager
-from ayon_api import get_project, get_folder_by_path
 
 from ayon_ftrack.common import is_ftrack_enabled_in_settings, FTRACK_ID_ATTRIB
 
