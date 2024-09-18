@@ -51,13 +51,13 @@ class ShowInFtrack(LauncherAction):
         project_name = selection.project_name
         folder_path = selection.folder_path
 
-        fields = ["data.ftrackId"]
+        fields = {"attrib"}
         project_entity = get_project(project_name=project_name,
                                      fields=fields)
         if not project_entity:
             raise RuntimeError(f"Project {project_name} not found.")
 
-        project_ftrack_id = project_entity["data"].get("ftrackId")
+        project_ftrack_id = project_entity["attrib"].get("ftrackId")
         if not project_ftrack_id:
             raise RuntimeError(
                 f"Project {project_name} has no connected ftrack id.")
@@ -67,7 +67,7 @@ class ShowInFtrack(LauncherAction):
             folder_entity = get_folder_by_path(project_name,
                                                folder_path=folder_path,
                                                fields=fields)
-            entity_ftrack_id = folder_entity["data"].get("ftrackId")
+            entity_ftrack_id = folder_entity["attrib"].get("ftrackId")
 
         # TODO: implement task entity support?
 
