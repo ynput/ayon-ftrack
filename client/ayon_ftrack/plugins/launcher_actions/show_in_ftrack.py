@@ -87,8 +87,10 @@ class ShowInFtrack(LauncherAction):
                 "slideEntityType": "task"
             })
 
-        sub_url = "&".join("{}={}".format(key, value) for
-                           key, value in data.items())
+        sub_url = "&".join(
+            "{}={}".format(key, value)
+            for key, value in data.items()
+        )
         url = f"{ftrack_url}/#{sub_url}"
 
         # Open URL in webbrowser
