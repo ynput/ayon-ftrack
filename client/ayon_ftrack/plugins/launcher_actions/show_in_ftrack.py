@@ -58,13 +58,18 @@ class ShowInFtrack(LauncherAction):
             raise RuntimeError(
                 f"Project {project_name} has no connected ftrack id.")
 
-        # Folder ftrack id (if selected)
+        # Get selected entity ftrack id
         entity_ftrack_id = None
-        folder_entity = selection.get_folder_entity()
-        if folder_entity:
-            entity_ftrack_id = folder_entity["attrib"].get(FTRACK_ID_ATTRIB)
+        task_entity = selection.get_task_entity()
+        if task_entity:
+            entity_ftrack_id = task_entity["attrib"].get(FTRACK_ID_ATTRIB)
 
-        # TODO: implement task entity support?
+        if not entity_ftrack_id:
+            folder_entity = selection.get_folder_entity()
+            if folder_entity:
+                entity_ftrack_id = folder_entity["attrib"].get(
+                    FTRACK_ID_ATTRIB
+                )
 
         # Construct the ftrack URL
         # Required
