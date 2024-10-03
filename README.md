@@ -1,4 +1,4 @@
-# Ftrack integration for AYON
+# ftrack integration for AYON
 
 This project provides three elements for the AYON pipeline:
  * server - The AYON backend Addon.
@@ -8,7 +8,7 @@ This project provides three elements for the AYON pipeline:
 There is a common code that can be re-used for `server`, `client` and `services`. Is located inside client code for developer mode `./client/ayon_ftrack/common/`.
 
 ## Server
-Once loaded into the backend, restart your server to update addons, ftrack addon will care about creation of attributes for entities. Addon must be enabled in Addon versions the plugin itself can be configured from the Project Settings page: `{ayon_url}/projectManager/projectSettings`, where you can specify your Ftrack instance URL.
+Once loaded into the backend, restart your server to update addons, ftrack addon will care about creation of attributes for entities. Addon must be enabled in Addon versions the plugin itself can be configured from the Project Settings page: `{ayon_url}/projectManager/projectSettings`, where you can specify your ftrack instance URL.
 
 ### Settings
 Settings for services and client.

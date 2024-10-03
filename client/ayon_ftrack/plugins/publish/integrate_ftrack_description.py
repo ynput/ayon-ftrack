@@ -16,11 +16,11 @@ from ayon_ftrack.pipeline import plugin
 
 
 class IntegrateFtrackDescription(plugin.FtrackPublishInstancePlugin):
-    """Add description to AssetVersions in Ftrack."""
+    """Add description to AssetVersions in ftrack."""
 
     # Must be after IntegrateAsset plugin in ayon_core
     order = pyblish.api.IntegratorOrder + 0.4999
-    label = "Integrate Ftrack description"
+    label = "Integrate ftrack description"
     families = ["ftrack"]
     optional = True
 

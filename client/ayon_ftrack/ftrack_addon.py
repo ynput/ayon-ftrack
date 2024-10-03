@@ -80,23 +80,23 @@ class FtrackAddon(
 
     @property
     def settings_ftrack_url(self):
-        """Ftrack url from settings in a format as it is.
+        """ftrack url from settings in a format as it is.
 
         Returns:
-            str: Ftrack url from settings.
+            str: ftrack url from settings.
         """
 
         return self._settings_ftrack_url
 
     def get_global_environments(self):
-        """Ftrack's global environments."""
+        """ftrack's global environments."""
 
         return {
             "FTRACK_SERVER": self.ftrack_url
         }
 
     def get_plugin_paths(self):
-        """Ftrack plugin paths."""
+        """ftrack plugin paths."""
         plugins_dir = os.path.join(FTRACK_ADDON_DIR, "plugins")
         return {
             "actions": [os.path.join(plugins_dir, "launcher_actions")],
@@ -204,7 +204,7 @@ class FtrackAddon(
         from ayon_core.addon import ProcessPreparationError
         from ayon_ftrack.common import is_ftrack_enabled_in_settings
 
-        # Do not continue if Ftrack is not enabled in settings
+        # Do not continue if ftrack is not enabled in settings
         if context.project_name:
             settings = get_project_settings(context.project_name)
         else:
@@ -238,7 +238,7 @@ class FtrackAddon(
 
         if context.headless:
             raise ProcessPreparationError(
-                "Ftrack login details are missing. Unable to proceed"
+                "ftrack login details are missing. Unable to proceed"
                 " without a user interface."
             )
 
@@ -256,7 +256,7 @@ class FtrackAddon(
             return
 
         raise ProcessPreparationError(
-            "Unable to connect to Ftrack. The process cannot proceed"
+            "Unable to connect to ftrack. The process cannot proceed"
             " without this connection."
         )
 
@@ -293,7 +293,7 @@ class FtrackAddon(
 
     def get_credentials(self):
         # type: () -> tuple
-        """Get local Ftrack credentials."""
+        """Get local ftrack credentials."""
 
         cred = get_credentials(self.ftrack_url)
         return cred.get("username"), cred.get("api_key")
@@ -336,14 +336,14 @@ def _check_ftrack_url(url):
 
 
 def resolve_ftrack_url(url, logger=None):
-    """Checks if Ftrack server is responding."""
+    """Checks if ftrack server is responding."""
 
     if logger is None:
         logger = Logger.get_logger(__name__)
 
     url = url.strip("/ ")
     if not url:
-        logger.error("Ftrack URL is not set!")
+        logger.error("ftrack URL is not set!")
         return None
 
     if not url.startswith("http"):
@@ -362,9 +362,9 @@ def resolve_ftrack_url(url, logger=None):
         ftrack_url = url
 
     if ftrack_url:
-        logger.debug("Ftrack server \"{}\" is accessible.".format(ftrack_url))
+        logger.debug("ftrack server \"{}\" is accessible.".format(ftrack_url))
 
     else:
-        logger.error("Ftrack server \"{}\" is not accessible!".format(url))
+        logger.error("ftrack server \"{}\" is not accessible!".format(url))
 
     return ftrack_url

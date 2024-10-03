@@ -1,4 +1,4 @@
-"""Ftrack common functions that can be used in ftrack services or on client.
+"""ftrack common functions that can be used in ftrack services or on client.
 
 Most of the functionality is usable at multiple places and would require to
 be duplicated.

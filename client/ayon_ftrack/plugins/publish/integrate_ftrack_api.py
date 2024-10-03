@@ -24,14 +24,14 @@ class IntegrateFtrackApi(plugin.FtrackPublishInstancePlugin):
     """ Commit components to server. """
 
     order = pyblish.api.IntegratorOrder + 0.499
-    label = "Integrate Ftrack Api"
+    label = "Integrate ftrack Api"
     families = ["ftrack"]
 
     def process(self, instance):
         component_list = instance.data.get("ftrackComponentsList")
         if not component_list:
             self.log.debug(
-                "Instance doesn't have components to integrate to Ftrack."
+                "Instance doesn't have components to integrate to ftrack."
                 " Skipping."
             )
             return
@@ -412,7 +412,7 @@ class IntegrateFtrackApi(plugin.FtrackPublishInstancePlugin):
             status_id = status_ids_by_name.get(status_name.lower())
             if not status_id:
                 self.log.info((
-                    "Ftrack status with name \"{}\""
+                    "ftrack status with name \"{}\""
                     " for AssetVersion was not found."
                 ).format(status_name))
 

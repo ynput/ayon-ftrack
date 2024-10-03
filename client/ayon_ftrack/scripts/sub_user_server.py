@@ -24,7 +24,7 @@ def main(args):
     # Connect the socket to the port where the server is listening
     server_address = ("localhost", port)
     log.debug(
-        "User Ftrack Server connected to {} port {}".format(*server_address)
+        "User ftrack Server connected to {} port {}".format(*server_address)
     )
     try:
         sock.connect(server_address)
@@ -40,12 +40,12 @@ def main(args):
         manager = AddonsManager()
         addon = manager.get("ftrack")
         server = FtrackServer(addon.user_event_handlers_paths)
-        log.debug("Launching User Ftrack Server")
+        log.debug("Launching User ftrack Server")
         server.run_server(session=session)
         return 0
 
     except Exception:
-        log.warning("Ftrack session server failed.", exc_info=True)
+        log.warning("ftrack session server failed.", exc_info=True)
         return 1
 
     finally:
@@ -54,7 +54,7 @@ def main(args):
 
 
 if __name__ == "__main__":
-    Logger.set_process_name("Ftrack User server")
+    Logger.set_process_name("ftrack User server")
 
     # Register interupt signal
     def signal_handler(sig, frame):

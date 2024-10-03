@@ -13,7 +13,7 @@ from ayon_ftrack.pipeline import plugin
 
 
 class CollectFtrackFamily(plugin.FtrackPublishInstancePlugin):
-    """Adds explicitly 'ftrack' to families to upload instance to FTrack.
+    """Adds explicitly 'ftrack' to families to upload instance to ftrack.
 
     Uses selection by combination of hosts/families/tasks names via
     profiles resolution.
@@ -25,14 +25,14 @@ class CollectFtrackFamily(plugin.FtrackPublishInstancePlugin):
     based on 'families' (editorial drives it by presence of 'review')
     """
 
-    label = "Collect Ftrack Family"
+    label = "Collect ftrack Family"
     order = pyblish.api.CollectorOrder + 0.4990
 
     profiles = None
 
     def process(self, instance):
         if not self.profiles:
-            self.log.warning("No profiles present for adding Ftrack family")
+            self.log.warning("No profiles present for adding ftrack family")
             return
 
         host_name = instance.context.data["hostName"]
@@ -85,7 +85,7 @@ class CollectFtrackFamily(plugin.FtrackPublishInstancePlugin):
         Triggered for more detailed filtering when main family matches,
         but content of 'families' actually matter.
         (For example 'review' in 'families' should result in adding to
-        Ftrack)
+        ftrack)
 
         Args:
             additional_filters (dict) - from Setting

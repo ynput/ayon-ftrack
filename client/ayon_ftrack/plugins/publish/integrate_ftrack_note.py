@@ -19,11 +19,11 @@ from ayon_ftrack.pipeline import plugin
 
 
 class IntegrateFtrackNote(plugin.FtrackPublishInstancePlugin):
-    """Create comments in Ftrack."""
+    """Create comments in ftrack."""
 
     # Must be after IntegrateAsset plugin in ayon_core
     order = pyblish.api.IntegratorOrder + 0.4999
-    label = "Integrate Ftrack note"
+    label = "Integrate ftrack note"
     families = ["ftrack"]
     optional = True
 
@@ -32,7 +32,7 @@ class IntegrateFtrackNote(plugin.FtrackPublishInstancePlugin):
     note_template = None
     # Backwards compatibility
     note_with_intent_template = "{comment}"
-    # - note label must exist in Ftrack
+    # - note label must exist in ftrack
     note_labels = []
 
     def process(self, instance):

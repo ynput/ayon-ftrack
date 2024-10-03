@@ -66,7 +66,7 @@ class ClientReviewSort(LocalAction):
         obj_list = sorted(obj_list, key=lambda k: k["version"])
         obj_list.sort(**task_name_sort_kwargs)
         obj_list = sorted(obj_list, key=lambda k: k["name"])
-        # Set 'sort order' to sorted list, so they are sorted in Ftrack also
+        # Set 'sort order' to sorted list, so they are sorted in ftrack also
         for i in range(len(obj_list)):
             obj_list[i]["sort_order"] = sort_order_list[i]
 

@@ -50,7 +50,7 @@ class PostFtrackHook(PostLaunchHook):
 
         if not is_ftrack_enabled_in_settings(project_settings["ftrack"]):
             self.log.debug(
-                f"Ftrack is disabled for project '{project_name}'. Skipping."
+                f"ftrack is disabled for project '{project_name}'. Skipping."
             )
             return
 
@@ -168,11 +168,11 @@ class PostFtrackHook(PostLaunchHook):
     def _find_ftrack_folder_entity(self, session, folder):
         """
         Args:
-            session (ftrack_api.Session): Ftrack session.
+            session (ftrack_api.Session): ftrack session.
             folder (dict): AYON folder data.
 
         Returns:
-            Union[ftrack_api.entity.base.Entity, None]: Ftrack folder entity.
+            Union[ftrack_api.entity.base.Entity, None]: ftrack folder entity.
         """
 
         # Find ftrack entity by id stored on folder
@@ -194,13 +194,13 @@ class PostFtrackHook(PostLaunchHook):
         """
 
         Args:
-            session (ftrack_api.Session): Ftrack session.
+            session (ftrack_api.Session): ftrack session.
             project_name (str): Project name.
             folder_path (str): Folder path.
             task_name (str): Task name.
 
         Returns:
-            Union[ftrack_api.entity.base.Entity, None]: Ftrack task entity.
+            Union[ftrack_api.entity.base.Entity, None]: ftrack task entity.
         """
 
         project_entity = session.query(

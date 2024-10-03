@@ -292,7 +292,7 @@ class BaseHandler(metaclass=ABCMeta):
             ).first()
             if not user:
                 raise ValueError((
-                    "Ftrack user with username \"{}\" was not found!"
+                    "ftrack user with username \"{}\" was not found!"
                 ).format(username))
 
             user_id = user["id"]
@@ -499,7 +499,7 @@ class BaseHandler(metaclass=ABCMeta):
         Args:
             session (ftrack_api.Session): Current session.
             event (ftrack_api.Event): Processed event by session.
-            project_id (str): Ftrack project id.
+            project_id (str): ftrack project id.
 
         Returns:
             Union[str, None]: Project name based on entities or None if project
@@ -541,7 +541,7 @@ class BaseHandler(metaclass=ABCMeta):
         Args:
             session (ftrack_api.Session): Current session.
             event (ftrack_api.Event): Processed event by session.
-            project_id (str): Ftrack project id.
+            project_id (str): ftrack project id.
 
         Returns:
             Union[str, None]: Project name based on entities or None if project
@@ -648,7 +648,7 @@ class BaseHandler(metaclass=ABCMeta):
         Args:
             job (JobEntity): Entity of job where file should be able to
                 download (Created or queried with passed session).
-            session (Session): Ftrack session which was used to query/create
+            session (Session): ftrack session which was used to query/create
                 entered job.
             exc_info (tuple): Exception info (e.g. from `sys.exc_info()`).
             description (str): Change job description to describe what
@@ -706,7 +706,7 @@ class BaseHandler(metaclass=ABCMeta):
         Args:
             job (JobEntity): Entity of job where file should be able to
                 download (Created or queried with passed session).
-            session (Session): Ftrack session which was used to query/create
+            session (Session): ftrack session which was used to query/create
                 entered job.
             filepath (str): Path to file which should be added to job.
             basename (str): Defines name of file which will be downloaded on

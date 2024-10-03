@@ -16,7 +16,7 @@ class CollectFamilyAdvancedFilterModel(BaseSettingsModel):
     )
     add_ftrack_family: bool = SettingsField(
         True,
-        title="Add Ftrack Family"
+        title="Add ftrack Family"
     )
 
 
@@ -40,7 +40,7 @@ class CollectFamilyProfile(BaseSettingsModel):
     )
     add_ftrack_family: bool = SettingsField(
         True,
-        title="Add Ftrack Family",
+        title="Add ftrack Family",
     )
     advanced_filtering: list[CollectFamilyAdvancedFilterModel] = SettingsField(
         title="Advanced adding if additional families present",
@@ -313,7 +313,7 @@ class FtrackPublishPlugins(BaseSettingsModel):
     """Settings for event handlers running in ftrack service."""
 
     CollectFtrackFamily: CollectFtrackFamilyPlugin = SettingsField(
-        title="Collect Ftrack Family",
+        title="Collect ftrack Family",
         default_factory=CollectFtrackFamilyPlugin,
     )
     CollectFtrackCustomAttributeData: CollectFtrackCustomAttributeDataModel = (
@@ -327,7 +327,7 @@ class FtrackPublishPlugins(BaseSettingsModel):
         )
     )
     ValidateFtrackAttributes: ValidateFtrackAttributesModel = SettingsField(
-        title="Validate Ftrack Attributes",
+        title="Validate ftrack Attributes",
         default_factory=ValidateFtrackAttributesModel,
     )
     IntegrateHierarchyToFtrack: IntegrateHierarchyToFtrackModel = (
@@ -336,31 +336,31 @@ class FtrackPublishPlugins(BaseSettingsModel):
             default_factory=IntegrateHierarchyToFtrackModel,
             description=(
                 "Set task status on new task creation."
-                " Ftrack's default status is used otherwise."
+                " ftrack's default status is used otherwise."
             )
         )
     )
     IntegrateFtrackNote: IntegrateFtrackNoteModel = SettingsField(
-        title="Integrate Ftrack Note",
+        title="Integrate ftrack Note",
         default_factory=IntegrateFtrackNoteModel,
     )
     IntegrateFtrackDescription: IntegrateFtrackDescriptionModel = (
         SettingsField(
-            title="Integrate Ftrack Description",
+            title="Integrate ftrack Description",
             default_factory=IntegrateFtrackDescriptionModel,
             description="Add description to integrated AssetVersion.",
         )
     )
     IntegrateFtrackComponentOverwrite: IntegrateFtrackComponentOverwriteModel = SettingsField(
-        title="Integrate Ftrack Component Overwrite",
+        title="Integrate ftrack Component Overwrite",
         default_factory=IntegrateFtrackComponentOverwriteModel,
     )
     IntegrateFtrackInstance: IntegrateFtrackInstanceModel = SettingsField(
-        title="Integrate Ftrack Instance",
+        title="Integrate ftrack Instance",
         default_factory=IntegrateFtrackInstanceModel,
     )
     IntegrateFtrackFarmStatus: IntegrateFtrackFarmStatusModel = SettingsField(
-        title="Integrate Ftrack Farm Status",
+        title="Integrate ftrack Farm Status",
         default_factory=IntegrateFtrackFarmStatusModel,
         description=(
             "Change status of task when it's product is submitted to farm"
@@ -369,18 +369,18 @@ class FtrackPublishPlugins(BaseSettingsModel):
     ftrack_task_status_local_publish: FtrackTaskStatusLocalModel = (
         SettingsField(
             default_factory=FtrackTaskStatusLocalModel,
-            title="Ftrack Status Local Integration",
+            title="ftrack Status Local Integration",
         )
     )
     ftrack_task_status_on_farm_publish: FtrackTaskStatusOnFarmModel = (
         SettingsField(
             default_factory=FtrackTaskStatusOnFarmModel,
-            title="Ftrack Status On Farm Integration",
+            title="ftrack Status On Farm Integration",
         )
     )
     IntegrateFtrackTaskStatus: IntegrateFtrackTaskStatusModel = SettingsField(
         default_factory=IntegrateFtrackTaskStatusModel,
-        title="Integrate Ftrack Task Status"
+        title="Integrate ftrack Task Status"
     )
 
 

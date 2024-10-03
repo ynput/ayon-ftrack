@@ -40,7 +40,7 @@ class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
     """
 
     order = pyblish.api.IntegratorOrder - 0.04
-    label = "Integrate Hierarchy To Ftrack"
+    label = "Integrate Hierarchy To ftrack"
     families = ["shot"]
     hosts = [
         "hiero",

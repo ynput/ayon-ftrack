@@ -30,7 +30,7 @@ class BaseEventHandler(BaseHandler):
         """Callback triggered on event with matching topic.
 
         Args:
-            event (ftrack_api.Event): Ftrack event to process.
+            event (ftrack_api.Event): ftrack event to process.
 
         """
         return self.launch(self.session, event)
@@ -48,9 +48,9 @@ class BaseEventHandler(BaseHandler):
         of not action based processing.
 
         Args:
-            session (ftrack_api.Session): Ftrack session which triggered
+            session (ftrack_api.Session): ftrack session which triggered
                 the event.
-            event (ftrack_api.Event): Ftrack event to process.
+            event (ftrack_api.Event): ftrack event to process.
 
         """
         raise NotImplementedError()

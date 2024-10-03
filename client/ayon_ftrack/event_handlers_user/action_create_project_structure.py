@@ -11,9 +11,9 @@ from ayon_ftrack.lib import get_ftrack_icon_url
 
 
 class CreateProjectFolders(LocalAction):
-    """Action create folder structure and may create hierarchy in Ftrack.
+    """Action create folder structure and may create hierarchy in ftrack.
 
-    Creation of folder structure and hierarchy in Ftrack is based on settings.
+    Creation of folder structure and hierarchy in ftrack is based on settings.
 
     Example of content:
     ```json
@@ -45,10 +45,10 @@ class CreateProjectFolders(LocalAction):
     with subfolders.
 
     Identifier `[ftrack]` in name says that this should be also created in
-    Ftrack hierarchy. It is possible to specify entity type of item with "." .
+    ftrack hierarchy. It is possible to specify entity type of item with "." .
     If key is `assets[ftrack.Library]` then in ftrack will be created entity
     with name "assets" and entity type "Library". It is expected Library entity
-    type exist in Ftrack.
+    type exist in ftrack.
     """
 
     identifier = "ayon.create.project.structure"

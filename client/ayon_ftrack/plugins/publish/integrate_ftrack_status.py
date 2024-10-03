@@ -25,12 +25,12 @@ class CollectFtrackTaskStatuses(plugin.FtrackPublishContextPlugin):
 
     # After 'CollectFtrackApi'
     order = pyblish.api.CollectorOrder + 0.4992
-    label = "Collect Ftrack Task Statuses"
+    label = "Collect ftrack Task Statuses"
 
     def process(self, context):
         ftrack_session = context.data("ftrackSession")
         if ftrack_session is None:
-            self.log.info("Ftrack session is not created.")
+            self.log.info("ftrack session is not created.")
             return
 
         # Prepare available task statuses on the project
@@ -104,7 +104,7 @@ class IntegrateFtrackStatusBase(plugin.FtrackPublishInstancePlugin):
         task_statuses_by_type_id = context.data.get("ftrackTaskStatuses")
         if not task_statuses_by_type_id:
             self.log.debug(
-                "Ftrack task statuses are not collected. Skipping.")
+                "ftrack task statuses are not collected. Skipping.")
             return
 
         self.prepare_status_names(context, instance, profiles)
@@ -238,7 +238,7 @@ class IntegrateFtrackFarmStatus(IntegrateFtrackStatusBase):
     """
 
     order = pyblish.api.IntegratorOrder + 0.48
-    label = "Ftrack Task Status To Farm Status"
+    label = "ftrack Task Status To Farm Status"
     active = True
 
     farm_status_profiles = []
@@ -278,7 +278,7 @@ class IntegrateFtrackLocalStatus(IntegrateFtrackStatusBase):
     """
 
     order = IntegrateFtrackFarmStatus.order + 0.001
-    label = "Ftrack Task Status Local Publish"
+    label = "ftrack Task Status Local Publish"
     active = True
     targets = ["local"]
     settings_key = "ftrack_task_status_local_publish"
@@ -315,11 +315,11 @@ class IntegrateFtrackOnFarmStatus(IntegrateFtrackStatusBase):
 
 
 class IntegrateFtrackTaskStatus(plugin.FtrackPublishContextPlugin):
-    # Use order of Integrate Ftrack Api plugin and offset it before or after
+    # Use order of Integrate ftrack Api plugin and offset it before or after
     base_order = pyblish.api.IntegratorOrder + 0.499
-    # By default is after Integrate Ftrack Api
+    # By default is after Integrate ftrack Api
     order = base_order + 0.0001
-    label = "Integrate Ftrack Task Status"
+    label = "Integrate ftrack Task Status"
 
     @classmethod
     def apply_settings(cls, project_settings):
@@ -344,7 +344,7 @@ class IntegrateFtrackTaskStatus(plugin.FtrackPublishContextPlugin):
     def process(self, context):
         task_statuses_by_type_id = context.data.get("ftrackTaskStatuses")
         if not task_statuses_by_type_id:
-            self.log.debug("Ftrack task statuses are not collected. Skipping.")
+            self.log.debug("ftrack task statuses are not collected. Skipping.")
             return
 
         status_by_task_id = self._get_status_by_task_id(context)

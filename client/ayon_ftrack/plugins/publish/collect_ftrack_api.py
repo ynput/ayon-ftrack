@@ -12,7 +12,7 @@ class CollectFtrackApi(plugin.FtrackPublishContextPlugin):
     """ Collects an ftrack session and the current task id. """
 
     order = pyblish.api.CollectorOrder + 0.4991
-    label = "Collect Ftrack Api"
+    label = "Collect ftrack Api"
 
     def process(self, context):
         ftrack_log = logging.getLogger("ftrack_api")
@@ -25,7 +25,7 @@ class CollectFtrackApi(plugin.FtrackPublishContextPlugin):
         import ftrack_api
 
         session = ftrack_api.Session(auto_connect_event_hub=False)
-        self.log.debug("Ftrack user: \"{0}\"".format(session.api_user))
+        self.log.debug("ftrack user: \"{0}\"".format(session.api_user))
 
         # Collect task
         project_name = context.data["projectName"]
@@ -38,12 +38,12 @@ class CollectFtrackApi(plugin.FtrackPublishContextPlugin):
         project_entities = list(session.query(project_query).all())
         if len(project_entities) == 0:
             raise AssertionError(
-                "Project \"{0}\" not found in Ftrack.".format(project_name)
+                "Project \"{0}\" not found in ftrack.".format(project_name)
             )
         # QUESTION Is possible to happen?
         elif len(project_entities) > 1:
             raise AssertionError((
-                "Found more than one project with name \"{0}\" in Ftrack."
+                "Found more than one project with name \"{0}\" in ftrack."
             ).format(project_name))
 
         project_entity = project_entities[0]
@@ -60,7 +60,7 @@ class CollectFtrackApi(plugin.FtrackPublishContextPlugin):
             if context_ftrack_entity is None:
                 raise AssertionError((
                     "Entity with path \"{}\" not found"
-                    " in Ftrack project \"{}\"."
+                    " in ftrack project \"{}\"."
                 ).format(folder_path, project_name))
 
         self.log.debug("Folder found: {}".format(context_ftrack_entity))

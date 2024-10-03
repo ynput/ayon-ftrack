@@ -125,7 +125,7 @@ class AppplicationsAction(BaseAction):
         Args:
             session (ftrack_api.Session): Helps to query necessary data.
             entities (list): Object of selected entities.
-            event (ftrack_api.Event): Ftrack event causing discover callback.
+            event (ftrack_api.Event): ftrack event causing discover callback.
         """
 
         if (
@@ -236,7 +236,7 @@ class AppplicationsAction(BaseAction):
         folder_path = self._get_folder_path(session, entity["parent"])
         project_name = entity["project"]["full_name"]
         self.log.info(
-            f"Ftrack launch app: \"{app_name}\""
+            f"ftrack launch app: \"{app_name}\""
             f" on {project_name}{folder_path}/{task_name}"
         )
         try:

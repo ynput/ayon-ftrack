@@ -25,7 +25,7 @@ class TaskToVersionStatus(BaseEventHandler):
             ).first()
             if not session_user_entity:
                 self.log.warning(
-                    "Couldn't query Ftrack user with username \"{}\"".format(
+                    "Couldn't query ftrack user with username \"{}\"".format(
                         session.api_user
                     )
                 )
@@ -315,7 +315,7 @@ class TaskToVersionStatus(BaseEventHandler):
         same version for the task.
 
         Args:
-            session (ftrack_api.Session): Ftrack session.
+            session (ftrack_api.Session): ftrack session.
             task_ids (list[str]): Task ids.
             is_allow_list (bool): If True then asset_types are used
                 as allow list.
@@ -359,7 +359,7 @@ class TaskToVersionStatus(BaseEventHandler):
             # Allow list is enabled but asset type names are not available
             if is_allow_list and not asset_type_ids:
                 self.log.warning((
-                    "None of asset type names were found in Ftrack."
+                    "None of asset type names were found in ftrack."
                     " Skipping filter."
                 ))
                 return last_asset_versions_by_task_id

@@ -53,7 +53,7 @@ class PushHierValuesToNonHierEvent(BaseEventHandler):
         from ftrack nor use settings.
 
         Args:
-            event (ftrack_api.event.base.Event): Ftrack event with update
+            event (ftrack_api.event.base.Event): ftrack event with update
                 information.
 
         Returns:
@@ -95,7 +95,7 @@ class PushHierValuesToNonHierEvent(BaseEventHandler):
         """Get custom attribute configurations by name.
 
         Args:
-            session (ftrack_api.Session): Ftrack sesson.
+            session (ftrack_api.Session): ftrack sesson.
             interest_attributes (list[str]): Names of custom attributes
                 that should be synchronized.
 
@@ -127,8 +127,8 @@ class PushHierValuesToNonHierEvent(BaseEventHandler):
         """Get handler settings based on the project.
 
         Args:
-            session (ftrack_api.Session): Ftrack session.
-            event (ftrack_api.event.base.Event): Ftrack event which triggered
+            session (ftrack_api.Session): ftrack session.
+            event (ftrack_api.event.base.Event): ftrack event which triggered
                 the changes.
             project_id (str): Project id where the current changes are handled.
 
@@ -404,7 +404,7 @@ class PushHierValuesToNonHierEvent(BaseEventHandler):
         """Proces changes in single project.
 
         Args:
-            session (ftrack_api.Session): Ftrack session.
+            session (ftrack_api.Session): ftrack session.
             event (ftrack_api.event.base.Event): Event which has all changes
                 information.
             project_id (str): Project id related to changes.

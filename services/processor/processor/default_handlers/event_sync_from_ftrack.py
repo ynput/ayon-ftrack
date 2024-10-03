@@ -210,7 +210,7 @@ class SyncProcess:
         """
 
         Returns:
-            ftrack_api.Entity: Ftrack project entity.
+            ftrack_api.Entity: ftrack project entity.
         """
 
         if self._ft_project is UNKNOWN_VALUE:
@@ -1572,9 +1572,9 @@ class AutoSyncFromFtrack(BaseEventHandler):
             Goes through event (can contain multiple changes) and decides if
             the event is interesting for us (interest_base_types).
             It separates changes into add|remove|update.
-            All task changes are handled together by refresh from Ftrack.
+            All task changes are handled together by refresh from ftrack.
         Args:
-            session (ftrack_api.Session): session to Ftrack
+            session (ftrack_api.Session): session to ftrack
             event (dictionary): event content
 
         Returns:
