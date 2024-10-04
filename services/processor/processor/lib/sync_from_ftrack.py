@@ -3,6 +3,7 @@ import collections
 import time
 import logging
 
+import arrow
 from ayon_api import (
     get_project,
     create_project,
@@ -716,6 +717,13 @@ class SyncFromFtrack:
             ):
                 if value is None or attr_name not in entity.attribs:
                     continue
+
+                if isinstance(value, arrow.Arrow):
+                    # Shift date to 00:00:00 of the day
+                    # - ftrack is returning e.g. '2024-10-29T22:00:00'
+                    #  for '2024-10-30'
+                    value = str(value.shift(hours=24 - value.hour))
+
                 entity.attribs[attr_name] = str(value)
 
             # ftrack id can not be available if ftrack entity was recreated

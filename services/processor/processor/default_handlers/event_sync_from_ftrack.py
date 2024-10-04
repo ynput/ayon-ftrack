@@ -1331,15 +1331,26 @@ class SyncProcess:
                     task_type_changes[ftrack_id] = (entity, info)
 
                 default_attr_key = DEFAULT_ATTRS_MAPPING.get(key)
-                dst_key = key
+
                 if default_attr_key is not None:
                     dst_key = default_attr_key
                 elif key == CUST_ATTR_TOOLS:
                     dst_key = "tools"
+                else:
+                    dst_key = key
+
                 if dst_key not in entity.attribs:
                     continue
 
-                if default_attr_key is None and value is not None:
+                if default_attr_key is not None:
+                    if value is not None and key in ("startdate", "enddate"):
+                        date = arrow.get(value)
+                        # Shift date to 00:00:00 of the day
+                        # - ftrack is returning e.g. '2024-10-29T22:00:00'
+                        #  for '2024-10-30'
+                        value = str(date.shift(hours=24 - date.hour))
+
+                elif value is not None:
                     if key in FPS_KEYS:
                         value = convert_to_fps(value)
                     else:
