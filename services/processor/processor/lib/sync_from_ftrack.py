@@ -711,7 +711,7 @@ class SyncFromFtrack:
 
             for attr_name, value in (
                 ("startDate", ft_entity["start_date"]),
-                ("endtDate", ft_entity["end_date"]),
+                ("endDate", ft_entity["end_date"]),
                 ("description", ft_entity.get("description")),
             ):
                 if value is None or attr_name not in entity.attribs:
