@@ -41,11 +41,21 @@ from ftrack_common import (
 
 UNKNOWN_VALUE = object()
 
+DEFAULT_ATTRS_MAPPING = {
+    "startdate": "startDate",
+    "enddate": "endDate",
+    "description": "description",
+}
+
 
 class SyncProcess:
     interest_base_types = ["show", "task"]
     ignore_ent_types = ["Milestone"]
-    ignore_change_keys = ["statusid", "thumbid"]
+    ignore_change_keys = [
+        "statusid",
+        "thumbid",
+        "priorityid",
+    ]
 
     project_query = (
         "select id, full_name, name, custom_attributes,"
@@ -1320,13 +1330,16 @@ class SyncProcess:
                 if key == "typeid" and entity.entity_type == "task":
                     task_type_changes[ftrack_id] = (entity, info)
 
+                default_attr_key = DEFAULT_ATTRS_MAPPING.get(key)
                 dst_key = key
-                if key == CUST_ATTR_TOOLS:
+                if default_attr_key is not None:
+                    dst_key = default_attr_key
+                elif key == CUST_ATTR_TOOLS:
                     dst_key = "tools"
                 if dst_key not in entity.attribs:
                     continue
 
-                if value is not None:
+                if default_attr_key is None and value is not None:
                     if key in FPS_KEYS:
                         value = convert_to_fps(value)
                     else:
@@ -1337,6 +1350,7 @@ class SyncProcess:
                                 continue
                         value = self._convert_value_by_cust_attr_conf(
                             value, attr)
+
                 entity.attribs[dst_key] = value
 
         self._propagate_task_type_changes(task_type_changes)
