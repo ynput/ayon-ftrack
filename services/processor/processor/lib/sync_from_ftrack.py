@@ -3,6 +3,7 @@ import collections
 import time
 import logging
 
+import arrow
 from ayon_api import (
     get_project,
     create_project,
@@ -308,7 +309,8 @@ class SyncFromFtrack:
 
         self.log.info("Querying project hierarchy from ftrack")
         ft_entities = ft_session.query((
-            "select id, name, parent_id, type_id, object_type_id"
+            "select id, name, parent_id, type_id, object_type_id, status_id"
+            ", start_date, end_date, description"  #, bid, status_id"
             " from TypedContext where project_id is \"{}\""
         ).format(ft_project["id"])).all()
         t_ft_entities_4 = time.perf_counter()
@@ -707,6 +709,23 @@ class SyncFromFtrack:
             ])
             entity.attribs[FTRACK_ID_ATTRIB] = ftrack_id
             entity.attribs[FTRACK_PATH_ATTRIB] = path
+
+            for attr_name, value in (
+                ("startDate", ft_entity["start_date"]),
+                ("endDate", ft_entity["end_date"]),
+                ("description", ft_entity.get("description")),
+            ):
+                if value is None or attr_name not in entity.attribs:
+                    continue
+
+                if isinstance(value, arrow.Arrow):
+                    # Shift date to 00:00:00 of the day
+                    # - ftrack is returning e.g. '2024-10-29T22:00:00'
+                    #  for '2024-10-30'
+                    value = str(value.shift(hours=24 - value.hour))
+
+                entity.attribs[attr_name] = str(value)
+
             # ftrack id can not be available if ftrack entity was recreated
             #   during immutable entity processing
             attribute_values = cust_attr_value_by_entity_id[ftrack_id]
