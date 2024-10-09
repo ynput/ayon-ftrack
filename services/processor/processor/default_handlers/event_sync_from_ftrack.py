@@ -52,7 +52,6 @@ class SyncProcess:
     interest_base_types = ["show", "task"]
     ignore_ent_types = ["Milestone"]
     ignore_change_keys = [
-        "statusid",
         "thumbid",
         "priorityid",
     ]
@@ -118,6 +117,7 @@ class SyncProcess:
         self._ft_std_cust_attrs = None
         self._ft_object_type_name_by_id = None
         self._ft_task_type_name_by_id = None
+        self._ft_status_names_by_id = None
 
         self._created_entity_by_ftrack_id = {}
         self._hierarchy_changed_by_ftrack_id = {}
@@ -408,6 +408,16 @@ class SyncProcess:
                 for task_type in task_types
             }
         return self._ft_task_type_name_by_id
+
+    @property
+    def ft_status_names_by_id(self):
+        if self._ft_status_names_by_id is None:
+            statuses = self.session.query("select id, name from Status").all()
+            self._ft_status_names_by_id = {
+                statuse["id"]: statuse["name"]
+                for statuse in statuses
+            }
+        return self._ft_status_names_by_id
 
     @property
     def has_valid_entity_types(self):
@@ -1256,6 +1266,27 @@ class SyncProcess:
 
         project_entity.task_types = new_task_types
 
+    def _update_project_statuses(self):
+        # TODO implement statuses sync to AYON project
+        return
+        project_entity = self.entity_hub.project_entity
+        src_statuses = {
+            statuse.name.lower(): statuse
+            for statuse in project_entity.statuses
+        }
+        new_statuses = []
+        project_schema = self.ft_project["project_schema"]
+        for task_type in project_schema["task_type_schema"]["types"]:
+            status_name = task_type["name"]
+            ayon_status = src_statuses.get(status_name.lower())
+            if ayon_status is None:
+                new_statuses.append({
+                    "name": status_name,
+                    "color": task_type["color"]
+                })
+
+        project_entity.statuses = new_statuses
+
     def _propagate_task_type_changes(self, task_type_changes):
         if not task_type_changes:
             return
@@ -1289,6 +1320,44 @@ class SyncProcess:
             self.log.debug(
                 f"Changed task type {prev_task_type} -> {new_type_name}")
 
+    def _propagate_status_changes(self, status_changes):
+        if not status_changes:
+            return
+
+        project_entity = self.entity_hub.project_entity
+        ayon_statuses_by_name = {
+            status.name.lower(): status
+            for status in project_entity.statuses
+        }
+        ft_status_names_by_id = self.ft_status_names_by_id
+        to_change = []
+        project_need_update = False
+        for ftrack_id, (entity, info) in status_changes.items():
+            new_status_id = info["changes"]["statusid"]["new"]
+            new_status_name = ft_status_names_by_id[new_status_id]
+            if entity.status.lower() == new_status_name.lower():
+                continue
+
+            ayon_status = ayon_statuses_by_name.get(new_status_name.lower())
+            if (
+                ayon_status is None
+                or entity.entity_type not in ayon_status.scope
+            ):
+                # TODO implement statuses sync to AYON project
+                continue
+                project_need_update = True
+
+            to_change.append((entity, new_status_name))
+
+        if project_need_update:
+            self._update_project_statuses()
+
+        for entity, new_status_name in to_change:
+            prev_status_name = entity.status
+            entity.status = new_status_name
+            self.log.debug(
+                f"Changed status {prev_status_name} -> {new_status_name}")
+
     def _propagate_attrib_changes(self):
         std_cust_attr = self.ft_std_cust_attrs
         hier_cust_attr = self.ft_hier_cust_attrs
@@ -1298,6 +1367,7 @@ class SyncProcess:
         #   set all attributes from ftrack
         created_ftrack_ids = set(self._created_entity_by_ftrack_id.keys())
         task_type_changes = {}
+        status_changes = {}
         for ftrack_id, info in self.entities_by_action["update"].items():
             if ftrack_id in created_ftrack_ids:
                 continue
@@ -1327,8 +1397,14 @@ class SyncProcess:
 
             for key, change_info in info["changes"].items():
                 value = change_info["new"]
-                if key == "typeid" and entity.entity_type == "task":
-                    task_type_changes[ftrack_id] = (entity, info)
+                if key == "typeid":
+                    if entity.entity_type == "task":
+                        task_type_changes[ftrack_id] = (entity, info)
+                    continue
+
+                if key == "statusid":
+                    status_changes[ftrack_id] = (entity, info)
+                    continue
 
                 default_attr_key = DEFAULT_ATTRS_MAPPING.get(key)
 
@@ -1365,6 +1441,7 @@ class SyncProcess:
                 entity.attribs[dst_key] = value
 
         self._propagate_task_type_changes(task_type_changes)
+        self._propagate_status_changes(status_changes)
 
     def _create_ft_attr_operation(
         self, conf_id, entity_id, is_new, new_value, old_value=None

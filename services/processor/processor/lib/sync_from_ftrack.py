@@ -2,6 +2,7 @@ import re
 import collections
 import time
 import logging
+from typing import Any, Dict
 
 import arrow
 from ayon_api import (
@@ -9,7 +10,7 @@ from ayon_api import (
     create_project,
     slugify_string,
 )
-from ayon_api.entity_hub import EntityHub
+from ayon_api.entity_hub import EntityHub, BaseEntity
 import ftrack_api
 from ftrack_common import (
     CUST_ATTR_KEY_SERVER_ID,
@@ -211,7 +212,9 @@ class SyncFromFtrack:
             self._report_items.extend([
                 {
                     "type": "label",
-                    "value": "## Project does not exist in AYON"
+                    "value": (
+                        f"## Project '{project_name}' does not exist in AYON"
+                    )
                 },
                 {
                     "type": "label",
@@ -310,7 +313,7 @@ class SyncFromFtrack:
         self.log.info("Querying project hierarchy from ftrack")
         ft_entities = ft_session.query((
             "select id, name, parent_id, type_id, object_type_id, status_id"
-            ", start_date, end_date, description"  #, bid, status_id"
+            ", start_date, end_date, description, status_id"
             " from TypedContext where project_id is \"{}\""
         ).format(ft_project["id"])).all()
         t_ft_entities_4 = time.perf_counter()
@@ -686,9 +689,44 @@ class SyncFromFtrack:
             for child in entity.children:
                 deactivate_queue.append(child)
 
+    def _set_entity_status(
+        self,
+        ft_entity: ftrack_api.entity.base.Entity,
+        entity: BaseEntity,
+        ftrack_statuses: Dict[str, str],
+        ayon_statuses: Dict[str, Any],
+    ):
+        # QUESTION should we log all invalid/missing statuses?
+        # QUESTION should we update AYON project statuses if status
+        #   is not available?
+        if entity.entity_type not in ("folder", "task"):
+            return
+
+        ft_status_name = ftrack_statuses.get(ft_entity.get("status_id"))
+        if ft_status_name is None:
+            return
+
+        ayon_status = ayon_statuses.get(ft_status_name.lower())
+        if ayon_status is None:
+            return
+
+        scope = ayon_status.scope
+        if entity.entity_type in scope:
+            entity.set_status(ayon_status["name"])
+
     def update_attributes_from_ftrack(
         self, cust_attr_value_by_entity_id, ft_entities_by_id
     ):
+        ftrack_statuses = {
+            status["id"]: status["name"]
+            for status in self._ft_session.query(
+                "select id, name from Status"
+            ).all()
+        }
+        ayon_statuses = {
+            status["name"].lower(): status
+            for status in self._entity_hub.project_entity["statuses"]
+        }
         hierarchy_queue = collections.deque()
         hierarchy_queue.append(self._entity_hub.project_entity)
         while hierarchy_queue:
@@ -709,6 +747,10 @@ class SyncFromFtrack:
             ])
             entity.attribs[FTRACK_ID_ATTRIB] = ftrack_id
             entity.attribs[FTRACK_PATH_ATTRIB] = path
+
+            self._set_entity_status(
+                ft_entity, entity, ftrack_statuses, ayon_statuses
+            )
 
             for attr_name, value in (
                 ("startDate", ft_entity["start_date"]),
