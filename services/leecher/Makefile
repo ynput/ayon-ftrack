@@ -1,4 +1,11 @@
-include .env
+ENVFILE = .env
+ENVFILE_EXAMPLE = example_env
+
+# Create the .env file if not exit.
+ifeq ("$(wildcard $(ENVFILE))","")
+   $(shell cp $(ENVFILE_EXAMPLE) $(ENVFILE))
+endif
+
 VERSION=$(shell python -c "import os;import sys;content={};f=open('$(CURDIR)/../../package.py');exec(f.read(),content);f.close();print(content['version'])")
 BASE_NAME := ayon-ftrack-leecher
 IMAGE := ynput/$(BASE_NAME):$(VERSION)
