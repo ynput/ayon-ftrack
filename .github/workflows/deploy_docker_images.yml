@@ -1,4 +1,4 @@
-name: Docker Image Deployment
+name: 🐳 Docker Image Deployment
 
 on:
   workflow_dispatch:
@@ -20,17 +20,17 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build leecher image
-        id: build-docker-image
+        id: build-leecher-docker-image
         run: make build -C ./services/leecher
 
       - name: Push leecher image
-        id: build-docker-image
+        id: push-leecher-docker-image
         run: make dist -C ./services/leecher
 
       - name: Build processor image
-        id: build-docker-image
+        id: build-processor-docker-image
         run: make build -C ./services/processor
 
       - name: Push processor image
-        id: build-docker-image
+        id: push-processor-docker-image
         run: make dist -C ./services/processor
