@@ -7,6 +7,9 @@ BASH_CONTAINER_NAME := $(BASE_NAME)-bash-$(VERSION)
 build:
 	docker build -t $(IMAGE)  .
 
+dist:
+	docker push -t $(IMAGE)  .
+
 clean:
 	docker rmi $(IMAGE)
 

@@ -9,6 +9,9 @@ build:
 	docker build -t $(IMAGE) .
 	rm -rf ftrack_common
 
+dist:
+	docker push -t $(IMAGE)  .
+
 clean:
 	docker rmi $(image)
 
