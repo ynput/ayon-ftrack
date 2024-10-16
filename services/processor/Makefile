@@ -17,7 +17,7 @@ build:
 	rm -rf ftrack_common
 
 dist:
-	docker push $(IMAGE)  .
+	docker push $(IMAGE)
 
 clean:
 	docker rmi $(image)

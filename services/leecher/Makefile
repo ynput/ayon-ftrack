@@ -15,7 +15,7 @@ build:
 	docker build -t $(IMAGE)  .
 
 dist:
-	docker push $(IMAGE)  .
+	docker push $(IMAGE)
 
 clean:
 	docker rmi $(IMAGE)
