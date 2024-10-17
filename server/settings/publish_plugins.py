@@ -390,49 +390,6 @@ DEFAULT_PUBLISH_SETTINGS = {
         "profiles": [
             {
                 "host_names": [
-                    "standalonepublisher"
-                ],
-                "product_types": [],
-                "task_types": [],
-                "task_names": [],
-                "add_ftrack_family": True,
-                "advanced_filtering": []
-            },
-            {
-                "host_names": [
-                    "standalonepublisher"
-                ],
-                "product_types": [
-                    "matchmove",
-                    "shot"
-                ],
-                "task_types": [],
-                "task_names": [],
-                "add_ftrack_family": False,
-                "advanced_filtering": []
-            },
-            {
-                "host_names": [
-                    "standalonepublisher"
-                ],
-                "product_types": [
-                    "plate"
-                ],
-                "task_types": [],
-                "task_names": [],
-                "add_ftrack_family": False,
-                "advanced_filtering": [
-                    {
-                        "families": [
-                            "clip",
-                            "review"
-                        ],
-                        "add_ftrack_family": True
-                    }
-                ]
-            },
-            {
-                "host_names": [
                     "traypublisher"
                 ],
                 "product_types": [],
