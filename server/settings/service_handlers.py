@@ -330,6 +330,10 @@ class FtrackServiceHandlers(BaseSettingsModel):
         title="Sync to AYON",
         default_factory=SimpleAction,
     )
+    sync_users_from_ftrack: SimpleAction = SettingsField(
+        title="Sync Users to AYON",
+        default_factory=SimpleAction,
+    )
     sync_hier_entity_attributes: SyncHierarchicalAttributes = SettingsField(
         title="Sync Hierarchical and Entity Attributes",
         default_factory=SyncHierarchicalAttributes,
@@ -389,6 +393,13 @@ DEFAULT_SERVICE_HANDLERS_SETTINGS = {
         ]
     },
     "sync_from_ftrack": {
+        "enabled": True,
+        "role_list": [
+            "Administrator",
+            "Project manager"
+        ]
+    },
+    "sync_users_from_ftrack": {
         "enabled": True,
         "role_list": [
             "Administrator",
