@@ -1,5 +1,5 @@
 import typing
-from typing import Union, List, Set, Dict, Any
+from typing import Union, List, Dict
 
 import ayon_api
 
@@ -49,7 +49,56 @@ class SyncUsersFromFtrackAction(ServerAction):
             return False
         return self.valid_roles(session, entities, event)
 
+    def interface(self, session, entities, event):
+        if event["data"].get("values"):
+            return
+
+        response = ayon_api.get("accessGroups/_")
+        access_groups = [
+            item["name"]
+            for item in response.data
+        ]
+
+        title = "Default artist access groups"
+
+        items = [
+            {
+                "type": "label",
+                "value": "Select default access groups for artists",
+            },
+            {
+                "type": "enumerator",
+                "name": "access_groups",
+                "data": [
+                    {
+                        "value": access_group,
+                        "label": access_group,
+                    }
+                    for access_group in access_groups
+                ],
+                "value": access_groups,
+                "multi_select": True,
+            },
+        ]
+
+        return {
+            "items": items,
+            "title": title
+        }
+
     def launch(self, session, entities, event):
+        values = event["data"].get("values")
+        access_groups = None
+        if values:
+            access_groups = values.get("access_groups")
+
+        if access_groups is None:
+            response = ayon_api.get("accessGroups/_")
+            access_groups = [
+                item["name"]
+                for item in response.json()
+            ]
+
         self.log.info("Synchronization begins")
         fields = {
             "id",
@@ -144,15 +193,16 @@ class SyncUsersFromFtrackAction(ServerAction):
                 ayon_user_data["isManger"] = is_manager
                 # Create new user
                 if not is_admin and not is_manager:
-                    # TODO define default access groups in settings???
-                    # - they can be customized
                     # TODO use predefined endpoints (are not available
                     #   at the moment of this PR)
-                    ayon_user_data["defaultAccessGroups"] = ["artist"]
+                    ayon_user_data["defaultAccessGroups"] = list(
+                        access_groups
+                    )
                     ayon_user_data["accessGroups"] = (
                         self._calculate_default_access_groups(
                             ftrack_projects,
-                            user_roles_by_user_id[ftrack_id]
+                            user_roles_by_user_id[ftrack_id],
+                            access_groups
                         )
                     )
 
@@ -227,7 +277,7 @@ class SyncUsersFromFtrackAction(ServerAction):
         return True
 
     def _calculate_default_access_groups(
-        self, ftrack_projects, user_roles
+        self, ftrack_projects, user_roles, access_groups
     ):
         available_project_names = []
         project_names = set(ayon_api.get_project_names(active=None))
@@ -247,6 +297,6 @@ class SyncUsersFromFtrackAction(ServerAction):
                     break
 
         return {
-            project_name: ["artist"]
+            project_name: list(access_groups)
             for project_name in available_project_names
         }
