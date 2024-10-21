@@ -87,7 +87,11 @@ class SyncUsersFromFtrackEvent(BaseEventHandler):
         ayon_users = [
             user
             for user in ayon_api.get_users()
-            if not user["isAdmin"] and not user["isManager"]
+            if (
+                not user["isAdmin"]
+                and not user["isManager"]
+                and not user["isService"]
+            )
         ]
         if not ayon_users:
             return
