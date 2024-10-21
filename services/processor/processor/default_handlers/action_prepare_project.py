@@ -704,7 +704,7 @@ class PrepareProjectServer(ServerAction):
         anatomy_preset = event_values["anatomy_preset"]
         if anatomy_preset == self.default_preset_name:
             anatomy_preset = None
-        
+
         ayon_users_to_clean_roles = self.get_ayon_users_to_clean_roles(
             session, project_entity
         )
