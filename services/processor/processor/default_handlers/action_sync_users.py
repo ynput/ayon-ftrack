@@ -218,7 +218,7 @@ class SyncUsersFromFtrackAction(ServerAction):
                     attrib_diffs[key] = value
 
             if user_diffs:
-                ayon_api.put(
+                ayon_api.patch(
                     f"users/{ayon_user_name}",
                     **user_diffs,
                 )
