@@ -38,7 +38,8 @@ def map_ftrack_users_to_ayon_users(
     mapped_ayon_users: Set[str] = set()
     for ftrack_user in ftrack_users:
         ftrack_id: str = ftrack_user["id"]
-        ftrack_name: str = ftrack_user["username"]
+        # Make sure username does not contain '@' character
+        ftrack_name: str = ftrack_user["username"].split("@", 1)[0]
         ftrack_email: str = ftrack_user["email"]
 
         if ftrack_email and ftrack_email.lower() in ayon_users_by_email:

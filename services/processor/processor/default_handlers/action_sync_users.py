@@ -162,7 +162,7 @@ class SyncUsersFromFtrackAction(ServerAction):
                 }
                 if attrib:
                     new_ayon_user["attrib"] = attrib
-                username = ftrack_user["username"]
+                username = ftrack_user["username"].split("@", 1)[0]
                 ayon_api.put(
                     f"users/{username}",
                     **new_ayon_user,
