@@ -15,7 +15,7 @@ from ftrack_common import (
     get_ayon_attr_configs,
     query_custom_attribute_values,
 )
-from processor.lib import SyncFromFtrack
+from processor.lib import SyncFromFtrack, map_ftrack_users_to_ayon_users
 
 
 class PrepareProjectServer(ServerAction):
@@ -704,7 +704,19 @@ class PrepareProjectServer(ServerAction):
         anatomy_preset = event_values["anatomy_preset"]
         if anatomy_preset == self.default_preset_name:
             anatomy_preset = None
+
+        ayon_users_to_clean_roles = self.get_ayon_users_to_clean_roles(
+            session, project_entity
+        )
+
         syncer.create_project(anatomy_preset, attributes)
+
+        for ayon_username in ayon_users_to_clean_roles:
+            user = ayon_api.get_user(ayon_username)
+            user_data = user["data"]
+            user_access_groups = user_data.setdefault("accessGroups", {})
+            user_access_groups[project_name] = []
+            ayon_api.patch(f"users/{ayon_username}", data=user_data)
 
         ayon_project = ayon_api.get_project(project_entity["full_name"])
         values = copy.deepcopy(ayon_project["attrib"])
@@ -748,3 +760,75 @@ class PrepareProjectServer(ServerAction):
             "message": "Project created in AYON.",
             "success": True
         }
+
+    def get_ayon_users_to_clean_roles(
+        self, session, project_entity
+    ):
+        """Get AYON usernames that should have removed roles from a project.
+
+        If project is private in ftrack we do remove roles from AYON users if
+        they should not see it.
+
+        Args:
+            session (ftrack_api.Session): ftrack session.
+            project_entity (ftrack_api.entity.base.Entity): Project entity.
+
+        """
+        if not project_entity["is_private"]:
+            return []
+
+        ayon_users = [
+            ayon_user
+            for ayon_user in ayon_api.get_users()
+            if (
+                not ayon_user["isAdmin"]
+                and not ayon_user["isManager"]
+                and not ayon_user["isService"]
+            )
+        ]
+        ayon_usernames = [
+            ayon_user["name"]
+            for ayon_user in ayon_users
+        ]
+
+        project_id = project_entity["id"]
+        role_ids = [
+            role["user_security_role_id"]
+            for role in session.query(
+                "select user_security_role_id"
+                " from UserSecurityRoleProject"
+                f" where project_id is '{project_id}'"
+            ).all()
+        ]
+        if not role_ids:
+            return ayon_usernames
+        joined_role_ids = self.join_filter_values(role_ids)
+        user_ids = {
+            role["user_id"]
+            for role in session.query(
+                "select user_id"
+                " from UserSecurityRole"
+                f" where security_role_id in ({joined_role_ids})"
+            ).all()
+        }
+        ftrack_users = []
+        if user_ids:
+            joined_user_ids = self.join_filter_values(user_ids)
+            ftrack_users = session.query(
+                "select id, username, email from User"
+                f" where id in ({joined_user_ids})"
+            ).all()
+        users_mapping = map_ftrack_users_to_ayon_users(
+            ftrack_users,
+            ayon_users
+        )
+
+        for ftrack_id, ayon_username in users_mapping.items():
+            if ayon_username is None:
+                continue
+
+            if ftrack_id not in user_ids:
+                ayon_usernames.remove(ayon_username)
+
+        return ayon_usernames
+
