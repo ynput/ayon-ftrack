@@ -520,7 +520,7 @@ class SyncFromFtrack:
         if entity_type.lower() == "task":
             task_type_name = ft_type_names_by_id[ft_entity["type_id"]]
             new_entity = self._entity_hub.add_new_task(
-                task_type_name,
+                task_type=task_type_name,
                 name=name,
                 label=label,
                 entity_id=entity_id,
@@ -531,7 +531,7 @@ class SyncFromFtrack:
             object_type = ft_object_type_name_by_id[
                 ft_entity["object_type_id"]]
             new_entity = self._entity_hub.add_new_folder(
-                object_type,
+                folder_type=object_type,
                 name=name,
                 label=label,
                 entity_id=entity_id,
