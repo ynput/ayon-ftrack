@@ -25,6 +25,7 @@ class _GlobalContext:
     stop_event = threading.Event()
     session = None
     session_fail_logged = 0
+    process_cleaned_up = False
 
 
 def get_handler_paths() -> list[str]:
@@ -181,6 +182,9 @@ def main_loop():
 
 def _cleanup_process():
     """Cleanup timer threads on exit."""
+    if _GlobalContext.process_cleaned_up:
+        return
+    _GlobalContext.process_cleaned_up = True
     logging.info("Process stop requested. Terminating process.")
     logging.info("Canceling threading timers.")
     counter = 0
