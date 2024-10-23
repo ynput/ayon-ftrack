@@ -122,6 +122,13 @@ class BaseHandler(metaclass=ABCMeta):
         """Subscribe to event topics."""
         pass
 
+    def cleanup(self):
+        """Cleanup handler.
+
+        This method should end threads, timers, close connections, etc.
+        """
+        pass
+
     def register_wrapper(self, func):
         @functools.wraps(func)
         def wrapper_register(*args, **kwargs):

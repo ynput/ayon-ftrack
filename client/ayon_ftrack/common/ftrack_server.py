@@ -115,6 +115,13 @@ class FtrackServer:
         try:
             session.event_hub.wait()
         finally:
+            for handler in self._cached_objects:
+                try:
+                    handler.cleanup()
+                except Exception:
+                    self.log.warning(
+                        "Failed to cleanup handler", exc_info=True
+                    )
             self._is_running = False
             self._cached_modules = []
 
