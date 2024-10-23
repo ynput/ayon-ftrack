@@ -183,9 +183,14 @@ def _cleanup_process():
     """Cleanup timer threads on exit."""
     logging.info("Process stop requested. Terminating process.")
     logging.info("Canceling threading timers.")
+    counter = 0
     for thread in threading.enumerate():
         if isinstance(thread, threading.Timer):
             thread.cancel()
+            counter += 1
+
+    if counter:
+        logging.info(f"Canceled {counter} timers.")
 
     logging.info("Stopping main loop.")
     if not _GlobalContext.stop_event.is_set():
