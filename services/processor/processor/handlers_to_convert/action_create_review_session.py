@@ -47,7 +47,6 @@ class CreateDailyReviewSessionServerAction(ServerAction):
         )
 
         self._cycle_timers_by_id = {}
-        self._last_cyle_time = None
         self._day_delta = datetime.timedelta(days=1)
 
     def discover(self, session, entities, event):
@@ -106,12 +105,10 @@ class CreateDailyReviewSessionServerAction(ServerAction):
         expected_next_trigger = datetime.datetime(
             now.year, now.month, now.day, h, m, s
         )
-        if expected_next_trigger > now:
-            seconds = (expected_next_trigger - now).total_seconds()
-        else:
+        if expected_next_trigger <= now:
             expected_next_trigger += self._day_delta
-            seconds = (expected_next_trigger - now).total_seconds()
-        return seconds, expected_next_trigger
+
+        return (expected_next_trigger - now).total_seconds()
 
     def register(self, *args, **kwargs):
         """Override register to be able trigger """
@@ -129,11 +126,7 @@ class CreateDailyReviewSessionServerAction(ServerAction):
                 timer.cancel()
 
     def _add_timer_callback(self):
-        seconds_delta, cycle_time = self._calculate_next_cycle_delta()
-
-        # Store cycle time which will be used to create next timer
-        # Create timer thread
-        self._last_cyle_time = cycle_time
+        seconds_delta = self._calculate_next_cycle_delta()
 
         timer_id = uuid.uuid4().hex
         cycle_timer = threading.Timer(
