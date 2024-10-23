@@ -48,12 +48,9 @@ class CreateDailyListServerAction(ServerAction):
     settings_key = "create_daily_lists"
 
     def __init__(self, *args, **kwargs):
-        super(CreateDailyListServerAction, self).__init__(
-            *args, **kwargs
-        )
+        super().__init__(*args, **kwargs)
 
-        self._cycle_timer = None
-        self._last_cyle_time = None
+        self._cycle_timers_by_id = {}
         self._day_delta = datetime.timedelta(days=1)
 
     def discover(self, session, entities, event):
@@ -173,19 +170,14 @@ class CreateDailyListServerAction(ServerAction):
         expected_next_trigger = datetime.datetime(
             now.year, now.month, now.day, h, m, s
         )
-        if expected_next_trigger > now:
-            seconds = (expected_next_trigger - now).total_seconds()
-        else:
+        if expected_next_trigger <= now:
             expected_next_trigger += self._day_delta
-            seconds = (expected_next_trigger - now).total_seconds()
-        return seconds, expected_next_trigger
+        return (expected_next_trigger - now).total_seconds()
 
     def register(self, *args, **kwargs):
         """Override register to be able trigger """
         # Register server action as would be normally
-        super(CreateDailyListServerAction, self).register(
-            *args, **kwargs
-        )
+        super().register(*args, **kwargs)
 
         self.session.event_hub.subscribe(
             "topic={}".format(self.automated_topic),
@@ -193,17 +185,29 @@ class CreateDailyListServerAction(ServerAction):
             priority=self.priority
         )
 
-        seconds_delta, cycle_time = self._calculate_next_cycle_delta()
+        self._add_timer_callback()
 
-        # Store cycle time which will be used to create next timer
-        self._last_cyle_time = cycle_time
-        # Create timer thread
-        self._cycle_timer = threading.Timer(
-            seconds_delta, self._timer_callback
+    def cleanup(self):
+        for timer_id in list(self._cycle_timers_by_id.keys()):
+            timer = self._cycle_timers_by_id.pop(timer_id, None)
+            if timer is not None:
+                timer.cancel()
+
+    def _add_timer_callback(self):
+        seconds_delta = self._calculate_next_cycle_delta()
+
+        timer_id = uuid.uuid4().hex
+        cycle_timer = threading.Timer(
+            seconds_delta, self._timer_callback, [timer_id]
         )
-        self._cycle_timer.start()
+        self._cycle_timers_by_id[timer_id] = cycle_timer
+        cycle_timer.start()
 
-    def _timer_callback(self):
+    def _timer_callback(self, timer_id):
+        timer = self._cycle_timers_by_id.pop(timer_id, None)
+        if timer is None:
+            return
+
         # Stop chrono callbacks if session is closed
         if self.session.closed:
             return
@@ -214,15 +218,8 @@ class CreateDailyListServerAction(ServerAction):
             [self.settings_frack_subkey]
             [self.settings_key]
         )
-        seconds_delta, cycle_time = self._calculate_next_cycle_delta(
-            action_settings
-        )
-        self._last_cyle_time = cycle_time
 
-        self._cycle_timer = threading.Timer(
-            seconds_delta, self._timer_callback
-        )
-        self._cycle_timer.start()
+        self._add_timer_callback()
 
         datetime_obj = datetime.datetime.now()
         weekday = WEEKDAY_MAPPING[datetime_obj.weekday()]
