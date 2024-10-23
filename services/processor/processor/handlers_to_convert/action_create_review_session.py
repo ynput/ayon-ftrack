@@ -2,6 +2,7 @@ import threading
 import datetime
 import copy
 import collections
+import uuid
 
 import ftrack_api
 
@@ -45,7 +46,7 @@ class CreateDailyReviewSessionServerAction(ServerAction):
             *args, **kwargs
         )
 
-        self._cycle_timer = None
+        self._cycle_timers_by_id = {}
         self._last_cyle_time = None
         self._day_delta = datetime.timedelta(days=1)
 
@@ -115,38 +116,43 @@ class CreateDailyReviewSessionServerAction(ServerAction):
     def register(self, *args, **kwargs):
         """Override register to be able trigger """
         # Register server action as would be normally
-        super(CreateDailyReviewSessionServerAction, self).register(
-            *args, **kwargs
-        )
+        super().register(*args, **kwargs)
 
-        seconds_delta, cycle_time = self._calculate_next_cycle_delta()
-
-        # Store cycle time which will be used to create next timer
-        self._last_cyle_time = cycle_time
-        # Create timer thread
-        self._cycle_timer = threading.Timer(
-            seconds_delta, self._timer_callback
-        )
-        self._cycle_timer.start()
+        self._add_timer_callback()
 
         self._check_review_session()
 
-    def _timer_callback(self):
-        # Stop chrono callback if session is closed
+    def cleanup(self):
+        for timer_id in list(self._cycle_timers_by_id.keys()):
+            timer = self._cycle_timers_by_id.pop(timer_id, None)
+            if timer is not None:
+                timer.cancel()
+
+    def _add_timer_callback(self):
+        seconds_delta, cycle_time = self._calculate_next_cycle_delta()
+
+        # Store cycle time which will be used to create next timer
+        # Create timer thread
+        self._last_cyle_time = cycle_time
+
+        timer_id = uuid.uuid4().hex
+        cycle_timer = threading.Timer(
+            seconds_delta, self._timer_callback, [timer_id]
+        )
+        self._cycle_timers_by_id[timer_id] = cycle_timer
+        cycle_timer.start()
+
+    def _timer_callback(self, timer_id):
+        timer = self._cycle_timers_by_id.pop(timer_id, None)
+        if timer is None:
+            return
+
+        # Stop chrono callbacks if session is closed
         if self.session.closed:
             return
 
-        if (
-            self._cycle_timer is not None
-            and self._last_cyle_time is not None
-        ):
-            seconds_delta, cycle_time = self._calculate_next_cycle_delta()
-            self._last_cyle_time = cycle_time
+        self._add_timer_callback()
 
-            self._cycle_timer = threading.Timer(
-                seconds_delta, self._timer_callback
-            )
-            self._cycle_timer.start()
         self._check_review_session()
 
     def _check_review_session(self):
