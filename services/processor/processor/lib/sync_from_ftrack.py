@@ -25,6 +25,8 @@ from ftrack_common import (
     get_ayon_attr_configs,
 )
 
+from .users import map_ftrack_users_to_ayon_users
+
 
 def _get_ftrack_project(session, project_name):
     ft_project = session.query((
@@ -64,6 +66,13 @@ class SyncFromFtrack:
         self._ft_session = session
         self._project_name = project_name
         self._ids_mapping = IdsMapping()
+
+        ft_users = session.query("select id, username, email from User").all()
+        users_mapping = map_ftrack_users_to_ayon_users(ft_users)
+        for ftrack_id, ayon_id in users_mapping.items():
+            if ayon_id:
+                self._ids_mapping.set_ftrack_to_server(ftrack_id, ayon_id)
+
         # Create entity hub which handle entity changes
         self._entity_hub = EntityHub(project_name)
 
@@ -354,6 +363,11 @@ class SyncFromFtrack:
             ft_object_type_name_by_id,
             ft_type_names_by_id,
             cust_attr_value_by_entity_id
+        )
+
+        self.log.info("Updating assignees")
+        self.update_assignees_from_ftrack(
+            ft_entities_by_id
         )
 
         self.log.info("Updating attributes of entities")
@@ -713,6 +727,50 @@ class SyncFromFtrack:
         scope = ayon_status.scope
         if entity.entity_type in scope:
             entity.set_status(ayon_status["name"])
+
+    def update_assignees_from_ftrack(self, ft_entities_by_id):
+        task_entities_by_id = {}
+        for entity in ft_entities_by_id.values():
+            if entity.entity_type == "Task":
+                task_id = entity["id"]
+                ayon_id = self._ids_mapping.get_server_mapping(task_id)
+                if ayon_id is not None:
+                    task_entities_by_id[task_id] = entity
+
+        if not task_entities_by_id:
+            return
+
+        assignment_by_task_id = collections.defaultdict(set)
+        task_ids = list(task_entities_by_id.keys())
+        for task_ids_chunk in create_chunks(task_ids, 50):
+            joined_ids = ",".join([
+                f'"{task_id}"'
+                for task_id in task_ids_chunk
+            ])
+            appointments = self._ft_session.query(
+                f"select resource_id, context_id from Appointment"
+                f" where context_id in ({joined_ids})"
+                f" and type is 'assignment'"
+            ).all()
+            for appointment in appointments:
+                task_id = appointment["context_id"]
+                user_id = appointment["resource_id"]
+                assignment_by_task_id[task_id].add(user_id)
+
+        for task_id, user_ids in assignment_by_task_id.items():
+            ayon_task = self._entity_hub.get_entity_by_id(
+                self._ids_mapping.get_server_mapping(task_id)
+            )
+            if ayon_task is None:
+                continue
+
+            assignees = []
+            for user_id in user_ids:
+                ayon_user = self._ids_mapping.get_server_mapping(user_id)
+                if ayon_user:
+                    assignees.append(ayon_user)
+
+            ayon_task.assignees = assignees
 
     def update_attributes_from_ftrack(
         self, cust_attr_value_by_entity_id, ft_entities_by_id

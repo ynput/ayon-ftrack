@@ -1,11 +1,12 @@
 from typing import Dict, List, Set, Union, Any
 
+import ayon_api
 import ftrack_api.entity.user
 
 
 def map_ftrack_users_to_ayon_users(
     ftrack_users: List[ftrack_api.entity.user.User],
-    ayon_users: List[Dict[str, Any]],
+    ayon_users: List[Dict[str, Any]] = None,
 ) -> Dict[str, Union[str, None]]:
     """Map ftrack users to AYON users.
 
@@ -22,6 +23,9 @@ def map_ftrack_users_to_ayon_users(
             to AYON username.
 
     """
+    if ayon_users is None:
+        ayon_users = ayon_api.get_users()
+
     mapping: Dict[str, Union[str, None]] = {
         user["id"]: None
         for user in ftrack_users
