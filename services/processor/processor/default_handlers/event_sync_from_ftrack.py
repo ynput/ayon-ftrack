@@ -14,6 +14,7 @@ from ayon_api import (
 )
 
 from ayon_api.entity_hub import EntityHub
+
 from ftrack_common import (
     BaseEventHandler,
 
@@ -38,6 +39,7 @@ from ftrack_common import (
     create_chunks,
     join_filter_values,
 )
+from processor.lib import map_ftrack_users_to_ayon_users
 
 UNKNOWN_VALUE = object()
 
@@ -481,12 +483,26 @@ class SyncProcess:
         entities_by_action = {
             "remove": {},
             "update": {},
-            "add": {}
+            "add": {},
+            "assignee_change": {}
         }
         found_actions = set()
         ft_project_removed = False
         for ent_info in self.event["data"]["entities"]:
             base_type = ent_info["entityType"]
+            if base_type == "appointment":
+                if ent_info["action"] not in ("remove", "add"):
+                    continue
+                type_changes = ent_info["changes"]["type"]
+                appointment_type = type_changes["new"] or type_changes["old"]
+                if appointment_type != "assignment":
+                    continue
+                action = "assignee_change"
+                ftrack_id = ent_info["entityId"]
+                found_actions.add(action)
+                entities_by_action[action][ftrack_id] = ent_info
+                continue
+
             if base_type not in self.interest_base_types:
                 continue
 
@@ -1443,6 +1459,62 @@ class SyncProcess:
         self._propagate_task_type_changes(task_type_changes)
         self._propagate_status_changes(status_changes)
 
+    def _propagate_assignee_changes(self):
+        assignee_changes = self.entities_by_action["assignee_change"]
+        if not assignee_changes:
+            return
+
+        # Initial preparation of user entities
+        ftrack_users = self.session.query(
+            "select id, username, email from User"
+        ).all()
+        ayon_user_by_ftrack_id = map_ftrack_users_to_ayon_users(ftrack_users)
+
+        ent_info_by_task_id = {}
+        for ent_info in assignee_changes.values():
+            changes = ent_info["changes"]
+            user_id_changes = changes["resource_id"]
+            user_id = user_id_changes["new"] or user_id_changes["old"]
+            ayon_user = ayon_user_by_ftrack_id.get(user_id)
+            if not ayon_user:
+                continue
+            task_id_changes = changes["context_id"]
+            task_id = task_id_changes["new"] or task_id_changes["old"]
+            ent_info_by_task_id.setdefault(task_id, []).append(ent_info)
+
+        for task_id, ent_infos in ent_info_by_task_id.items():
+            entity_ids = self.task_ids_by_ftrack_id[task_id]
+            if len(entity_ids) != 1:
+                continue
+            task_entity = self.entity_hub.get_or_query_entity_by_id(
+                entity_ids[0], ["task"]
+            )
+            if task_entity is None:
+                continue
+
+            assignees = task_entity.assignees
+            assignees_changed = False
+            for ent_info in ent_infos:
+                changes = ent_info["changes"]
+                user_id_changes = changes["resource_id"]
+                added = True
+                user_id = user_id_changes["new"]
+                if user_id is None:
+                    added = False
+                    user_id = user_id_changes["old"]
+
+                ayon_user = ayon_user_by_ftrack_id.get(user_id)
+                if added:
+                    if ayon_user not in assignees:
+                        assignees.append(ayon_user)
+                        assignees_changed = True
+                elif ayon_user in assignees:
+                    assignees.remove(ayon_user)
+                    assignees_changed = True
+
+            if assignees_changed:
+                task_entity.assignees = assignees
+
     def _create_ft_attr_operation(
         self, conf_id, entity_id, is_new, new_value, old_value=None
     ):
@@ -1582,7 +1654,8 @@ class SyncProcess:
         debug_action_map = {
             "add": "Created",
             "remove": "Removed",
-            "update": "Updated"
+            "update": "Updated",
+            "assignee_change": "Assignee changed",
         }
         debug_msg = "\n".join([
             f"- {debug_action_map[action]}: {len(entities_info)}"
@@ -1594,10 +1667,14 @@ class SyncProcess:
 
         # Get ftrack entities - find all ftrack ids first
         ftrack_ids = set()
-        for action, _ftrack_ids in entities_by_action.items():
-            # skip removed (not exist in ftrack)
-            if action != "remove":
-                ftrack_ids |= set(_ftrack_ids)
+        for action in {"add", "update"}:
+            ftrack_ids |= set(entities_by_action[action].keys())
+
+        # Add task ids from assignees changes
+        for ent_info in entities_by_action["assignee_change"].values():
+            context_id_changes = ent_info["changes"]["context_id"]
+            ftrack_id = context_id_changes["new"] or context_id_changes["old"]
+            ftrack_ids.add(ftrack_id)
 
         # Precache entities that will be needed in single call
         if ftrack_ids:
@@ -1613,16 +1690,19 @@ class SyncProcess:
             # 2. Propagate custom attribute changes
             self._propagate_attrib_changes()
             time_3 = time.time()
-            # 3. Commit changes to server
-            self.entity_hub.commit_changes()
-            # 4. Propagate entity changes to ftack
+            # 3. Propage assigneess changes
+            self._propagate_assignee_changes()
             time_4 = time.time()
+            # 4. Commit changes to server
+            self.entity_hub.commit_changes()
+            # 5. Propagate entity changes to ftack
+            time_5 = time.time()
             self._propagate_ftrack_attributes()
             # TODO propagate entities to ftrack
             #  - server id, server path, sync failed
-            time_5 = time.time()
+            time_6 = time.time()
 
-            total_time = f"{time_5 - time_1:.2f}"
+            total_time = f"{time_6 - time_1:.2f}"
             mid_times = ", ".join([
                 f"{diff:.2f}"
                 for diff in (
@@ -1630,6 +1710,7 @@ class SyncProcess:
                     time_3 - time_2,
                     time_4 - time_3,
                     time_5 - time_4,
+                    time_6 - time_5,
                 )
             ])
             self.log.debug(f"Process time: {total_time} <{mid_times}>")
