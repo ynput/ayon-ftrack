@@ -740,7 +740,10 @@ class SyncFromFtrack:
         if not task_entities_by_id:
             return
 
-        assignment_by_task_id = collections.defaultdict(set)
+        assignment_by_task_id = {
+            task_id: set()
+            for task_id in task_entities_by_id
+        }
         task_ids = list(task_entities_by_id.keys())
         for task_ids_chunk in create_chunks(task_ids, 50):
             joined_ids = ",".join([
@@ -764,13 +767,19 @@ class SyncFromFtrack:
             if ayon_task is None:
                 continue
 
-            assignees = []
+            new_assignees = set()
+            # Keep users that don't have ftrack mapping on task
+            for ayon_user in ayon_task.assignees:
+                user_id = self._ids_mapping.get_ftrack_mapping(ayon_user)
+                if user_id is None:
+                    new_assignees.add(ayon_user)
+
             for user_id in user_ids:
                 ayon_user = self._ids_mapping.get_server_mapping(user_id)
                 if ayon_user:
-                    assignees.append(ayon_user)
+                    new_assignees.add(ayon_user)
 
-            ayon_task.assignees = assignees
+            ayon_task.assignees = list(new_assignees)
 
     def update_attributes_from_ftrack(
         self, cust_attr_value_by_entity_id, ft_entities_by_id
