@@ -1,4 +1,4 @@
-from typing import Dict, List, Set, Union, Any
+from typing import Dict, List, Set, Union, Any, Optional
 
 import ayon_api
 import ftrack_api.entity.user
@@ -6,7 +6,7 @@ import ftrack_api.entity.user
 
 def map_ftrack_users_to_ayon_users(
     ftrack_users: List[ftrack_api.entity.user.User],
-    ayon_users: List[Dict[str, Any]] = None,
+    ayon_users: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Union[str, None]]:
     """Map ftrack users to AYON users.
 
