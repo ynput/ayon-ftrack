@@ -14,7 +14,3 @@ jobs:
       YNPUT_BOT_TOKEN: ${{ secrets.YNPUT_BOT_TOKEN }}
       YNPUT_CLOUD_URL: ${{ secrets.YNPUT_CLOUD_URL }}
       YNPUT_CLOUD_TOKEN: ${{ secrets.YNPUT_CLOUD_TOKEN }}
-name: workflow.yml
-on:
-
-jobs:
