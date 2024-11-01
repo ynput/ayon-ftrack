@@ -184,7 +184,7 @@ class SyncUsersFromFtrackAction(ServerAction):
                     full_name_items.append(value)
 
             if full_name_items:
-                attrib["full_name"] = " ".join(full_name_items)
+                attrib["fullName"] = " ".join(full_name_items)
 
             is_admin = ayon_role == "admin"
             is_manager = ayon_role == "manager"
