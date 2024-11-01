@@ -114,17 +114,18 @@ class SyncUsersFromFtrackAction(ServerAction):
         }
         joined_fields = ", ".join(fields)
 
-        ftrack_user_types_by_id = {
-            user_type["id"]: user_type["name"]
+        valid_ftrack_user_type_ids = {
+            user_type["id"]
             for user_type in session.query(
                 "select id, name from UserType"
             ).all()
+            # Ignore services and demo users
+            if user_type["name"] not in ("service", "demo")
         }
         ftrack_users = [
             user
             for user in session.query(f"select {joined_fields} from User")
-            # Use only 'ftrack' user type
-            if ftrack_user_types_by_id[user["user_type_id"]] == "ftrack"
+            if user["user_type_id"] in valid_ftrack_user_type_ids
         ]
         ftrack_users_by_id = {
             ftrack_user["id"]: ftrack_user
