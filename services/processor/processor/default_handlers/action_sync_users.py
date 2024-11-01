@@ -107,15 +107,25 @@ class SyncUsersFromFtrackAction(ServerAction):
             "email",
             "first_name",
             "last_name",
+            "user_type_id",
             # "resource_type",
             # "thumbnail_id",
             # "thumbnail_url",
         }
         joined_fields = ", ".join(fields)
-        ftrack_users = session.query(
-            f"select {joined_fields} from User"
-        ).all()
-        ayon_users = list(ayon_api.get_users())
+
+        ftrack_user_types_by_id = {
+            user_type["id"]: user_type["name"]
+            for user_type in session.query(
+                "select id, name from UserType"
+            ).all()
+        }
+        ftrack_users = [
+            user
+            for user in session.query(f"select {joined_fields} from User")
+            # Use only 'ftrack' user type
+            if ftrack_user_types_by_id[user["user_type_id"]] == "ftrack"
+        ]
         ftrack_users_by_id = {
             ftrack_user["id"]: ftrack_user
             for ftrack_user in ftrack_users
