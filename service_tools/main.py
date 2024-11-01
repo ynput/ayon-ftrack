@@ -85,7 +85,9 @@ def main():
 
     # Fix 'ftrack_common' import
     import common
+    import common.event_handlers
     sys.modules["ftrack_common"] = common
+    sys.modules["ftrack_common.event_handlers"] = common.event_handlers
 
     if service_name == "processor":
         from processor import main as service_main
