@@ -300,11 +300,28 @@ class SyncUsersFromFtrackAction(ServerAction):
                         data_diffs["isAdmin"] = False
 
             elif ayon_role == "artist":
+                became_artist = False
                 if current_user_data.get("isAdmin"):
+                    became_artist = True
                     data_diffs["isAdmin"] = False
 
                 if current_user_data.get("isManger"):
+                    became_artist = True
                     data_diffs["isManger"] = False
+
+                # User will become artist and we need to update access groups
+                if became_artist:
+                    data_diffs["defaultAccessGroups"] = list(
+                        access_groups
+                    )
+                    data_diffs["accessGroups"] = (
+                        self._calculate_default_access_groups(
+                            ftrack_projects,
+                            user_roles_by_user_id[ftrack_id],
+                            project_roles_by_id,
+                            access_groups,
+                        )
+                    )
 
             if data_diffs:
                 user_diffs["data"] = data_diffs
