@@ -1,5 +1,7 @@
 import time
 
+import ayon_api
+
 from ayon_core.addon import AddonsManager
 from ayon_ftrack.common import (
     is_ftrack_enabled_in_settings,
@@ -10,6 +12,21 @@ from ayon_applications import (
     ApplicationLaunchFailed,
     ApplicationExecutableNotFound,
 )
+try:
+    from ayon_applications.utils import get_applications_for_context
+except ImportError:
+    # Backwards compatibility for older ayon-applications addon
+    def get_applications_for_context(
+        project_name,
+        folder_entity,
+        task_entity,
+        project_settings,
+        project_entity,
+    ):
+        ayon_project_apps = project_entity["attrib"].get("applications")
+        if ayon_project_apps:
+            return ayon_project_apps
+        return []
 
 
 class AppplicationsAction(BaseAction):
@@ -157,17 +174,26 @@ class AppplicationsAction(BaseAction):
         ):
             return False
 
-        ayon_project_apps = ayon_project_entity["attrib"].get("applications")
-        if not ayon_project_apps:
-            return False
+        folder_path = self._get_folder_path(session, entity["parent"])
+        task_name = entity["name"]
+        folder_entity = ayon_api.get_folder_by_path(project_name, folder_path)
+        task_entity = ayon_api.get_task_by_name(
+            project_name, folder_entity["id"], task_name
+        )
 
-        settings = self.get_project_settings_from_event(
-            event, ayon_project_entity["name"])
+        only_available = project_settings["applications"].get(
+            "only_available", False
+        )
 
-        only_available = settings["applications"].get("only_available", False)
-
+        app_names = get_applications_for_context(
+            project_name,
+            folder_entity,
+            task_entity,
+            project_settings=project_settings,
+            project_entity=ayon_project_entity
+        )
         items = []
-        for app_name in ayon_project_apps:
+        for app_name in app_names:
             app = self.applications_manager.applications.get(app_name)
             if not app or not app.enabled:
                 continue
