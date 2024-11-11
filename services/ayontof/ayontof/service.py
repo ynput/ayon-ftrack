@@ -20,7 +20,7 @@ def _prepare_source_topics():
         "entity.{entity_type}.data_changed",
         "entity.{entity_type}.label_changed",
         "entity.{entity_type}.type_changed",
-        # "entity.{entity_type}.thumbnail_changed",
+        "entity.{entity_type}.thumbnail_changed",
         "entity.{entity_type}.active_changed",
         "entity.{entity_type}.deleted",
         "entity.{entity_type}.changed",
