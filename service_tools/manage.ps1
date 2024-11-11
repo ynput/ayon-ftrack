@@ -45,8 +45,12 @@ function Start-Processor {
   & python "$($script_dir)\main.py" --service processor @arguments
 }
 
-function Start-Both {
-  & python "$($script_dir)\main.py" --service both @arguments
+function Start-AYONToftrack {
+  & python "$($script_dir)\main.py" --service ayontof @arguments
+}
+
+function Start-All {
+  & python "$($script_dir)\main.py" --service all @arguments
 }
 
 function Load-Env {
@@ -87,8 +91,10 @@ function main {
       Start-Leecher
     } elseif ($FunctionName -eq "processor") {
       Start-Processor
+    } elseif ($FunctionName -eq "ayontof") {
+      Start-AYONToftrack
     } elseif ($FunctionName -eq "services") {
-      Start-Both
+      Start-All
     } else {
       Write-Host "Unknown function ""$FunctionName"""
       Default-Func

@@ -47,11 +47,17 @@ processor:
 		. $(CURDIR)/venv/bin/activate && \
 		python "$(CURDIR)/main.py" --service processor $@
 
+ayontof:
+		export AYON_ADDON_NAME="ftrack" && \
+		export AYON_ADDON_VERSION=$(VERSION) && \
+		. $(CURDIR)/venv/bin/activate && \
+		python "$(CURDIR)/main.py" --service ayontof $@
+
 services:
 		export AYON_ADDON_NAME="ftrack" && \
 		export AYON_ADDON_VERSION=$(VERSION) && \
 		. $(CURDIR)/venv/bin/activate && \
-		python "$(CURDIR)/main.py" --service both $@
+		python "$(CURDIR)/main.py" --service all $@
 
 info: help
 default: help
