@@ -12,41 +12,47 @@ CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 ADDON_DIR = os.path.dirname(CURRENT_DIR)
 
 
-def run_both():
-    both_idx = sys.argv.index("both")
+def run_all():
+    all_idx = sys.argv.index("all")
     leecher_args = list(sys.argv)
     processor_args = list(sys.argv)
+    ayontof_args = list(sys.argv)
 
-    leecher_args[both_idx] = "leecher"
-    processor_args[both_idx] = "processor"
+    leecher_args[all_idx] = "leecher"
+    processor_args[all_idx] = "processor"
+    ayontof_args[all_idx] = "ayontof"
 
     leecher_args.insert(0, sys.executable)
     processor_args.insert(0, sys.executable)
+    ayontof_args.insert(0, sys.executable)
 
     leecher = subprocess.Popen(leecher_args)
     processor = subprocess.Popen(processor_args)
+    ayontof = subprocess.Popen(ayontof_args)
+    processes = [leecher, processor, ayontof]
     try:
         while True:
-            l_poll = leecher.poll()
-            p_poll = processor.poll()
-            if l_poll is not None and p_poll is not None:
-                break
+            any_died = False
+            for process in processes:
+                if process.poll() is not None:
+                    any_died = True
+                    break
 
-            if p_poll is None:
-                if l_poll is not None:
-                    processor.kill()
+            if any_died:
+                all_died = True
+                for process in processes:
+                    if process.poll() is None:
+                        process.kill()
+                        all_died = False
 
-            if l_poll is None:
-                if p_poll is not None:
-                    leecher.kill()
+                if all_died:
+                    break
 
             time.sleep(0.1)
     finally:
-        if leecher.poll() is None:
-            leecher.kill()
-
-        if processor.poll() is None:
-            processor.kill()
+        for process in processes:
+            if process.poll() is None:
+                process.kill()
 
 
 def main():
@@ -54,7 +60,7 @@ def main():
     parser.add_argument(
         "--service",
         help="Run processor service",
-        choices=["processor", "leecher", "both"],
+        choices=["processor", "leecher", "ayontof", "all"],
     )
     parser.add_argument(
         "--variant",
@@ -73,8 +79,8 @@ def main():
         )
 
     service_name = opts.service
-    if service_name == "both":
-        return run_both()
+    if service_name == "all":
+        return run_all()
 
     for path in (
         os.path.join(ADDON_DIR, "client", "ayon_ftrack"),
@@ -91,8 +97,13 @@ def main():
 
     if service_name == "processor":
         from processor import main as service_main
-    else:
+    elif service_name == "leecher":
         from leecher import main as service_main
+    elif service_name == "ayontof":
+        from ayontof import main as service_main
+    else:
+        raise ValueError(f"Unknown service name {service_name}")
+
     service_main()
 
 
