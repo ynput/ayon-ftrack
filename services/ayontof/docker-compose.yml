@@ -1,0 +1,11 @@
+name: ayon-ftrack-services
+services:
+  ayontof:
+    container_name: ayontof
+    image: ynput/ayon-ftrack-ayontof:1.2.2+dev
+    restart: unless-stopped
+    environment:
+      - "AYON_SERVER_URL=${AYON_SERVER_URL}"
+      - "AYON_API_KEY=${AYON_API_KEY}"
+      - "AYON_ADDON_NAME=ftrack"
+      - "AYON_ADDON_VERSION=1.2.2+dev"
