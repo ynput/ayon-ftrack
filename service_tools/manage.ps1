@@ -28,6 +28,7 @@ function Default-Func {
   Write-Host "  install    Install requirements to currently actie python (recommended to create venv)"
   Write-Host "  leecher    Start leecher of ftrack events"
   Write-Host "  processor  Main processing logic"
+  Write-Host "  ayontof    AYON to ftrack sync"
   Write-Host "  services   Start both leecher and processor (experimental)"
   Write-Host ""
 }
