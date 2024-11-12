@@ -18,6 +18,8 @@ def map_ftrack_users_to_ayon_users(
     higher priority. Once AYON user is mapped it cannot be mapped again to
     different user.
 
+    Fields used from ftrack users: 'id', 'username', 'email'.
+
     Args:
         ftrack_users (List[ftrack_api.entity.user.User]): List of ftrack users.
         ayon_users (List[Dict[str, Any]]): List of AYON users.
