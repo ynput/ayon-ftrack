@@ -145,6 +145,7 @@ def create_session():
 
 
 def main_loop():
+    sender = ayon_api.get_service_name()
     while not _GlobalContext.stop_event.is_set():
         session: Optional[ftrack_api.Session] = create_session()
         if session is None:
@@ -153,7 +154,6 @@ def main_loop():
 
         _GlobalContext.session_fail_logged = False
 
-        sender = ayon_api.get_service_name()
         processor = EventProcessor(session)
         while not _GlobalContext.stop_event.is_set():
             if session.closed:
