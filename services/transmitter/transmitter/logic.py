@@ -1,5 +1,5 @@
 import logging
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, TypedDict, Literal
 
 import ftrack_api
 import ayon_api
@@ -10,6 +10,25 @@ from ftrack_common import (
 )
 
 from .structures import JobEventType
+
+
+class EntityDataChangesData(TypedDict):
+    new: Dict[str, Any]
+    old: Dict[str, Any]
+
+
+class EntityEventData(TypedDict):
+    action: Literal["created", "updated", "deleted"]
+    project_name: str
+    entity_type: Literal[
+        "project", "folder", "task", "product", "version"
+    ]
+    entity_id : str
+    # 'entity_data' is filled when action is 'deleted'
+    entity_data: Optional[Dict[str, Any]]
+    # 'update_key' and 'changes' are filled when action is 'updated'
+    update_key: Optional[str]
+    changes: Optional[EntityDataChangesData]
 
 
 class EventProcessor:
@@ -60,16 +79,18 @@ class EventProcessor:
         pass
 
     def _process_entity_event(self, source_event: Dict[str, Any]):
-        entity_data = self._convert_entity_event(source_event)
+        entity_data: Optional[EntityEventData] = self._convert_entity_event(
+            source_event
+        )
         if entity_data is None:
             return
 
-        if entity_data["action"] == "update":
+        if entity_data["action"] == "updated":
             self._handle_update_event(entity_data)
 
     def _convert_entity_event(
         self, source_event: Dict[str, Any]
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Optional[EntityEventData]:
         # TODO find out if this conversion makes sense?
         topic: str = source_event["topic"]
         topic_parts = topic.split(".")
@@ -83,12 +104,12 @@ class EventProcessor:
             self._log.warning(f"Unexpected topic: {topic}")
             return None
 
-        output: Dict[str, Any] = {
+        output: EntityEventData = {
             "project_name": source_event["project"],
             "entity_type": entity_type,
         }
         if change_type == "created":
-            output["action"] = "create"
+            output["action"] = "created"
             output["entity_id"] = source_event["summary"]["entityId"]
             return output
 
@@ -104,7 +125,7 @@ class EventProcessor:
         ):
             return None
 
-        output["action"] = "update"
+        output["action"] = "updated"
         output["entity_id"] = source_event["summary"]["entityId"]
 
         payload = source_event["payload"]
@@ -144,14 +165,14 @@ class EventProcessor:
 
         return None
 
-    def _handle_update_event(self, changes_data):
-        entity_type = changes_data["entity_type"]
+    def _handle_update_event(self, entity_data: EntityEventData):
+        entity_type = entity_data["entity_type"]
         # TODO implement all entities
         if entity_type in ("project", "folder", "product", "version"):
             return
 
-        project_name = changes_data["project_name"]
-        entity_id = changes_data["entity_id"]
+        project_name = entity_data["project_name"]
+        entity_id = entity_data["entity_id"]
         entity = self._get_entity_by_id(project_name, entity_type, entity_id)
         if entity is None:
             self._log.warning(
@@ -163,13 +184,17 @@ class EventProcessor:
         # TODO implement more logic
         if (
             entity_type == "task"
-            and changes_data["update_key"] == "assignees"
+            and entity_data["update_key"] == "assignees"
         ):
-            self._handle_task_assignees_change(entity, changes_data)
+            self._handle_task_assignees_change(entity, entity_data)
             return
         self._log.debug("Unhandled entity update event")
 
-    def _handle_task_assignees_change(self, entity, changes_data):
+    def _handle_task_assignees_change(
+        self,
+        entity: Dict[str, Any],
+        changes_data: EntityEventData,
+    ):
         self._log.info("Handling assignees changes.")
         # Find ftrack task entity
         task_ftrack_id = entity["attrib"].get(FTRACK_ID_ATTRIB)
