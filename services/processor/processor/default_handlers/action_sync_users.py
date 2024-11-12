@@ -7,8 +7,8 @@ from ftrack_common import (
     ServerAction,
     get_service_ftrack_icon_url,
     create_chunks,
+    map_ftrack_users_to_ayon_users,
 )
-from processor.lib import map_ftrack_users_to_ayon_users
 
 if typing.TYPE_CHECKING:
     from ftrack_api.entity.base import Entity as FtrackEntity

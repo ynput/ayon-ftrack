@@ -38,8 +38,8 @@ from ftrack_common import (
 
     create_chunks,
     join_filter_values,
+    map_ftrack_users_to_ayon_users,
 )
-from processor.lib import map_ftrack_users_to_ayon_users
 
 UNKNOWN_VALUE = object()
 

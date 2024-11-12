@@ -2,8 +2,10 @@ from typing import Dict, Union
 
 import ayon_api
 
-from ftrack_common import BaseEventHandler
-from processor.lib import map_ftrack_users_to_ayon_users
+from ftrack_common import (
+    BaseEventHandler,
+    map_ftrack_users_to_ayon_users,
+)
 
 
 class SyncUsersFromFtrackEvent(BaseEventHandler):

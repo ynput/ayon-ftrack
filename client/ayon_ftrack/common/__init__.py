@@ -38,6 +38,8 @@ __all__ = (
     "get_ftrack_icon_url",
     "get_service_ftrack_icon_url",
 
+    "map_ftrack_users_to_ayon_users",
+
     "get_ayon_attr_configs",
     "query_custom_attribute_values",
     "get_custom_attributes_by_entity_id",
@@ -96,6 +98,8 @@ from .lib import (
     get_ftrack_icon_url,
     get_service_ftrack_icon_url,
 )
+
+from .users import map_ftrack_users_to_ayon_users
 
 from .custom_attributes import (
     get_ayon_attr_configs,
