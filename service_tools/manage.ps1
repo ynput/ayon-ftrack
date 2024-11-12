@@ -25,11 +25,11 @@ function Default-Func {
   Write-Host "--variant [variant] (Define settings variant. default: 'production')"
   Write-Host ""
   Write-Host "Runtime targets:"
-  Write-Host "  install    Install requirements to currently actie python (recommended to create venv)"
-  Write-Host "  leecher    Start leecher of ftrack events"
-  Write-Host "  processor  Main processing logic"
-  Write-Host "  ayontof    AYON to ftrack sync"
-  Write-Host "  services   Start both leecher and processor (experimental)"
+  Write-Host "  install      Install requirements to currently actie python (recommended to create venv)"
+  Write-Host "  leecher      Start leecher of ftrack events"
+  Write-Host "  processor    Main processing logic"
+  Write-Host "  transmitter  AYON to ftrack sync"
+  Write-Host "  services     Start both leecher and processor (experimental)"
   Write-Host ""
 }
 
@@ -47,7 +47,7 @@ function Start-Processor {
 }
 
 function Start-AYONToftrack {
-  & python "$($script_dir)\main.py" --service ayontof @arguments
+  & python "$($script_dir)\main.py" --service transmitter @arguments
 }
 
 function Start-All {
@@ -92,7 +92,7 @@ function main {
       Start-Leecher
     } elseif ($FunctionName -eq "processor") {
       Start-Processor
-    } elseif ($FunctionName -eq "ayontof") {
+    } elseif ($FunctionName -eq "transmitter") {
       Start-AYONToftrack
     } elseif ($FunctionName -eq "services") {
       Start-All

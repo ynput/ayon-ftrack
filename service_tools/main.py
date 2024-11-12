@@ -16,20 +16,20 @@ def run_all():
     all_idx = sys.argv.index("all")
     leecher_args = list(sys.argv)
     processor_args = list(sys.argv)
-    ayontof_args = list(sys.argv)
+    transmitter_args = list(sys.argv)
 
     leecher_args[all_idx] = "leecher"
     processor_args[all_idx] = "processor"
-    ayontof_args[all_idx] = "ayontof"
+    transmitter_args[all_idx] = "ayontof"
 
     leecher_args.insert(0, sys.executable)
     processor_args.insert(0, sys.executable)
-    ayontof_args.insert(0, sys.executable)
+    transmitter_args.insert(0, sys.executable)
 
     leecher = subprocess.Popen(leecher_args)
     processor = subprocess.Popen(processor_args)
-    ayontof = subprocess.Popen(ayontof_args)
-    processes = [leecher, processor, ayontof]
+    transmitter = subprocess.Popen(transmitter_args)
+    processes = [leecher, processor, transmitter]
     try:
         while True:
             any_died = False
@@ -60,7 +60,7 @@ def main():
     parser.add_argument(
         "--service",
         help="Run processor service",
-        choices=["processor", "leecher", "ayontof", "all"],
+        choices=["processor", "leecher", "transmitter", "all"],
     )
     parser.add_argument(
         "--variant",
@@ -99,8 +99,8 @@ def main():
         from processor import main as service_main
     elif service_name == "leecher":
         from leecher import main as service_main
-    elif service_name == "ayontof":
-        from ayontof import main as service_main
+    elif service_name == "transmitter":
+        from transmitter import main as service_main
     else:
         raise ValueError(f"Unknown service name {service_name}")
 
