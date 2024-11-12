@@ -107,7 +107,7 @@ def create_session():
 
     session = _GlobalContext.session
     if session is not None:
-        print("Created ftrack session")
+        log.info("Created ftrack session")
         return session
 
     if not error_message:
@@ -165,10 +165,10 @@ def main_loop():
                 sender=sender,
             )
             if job_event is None:
-                print("Nothing to do.")
                 time.sleep(1)
                 continue
 
+            log.info("Processing event: %s", job_event["dependsOn"])
             source_event = ayon_api.get_event(job_event["dependsOn"])
             processor.process_event(source_event, job_event)
 
