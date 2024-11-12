@@ -8,6 +8,7 @@ authors = ["Ynput s.r.o. <info@ynput.io>"]
 python = ">=3.9,<3.10"
 ayon-python-api = "1.0.10"
 ftrack-python-api = "2.3.3"
+platformdirs = "*"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"

@@ -9,7 +9,7 @@ import json
 import tarfile
 import zipfile
 
-import appdirs
+import platformdirs
 import ayon_api
 
 IMPLEMENTED_ARCHIVE_FORMATS = {
@@ -25,7 +25,7 @@ def get_download_root():
     root = os.getenv("AYON_FTRACK_DOWNLOAD_ROOT")
     if not root:
         root = os.path.join(
-            appdirs.user_data_dir("ayon-ftrack", "Ynput"),
+            platformdirs.user_data_dir("ayon-ftrack", "Ynput"),
             "downloads"
         )
     return root
@@ -65,8 +65,8 @@ def extract_archive_file(archive_file, dst_folder=None):
         archive_file (str): Path to a archive file.
         dst_folder (Optional[str]): Directory where content will be extracted.
             By default, same folder where archive file is.
-    """
 
+    """
     if not dst_folder:
         dst_folder = os.path.dirname(archive_file)
 
