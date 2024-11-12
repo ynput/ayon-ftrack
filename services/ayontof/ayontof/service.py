@@ -155,7 +155,7 @@ def main_loop():
 
         sender = ayon_api.get_service_name()
         processor = EventProcessor(session)
-        while _GlobalContext.stop_event.is_set():
+        while not _GlobalContext.stop_event.is_set():
             if session.closed:
                 print("Session closed. Reconnecting.")
                 break
