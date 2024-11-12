@@ -70,6 +70,8 @@ def extract_archive_file(archive_file, dst_folder=None):
     if not dst_folder:
         dst_folder = os.path.dirname(archive_file)
 
+    os.makedirs(dst_folder, exist_ok=True)
+
     archive_ext, archive_type = get_archive_ext_and_type(archive_file)
 
     print(f"Extracting {archive_file} -> {dst_folder}")
