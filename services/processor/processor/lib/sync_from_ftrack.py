@@ -23,9 +23,8 @@ from ftrack_common import (
     create_chunks,
     get_custom_attributes_by_entity_id,
     get_ayon_attr_configs,
+    map_ftrack_users_to_ayon_users,
 )
-
-from .users import map_ftrack_users_to_ayon_users
 
 
 def _get_ftrack_project(session, project_name):
