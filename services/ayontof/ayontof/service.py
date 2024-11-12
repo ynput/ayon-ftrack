@@ -107,7 +107,7 @@ def create_session():
 
     session = _GlobalContext.session
     if session is not None:
-        print("Created ftrack session")
+        log.info("Created ftrack session")
         return session
 
     if not error_message:
@@ -145,6 +145,7 @@ def create_session():
 
 
 def main_loop():
+    sender = ayon_api.get_service_name()
     while not _GlobalContext.stop_event.is_set():
         session: Optional[ftrack_api.Session] = create_session()
         if session is None:
@@ -153,9 +154,8 @@ def main_loop():
 
         _GlobalContext.session_fail_logged = False
 
-        sender = ayon_api.get_service_name()
         processor = EventProcessor(session)
-        while _GlobalContext.stop_event.is_set():
+        while not _GlobalContext.stop_event.is_set():
             if session.closed:
                 print("Session closed. Reconnecting.")
                 break
@@ -165,10 +165,10 @@ def main_loop():
                 sender=sender,
             )
             if job_event is None:
-                print("Nothing to do.")
                 time.sleep(1)
                 continue
 
+            log.info("Processing event: %s", job_event["dependsOn"])
             source_event = ayon_api.get_event(job_event["dependsOn"])
             processor.process_event(source_event, job_event)
 
