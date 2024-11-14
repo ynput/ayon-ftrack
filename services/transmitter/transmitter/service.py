@@ -26,6 +26,7 @@ def _prepare_source_topics():
         ("entity.{}.created", all_types),
         ("entity.{}.deleted", all_types),
         ("entity.{}.active_changed", all_types),
+        ("entity.{}.attrib_changed", all_types),
         ("entity.{}.data_changed", all_types),
         ("entity.{}.type_changed", {"folder", "task", "product"}),
         ("entity.{}.thumbnail_changed", {"folder", "task", "version"}),
