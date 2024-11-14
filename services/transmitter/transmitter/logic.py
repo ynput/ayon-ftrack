@@ -1,15 +1,19 @@
+import collections
 import logging
 import typing
 from typing import Optional, Dict, Set, Any, TypedDict, Literal
 from dataclasses import dataclass
 
-import ftrack_api
 import ayon_api
+import ftrack_api
+import ftrack_api.operation
 
 from ftrack_common import (
     FTRACK_ID_ATTRIB,
     map_ftrack_users_to_ayon_users,
     is_ftrack_enabled_in_settings,
+    join_filter_values,
+    query_custom_attribute_values,
 )
 
 from .structures import JobEventType
@@ -239,6 +243,8 @@ class EventProcessor:
                 self._handle_task_assignees_change(entity_data)
         elif entity_data.update_key == "status":
             self._handle_status_change(entity_data)
+        elif entity_data.update_key == "attrib":
+            self._handle_attrib_change(entity_data)
         else:
             self._log.info("Unhandled entity update event")
 
@@ -439,7 +445,7 @@ class EventProcessor:
                 schema["id"]
                 for schema in project_schema["object_type_schemas"]
             }
-            joined_ids = ",".join([f'"{i}"' for i in schema_ids])
+            joined_ids = join_filter_values(schema_ids)
             schema = self._session.query(
                 "select id, object_type_id from Schema"
                 f" where id in ({joined_ids})"
@@ -464,7 +470,7 @@ class EventProcessor:
             for task_override in
             project_schema["task_workflow_schema_overrides"]
         }
-        joined_ids = ",".join([f'"{i}"' for i in task_workflow_override_ids])
+        joined_ids = join_filter_values(task_workflow_override_ids)
         overrides_schema = self._session.query(
             "select workflow_schema_id"
             f" from ProjectSchemaOverride"
@@ -580,3 +586,168 @@ class EventProcessor:
 
         if self._session.recorded_operations:
             self._session.commit()
+
+    def _handle_attrib_change(self, entity_data: EntityEventData):
+        new_attribs = entity_data.changes["new"]["attrib"]
+
+        # TODO handle specific cases of AYON attributes that are not
+        #   custom attributes in ftrack (e.g. description)
+        fields = {
+            "id",
+            "key",
+            "entity_type",
+            "object_type_id",
+            "is_hierarchical"
+        }
+        joined_fields = ", ".join(fields)
+        joined_keys = join_filter_values(new_attribs)
+
+        attr_configs = self._session.query(
+            f"select {joined_fields}"
+            " from CustomAttributeConfiguration"
+            f" where key in ({joined_keys})"
+        ).all()
+        attr_configs_by_key = collections.defaultdict(list)
+        for attr_config in attr_configs:
+            attr_configs_by_key[attr_config["key"]].append(attr_config)
+
+        missing = set(new_attribs) - set(attr_configs_by_key)
+        if missing:
+            joined_missing = ", ".join([f'"{key}"' for key in missing])
+            self._log.info(
+                f"Attributes {joined_missing} not found in ftrack."
+            )
+
+        if not attr_configs:
+            return
+
+        ft_entity = self._get_ftrack_entity(entity_data)
+        if ft_entity is None:
+            self._log.info("Entity was not found in ftrack.")
+            return
+
+        filtered_attr_confs = {}
+        valid_conf_ids = set()
+        for key, attr_confs in attr_configs_by_key.items():
+            valid_confs = []
+            for attr_conf in attr_confs:
+                if self._is_attr_conf_valid(attr_conf, entity_data):
+                    valid_confs.append(attr_conf)
+                    valid_conf_ids.add(attr_conf["id"])
+
+            if valid_confs:
+                filtered_attr_confs[key] = valid_confs
+
+        if not filtered_attr_confs:
+            return
+
+        value_items = query_custom_attribute_values(
+            self._session,
+            valid_conf_ids,
+            {ft_entity["id"]}
+        )
+        values_by_attr_id = {
+            value_item["configuration_id"]: value_item["value"]
+            for value_item in value_items
+        }
+        ayon_entity = entity_data.get_ayon_entity()
+        any_changed = False
+        for key, attr_confs in filtered_attr_confs.items():
+            new_value = new_attribs[key]
+            for attr_conf in attr_confs:
+                attr_id = attr_conf["id"]
+                is_new = attr_id not in values_by_attr_id
+                old_value = values_by_attr_id.get(attr_id)
+                if new_value is None and not attr_conf["is_hierarchical"]:
+                    # NOTE Hack, non-hierarchical attributes will be set
+                    #   to current value on entity if new value is 'None'
+                    new_value = ayon_entity["attrib"][key]
+                if new_value == old_value:
+                    continue
+
+                any_changed = True
+                op = self._get_ft_attr_value_operation(
+                    attr_id,
+                    ft_entity["id"],
+                    is_new,
+                    new_value,
+                    old_value
+                )
+                self._session.recorded_operations.push(op)
+
+        if any_changed:
+            try:
+                self._session.commit()
+            finally:
+                self._session.recorded_operations.clear()
+
+    def _is_attr_conf_valid(self, attr_conf, entity_data):
+        if attr_conf["is_hierarchical"]:
+            return True
+
+        if attr_conf["entity_type"] == "context":
+            return entity_data.entity_type in ("project", "folder", "task")
+
+        if attr_conf["entity_type"] == "show":
+            return entity_data.entity_type == "project"
+
+        if attr_conf["entity_type"] == "asset":
+            return entity_data.entity_type == "product"
+
+        if attr_conf["entity_type"] == "assetversion":
+            return entity_data.entity_type == "version"
+
+        if (
+            attr_conf["entity_type"] != "task"
+            or entity_data.entity_type not in ("folder", "task")
+        ):
+            return False
+
+        obj_type_id = attr_conf["object_type_id"]
+        object_type = self._session.query(
+            f"select id, name from ObjectType where id is '{obj_type_id}'"
+        ).first()
+        if object_type is None:
+            return False
+
+        obj_name = object_type["name"].lower()
+        if entity_data.entity_type == "task":
+            return obj_name == "task"
+
+        ayon_entity = entity_data.get_ayon_entity()
+        if ayon_entity:
+            return ayon_entity["folderType"].lower() == obj_name
+        return False
+
+    def _get_ft_attr_value_operation(
+        self,
+        conf_id: str,
+        entity_id: str,
+        is_new: bool,
+        new_value: Any,
+        old_value: Optional[Any] = None,
+    ):
+        entity_key = collections.OrderedDict((
+            ("configuration_id", conf_id),
+            ("entity_id", entity_id)
+        ))
+        if is_new:
+            return ftrack_api.operation.CreateEntityOperation(
+                "CustomAttributeValue",
+                entity_key,
+                {"value": new_value}
+            )
+
+        if new_value is None:
+            return ftrack_api.operation.DeleteEntityOperation(
+                "CustomAttributeValue",
+                entity_key
+            )
+
+        return ftrack_api.operation.UpdateEntityOperation(
+            "CustomAttributeValue",
+            entity_key,
+            "value",
+            old_value,
+            new_value
+        )
