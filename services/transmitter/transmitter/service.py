@@ -15,24 +15,29 @@ log = logging.getLogger(__name__)
 
 
 def _prepare_source_topics():
-    for base_topic in (
-        "entity.{entity_type}.created",
-        "entity.{entity_type}.data_changed",
-        "entity.{entity_type}.label_changed",
-        "entity.{entity_type}.type_changed",
-        "entity.{entity_type}.thumbnail_changed",
-        "entity.{entity_type}.active_changed",
-        "entity.{entity_type}.deleted",
-        "entity.{entity_type}.changed",
+    all_types = {
+        "project",
+        "folder",
+        "task",
+        "product",
+        "version",
+    }
+    for (base_topic, entity_types) in (
+        ("entity.{}.created", all_types),
+        ("entity.{}.deleted", all_types),
+        ("entity.{}.active_changed", all_types),
+        ("entity.{}.data_changed", all_types),
+        ("entity.{}.type_changed", {"folder", "task", "product"}),
+        ("entity.{}.thumbnail_changed", {"folder", "task", "version"}),
+        ("entity.{}.status_changed", {"folder", "task", "version"}),
+        # ("entity.{}.label_changed", {"folder", "task"}),
+
     ):
-        for entity_type in (
-            "project",
-            "folder",
-            "task",
-            "product",
-            "version",
-        ):
-            yield base_topic.format(entity_type=entity_type)
+        for entity_type in entity_types:
+            yield base_topic.format(entity_type)
+    # Special cases
+    # not sure if 'entity.{}.changed' can be triggered for other types
+    yield "entity.project.changed"
     yield "entity.folder.parent_changed"
     yield "entity.task.folder_changed"
     yield "entity.product.folder_changed"
