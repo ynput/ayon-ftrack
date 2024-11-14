@@ -137,18 +137,25 @@ class EventProcessor:
             self._log.warning(f"Unexpected topic: {topic}")
             return None
 
+        project_name = source_event["project"]
+        entity_id = None
+        if entity_type == "project":
+            entity_id = project_name
         update_key = changes = entity_data = None
         if change_type == "created":
             action = "created"
-            entity_id = source_event["summary"]["entityId"]
+            if entity_id is None:
+                entity_id = source_event["summary"]["entityId"]
 
         elif change_type == "deleted":
             action = "deleted"
             entity_data = source_event["payload"]["entityData"]
-            entity_id = entity_data["id"]
+            if entity_id is None:
+                entity_id = entity_data["id"]
         else:
             action = "updated"
-            entity_id = source_event["summary"]["entityId"]
+            if entity_id is None:
+                entity_id = source_event["summary"]["entityId"]
             update_key, changes = self._prepare_update_data(
                 source_event, change_type, entity_type
             )
@@ -157,7 +164,7 @@ class EventProcessor:
 
         return EntityEventData(
             action=action,
-            project_name=source_event["project"],
+            project_name=project_name,
             entity_type=entity_type,
             entity_id=entity_id,
             entity_data=entity_data,
