@@ -707,6 +707,8 @@ class EventProcessor:
                     # NOTE Hack, non-hierarchical attributes will be set
                     #   to current value on entity if new value is 'None'
                     new_value = ayon_entity["attrib"][key]
+
+                # Value is already same (or both are unset)
                 if new_value == old_value:
                     continue
 
