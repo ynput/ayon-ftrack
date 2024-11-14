@@ -25,6 +25,13 @@ log = logging.getLogger(__name__)
 
 _NOT_SET = object()
 
+# AYON attrib to ftrack entity attribute mapping
+DEFAULT_ATTRS_MAPPING = {
+    "startDate": "start_date",
+    "endDate": "end_date",
+    "description": "description",
+}
+
 
 def _get_entity_by_id(project_name, entity_type, entity_id, logger=None):
     if entity_type == "project":
@@ -595,7 +602,43 @@ class EventProcessor:
             self._session.commit()
 
     def _handle_attrib_change(self, entity_data: EntityEventData):
+        ft_entity = self._get_ftrack_entity(entity_data)
+        if ft_entity is None:
+            self._log.info("Entity was not found in ftrack.")
+            return
+
         new_attribs = entity_data.changes["new"]["attrib"]
+        new_attrib_names = set(new_attribs)
+        default_keys = {
+            name
+            for name in new_attrib_names
+            if name in DEFAULT_ATTRS_MAPPING
+        }
+
+        default_key_changed = False
+        for name in default_keys:
+            mapped_name = DEFAULT_ATTRS_MAPPING[name]
+            new_value = new_attribs[name]
+            attribute = ft_entity.attributes.get(mapped_name)
+            # Skip if attribute is not mutable or value is the same
+            if (
+                attribute is None
+                or not attribute.mutable
+                or ft_entity[mapped_name] == new_value
+            ):
+                continue
+            ft_entity[mapped_name] = new_value
+            default_key_changed = True
+
+        if default_key_changed:
+            try:
+                self._session.commit()
+            finally:
+                self._session.recorded_operations.clear()
+
+        new_attrib_names -= default_keys
+        if not new_attrib_names:
+            return
 
         # TODO handle specific cases of AYON attributes that are not
         #   custom attributes in ftrack (e.g. description)
@@ -618,7 +661,7 @@ class EventProcessor:
         for attr_config in attr_configs:
             attr_configs_by_key[attr_config["key"]].append(attr_config)
 
-        missing = set(new_attribs) - set(attr_configs_by_key)
+        missing = new_attrib_names - set(attr_configs_by_key)
         if missing:
             joined_missing = ", ".join([f'"{key}"' for key in missing])
             self._log.info(
@@ -626,11 +669,6 @@ class EventProcessor:
             )
 
         if not attr_configs:
-            return
-
-        ft_entity = self._get_ftrack_entity(entity_data)
-        if ft_entity is None:
-            self._log.info("Entity was not found in ftrack.")
             return
 
         filtered_attr_confs = {}
