@@ -173,7 +173,6 @@ def main_loop():
                 time.sleep(1)
                 continue
 
-            log.info("Processing event: %s", job_event["dependsOn"])
             source_event = ayon_api.get_event(job_event["dependsOn"])
             processor.process_event(source_event, job_event)
 
