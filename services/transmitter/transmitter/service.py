@@ -169,6 +169,7 @@ def main_loop():
                 SOURCE_TOPICS,
                 TARGET_TOPIC,
                 sender=sender,
+                ignore_sender_types={"ftrack"},
             )
             if job_event is None:
                 time.sleep(1)

@@ -234,6 +234,8 @@ def main():
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
     atexit.register(_cleanup_process)
+
+    ayon_api.set_sender_type("ftrack")
     try:
         main_loop()
     finally:
