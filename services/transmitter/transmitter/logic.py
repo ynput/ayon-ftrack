@@ -1,3 +1,4 @@
+import datetime
 import collections
 import logging
 import typing
@@ -24,6 +25,7 @@ if typing.TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 _NOT_SET = object()
+FTRACK_META_COMMENTS_TOPIC = "ftrack.sync.meta.comments"
 
 # AYON attrib to ftrack entity attribute mapping
 DEFAULT_ATTRS_MAPPING = {
@@ -111,6 +113,11 @@ class EventProcessor:
                 job_event["id"],
                 status=job_status
             )
+
+    def sync_comments(self):
+        project_names = self._get_sync_project_names()
+        for project_name in project_names:
+            self._sync_comments(project_name)
 
     def _process_reviewable_created(self, source_event: Dict[str, Any]):
         # TODO implement
@@ -798,3 +805,192 @@ class EventProcessor:
             old_value,
             new_value
         )
+
+    def _get_sync_project_names(self):
+        """Get project names that are enabled for ftrack sync."""
+        ayon_project_names = set(ayon_api.get_project_names())
+        ft_project_names = {
+            project["full_name"]
+            for project in self._session.query(
+                "select full_name from Project"
+            ).all()
+        }
+
+        project_names = []
+        for project_name in ayon_project_names & ft_project_names:
+            project_settings = ayon_api.get_addons_settings(
+                project_name=project_name
+            )
+            if is_ftrack_enabled_in_settings(project_settings["ftrack"]):
+                project_names.append(project_name)
+        return project_names
+
+    def _create_ftrack_note(
+        self, project_name, entity, entity_type, activity, user_id
+    ):
+        if entity is None:
+            return None
+
+        ftrack_entity = self._find_ftrack_entity(
+            project_name,
+            entity_type,
+            entity,
+        )
+        if ftrack_entity is None or "notes" not in ftrack_entity:
+            return None
+
+        note = self._session.create(
+            "Note",
+            {
+                "content": activity["body"],
+                "user_id": user_id,
+                "metadata": {
+                    "ayon_activity_id": activity["activityId"],
+                }
+            }
+        )
+        ftrack_entity["notes"].append(note)
+        self._session.commit()
+        return note
+
+    def _sync_comments(self, project_name):
+        events = list(ayon_api.get_events(
+            topics={FTRACK_META_COMMENTS_TOPIC},
+            project_names={project_name},
+        ))
+        if len(events) > 1:
+            self._log.warning(
+                f"Multiple events found for project '{project_name}'."
+                " Only the latest event will be processed."
+            )
+            # TODO implement finding of best event
+            best_event = None
+            best_event_sync = None
+            for event in events:
+                last_sync = event["payload"]["last_sync_date"]
+                last_sync_date = datetime.datetime.strptime(
+                    last_sync, "%Y-%m-%dT%H:%M:%S.%fZ"
+                )
+
+                if (
+                    best_event is None
+                    or last_sync > best_event["payload"]["last_sync_date"]
+                ):
+                    best_event = event
+
+            events = [best_event]
+
+        new_payload = {
+            "last_sync_date": (
+                datetime.datetime.now(datetime.UTC).isoformat()
+            ),
+        }
+        if len(events) == 1:
+            # TODO check if the difference in last sync is not too small
+            #    to avoid unnecessary updates.
+            event = events[0]
+            ayon_api.update_event(
+                event["id"],
+                payload=new_payload,
+            )
+        else:
+            ayon_api.dispatch_event(
+                FTRACK_META_COMMENTS_TOPIC,
+                project_name=project_name,
+                description=(
+                    "Cache event to store progress about comments sync"
+                ),
+                summary=None,
+                payload=new_payload,
+                finished=True,
+                store=True,
+            )
+
+        project_activities = list(ayon_api.get_activities(
+            project_name,
+            activity_types={"comment"},
+        ))
+        if not project_activities:
+            return
+
+        ft_users = self._session.query(
+            "select id, username, email from User"
+        ).all()
+        ayon_username_by_ft_id = map_ftrack_users_to_ayon_users(ft_users)
+        ft_id_by_ay_username = {
+            ayon_username: ft_user_id
+            for ft_user_id, ayon_username in ayon_username_by_ft_id.items()
+            if ayon_username
+        }
+
+        entity_ids_by_entity_type = collections.defaultdict(set)
+        for activity in project_activities:
+            entity_id = activity["entityId"]
+            entity_type = activity["entityType"]
+            entity_ids_by_entity_type[entity_type].add(entity_id)
+
+        entities_by_id = {}
+        for entity_type, entity_ids in entity_ids_by_entity_type.items():
+            if entity_type == "project":
+                entities = []
+            elif entity_type == "folder":
+                entities = ayon_api.get_folders(
+                    project_name, entity_ids=entity_ids
+                )
+            elif entity_type == "task":
+                entities = ayon_api.get_tasks(
+                    project_name, entity_ids=entity_ids
+                )
+            elif entity_type == "version":
+                entities = ayon_api.get_tasks(
+                    project_name, entity_ids=entity_ids
+                )
+            else:
+                entities = []
+            entities_by_id.update({
+                entity["id"]: entity
+                for entity in entities
+            })
+
+        for activity in project_activities:
+            data = activity["activityData"]
+            ftrack_data = data.setdefault("ftrack", {})
+            orig_ftrack_id = ftrack_data.get("id")
+            ft_note = None
+            if orig_ftrack_id:
+                ft_note = self._session.query(
+                    "select id, content, metadata from Note"
+                    f" where id is '{orig_ftrack_id}'"
+                ).first()
+
+            if ft_note is None:
+                entity = entities_by_id.get(activity["entityId"])
+                entity_type = activity["entityType"]
+                ayon_username = activity["author"]["name"]
+                ft_user_id = ft_id_by_ay_username.get(ayon_username)
+                ft_note = self._create_ftrack_note(
+                    project_name, entity, entity_type, activity, ft_user_id
+                )
+            else:
+                changed = False
+                if ft_note["content"] != activity["body"]:
+                    changed = True
+                    ft_note["content"] = activity["body"]
+
+                activity_id = activity["activityId"]
+                if ft_note["metadata"].get("ayon_activity_id") != activity_id:
+                    changed = True
+                    ft_note["metadata"]["ayon_activity_id"] = activity_id
+
+                if changed:
+                    self._session.commit()
+
+            if ft_note is None:
+                continue
+
+            if orig_ftrack_id != ft_note["id"]:
+                ftrack_data["id"] = ft_note["id"]
+                ayon_api.update_activity(
+                    activity["activityId"],
+                    data=ftrack_data,
+                )
