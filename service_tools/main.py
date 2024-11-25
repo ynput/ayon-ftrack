@@ -12,24 +12,27 @@ CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 ADDON_DIR = os.path.dirname(CURRENT_DIR)
 
 
-def run_all():
-    all_idx = sys.argv.index("all")
-    leecher_args = list(sys.argv)
-    processor_args = list(sys.argv)
-    transmitter_args = list(sys.argv)
+def run_services(
+    run_leecher: bool,
+    run_processor: bool,
+    run_transmitter: bool,
+    command_index: int
+):
+    processes = []
+    for (run_service, name) in (
+        (run_leecher, "leecher"),
+        (run_processor, "processor"),
+        (run_transmitter, "transmitter"),
+     ):
+        if not run_service:
+            continue
 
-    leecher_args[all_idx] = "leecher"
-    processor_args[all_idx] = "processor"
-    transmitter_args[all_idx] = "ayontof"
+        args = list(sys.argv)
+        args[command_index] = name
+        args.insert(0, sys.executable)
 
-    leecher_args.insert(0, sys.executable)
-    processor_args.insert(0, sys.executable)
-    transmitter_args.insert(0, sys.executable)
+        processes.append(subprocess.Popen(args))
 
-    leecher = subprocess.Popen(leecher_args)
-    processor = subprocess.Popen(processor_args)
-    transmitter = subprocess.Popen(transmitter_args)
-    processes = [leecher, processor, transmitter]
     try:
         while True:
             any_died = False
@@ -60,7 +63,7 @@ def main():
     parser.add_argument(
         "--service",
         help="Run processor service",
-        choices=["processor", "leecher", "transmitter", "all"],
+        choices=["processor", "leecher", "transmitter", "ftrack2ayon", "all"],
     )
     parser.add_argument(
         "--variant",
@@ -80,7 +83,20 @@ def main():
 
     service_name = opts.service
     if service_name == "all":
-        return run_all()
+        return run_services(
+            True,
+            True,
+            True,
+            sys.argv.index("all")
+        )
+
+    if service_name == "ftrack2ayon":
+        return run_services(
+            True,
+            True,
+            False,
+            sys.argv.index("ftrack2ayon")
+        )
 
     for path in (
         os.path.join(ADDON_DIR, "client", "ayon_ftrack"),

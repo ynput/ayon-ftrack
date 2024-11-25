@@ -29,6 +29,8 @@ function Default-Func {
   Write-Host "  leecher      Start leecher of ftrack events"
   Write-Host "  processor    Main processing logic"
   Write-Host "  transmitter  AYON to ftrack sync"
+  Write-Host "  ftrack2ayon  Services related to ftrack to AYON sync"
+  Write-Host "  ayon2ftrack  Services related to AYON to ftrack sync"
   Write-Host "  services     Start both leecher and processor (experimental)"
   Write-Host ""
 }
@@ -48,6 +50,10 @@ function Start-Processor {
 
 function Start-AYONToftrack {
   & python "$($script_dir)\main.py" --service transmitter @arguments
+}
+
+function Start-Leecher-Processor {
+  & python "$($script_dir)\main.py" --service ftrack2ayon @arguments
 }
 
 function Start-All {
@@ -92,8 +98,10 @@ function main {
       Start-Leecher
     } elseif ($FunctionName -eq "processor") {
       Start-Processor
-    } elseif ($FunctionName -eq "transmitter") {
+    } elseif (($FunctionName -eq "transmitter") -or ($FunctionName -eq "ayon2ftrack")) {
       Start-AYONToftrack
+    } elseif ($FunctionName -eq "ftrack2ayon") {
+      Start-Leecher-Processor
     } elseif ($FunctionName -eq "services") {
       Start-All
     } else {
