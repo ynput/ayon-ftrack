@@ -23,6 +23,7 @@ from ftrack_common import (
     create_chunks,
     get_custom_attributes_by_entity_id,
     get_ayon_attr_configs,
+    join_filter_values,
 )
 
 from .users import map_ftrack_users_to_ayon_users
@@ -124,9 +125,6 @@ class SyncFromFtrack:
     def sync_project_types(self, ft_project, ft_session):
         """Sync project types from ftrack to AYON.
 
-        Todos:
-            Add statuses sync.
-
         Args:
             ft_project (ftrack_api.entity.Entity): ftrack project entity.
             ft_session (ftrack_api.Session): ftrack session.
@@ -165,6 +163,184 @@ class SyncFromFtrack:
         self.update_project_types(object_types, task_types)
         return object_types, task_types
 
+    def sync_statuses(self, ft_project, ft_session):
+        fields = {
+            "asset_version_workflow_schema",
+            "task_workflow_schema",
+            "task_workflow_schema_overrides",
+            "object_type_schemas",
+        }
+        project_schema_id = ft_project["project_schema_id"]
+
+        joined_fields = ", ".join(fields)
+        project_schema = ft_session.query(
+            f"select {joined_fields} from ProjectSchema"
+            f" where id is '{project_schema_id}'"
+        ).first()
+
+        # Folder statuses
+        schema_ids = {
+            schema["id"]
+            for schema in project_schema["object_type_schemas"]
+        }
+        joined_schema_ids = join_filter_values(schema_ids)
+        object_type_schemas = ft_session.query(
+            "select id, object_type_id from Schema"
+            f" where id in ({joined_schema_ids})"
+        ).all()
+
+        object_type_schema_ids = {
+            schema["id"]
+            for schema in object_type_schemas
+        }
+        joined_ot_schema_ids = join_filter_values(object_type_schema_ids)
+        schema_statuses = ft_session.query(
+            "select status_id from SchemaStatus"
+            f" where schema_id in ({joined_ot_schema_ids})"
+        ).all()
+        folder_statuse_ids = {
+            status["status_id"]
+            for status in schema_statuses
+        }
+
+        # Task statues
+        task_workflow_override_ids = {
+            task_override["id"]
+            for task_override in project_schema["task_workflow_schema_overrides"]
+        }
+        joined_ids = join_filter_values(task_workflow_override_ids)
+        override_schemas = ft_session.query(
+            "select workflow_schema_id"
+            f" from ProjectSchemaOverride"
+            f" where id in ({joined_ids})"
+        ).all()
+        workflow_ids = {
+            override_schema["workflow_schema_id"]
+            for override_schema in override_schemas
+        }
+        workflow_ids.add(project_schema["task_workflow_schema"]["id"])
+        joined_workflow_ids = join_filter_values(workflow_ids)
+        workflow_statuses = ft_session.query(
+            "select status_id"
+            " from WorkflowSchemaStatus"
+            f" where workflow_schema_id in ({joined_workflow_ids})"
+        ).all()
+        task_status_ids = {
+            item["status_id"]
+            for item in workflow_statuses
+        }
+
+        # Version statuses
+        av_workflow_schema_id = (
+            project_schema["asset_version_workflow_schema"]["id"]
+        )
+        version_statuse_ids = {
+            item["status_id"]
+            for item in ft_session.query(
+                "select status_id"
+                " from WorkflowSchemaStatus"
+                f" where workflow_schema_id is '{av_workflow_schema_id}'"
+            ).all()
+        }
+
+        statuses_by_id = {
+            status["id"]: status
+            for status in ft_session.query(
+                "select id, name, color, state, sort from Status"
+            ).all()
+        }
+        all_status_ids = (
+            folder_statuse_ids
+            | task_status_ids
+            | version_statuse_ids
+        )
+        state_mapping = {
+            "Blocked": "blocked",
+            "Not Started": "not_started",
+            "In Progress": "in_progress",
+            "Done": "done",
+        }
+        statuses_data = []
+        for status_id in all_status_ids:
+            status = statuses_by_id[status_id]
+            scope = ["representation", "workfile"]
+            if status_id in folder_statuse_ids:
+                scope.append("folder")
+            if status_id in task_status_ids:
+                scope.append("task")
+            if status_id in version_statuse_ids:
+                scope.append("product")
+                scope.append("version")
+
+            ft_state = status["state"]["name"]
+            ayon_state = state_mapping[ft_state]
+            statuses_data.append({
+                "name": status["name"],
+                "color": status["color"],
+                "state": ayon_state,
+                "scope": scope,
+                "sort": status["sort"],
+            })
+        statuses_data.sort(key=lambda i: i["sort"])
+
+        statuses = self._entity_hub.project_entity.statuses
+        for idx, status_data in enumerate(statuses_data):
+            status_item = statuses.get_status_by_slugified_name(
+                status_data["name"]
+            )
+            if status_item is None:
+                statuses.insert(idx, status_data)
+                continue
+            status_item.name = status_data["name"]
+            status_item.color = status_data["color"]
+            status_item.state = status_data["state"]
+            status_item.scope = status_data["scope"]
+            statuses.insert(idx, status_item)
+
+    def _get_available_ft_statuses(
+        self,
+        ft_entity: "ftrack_api.entity.base.Entity",
+        project_schema_id: str,
+    ) :
+        fields = {
+            "asset_version_workflow_schema",
+            "task_workflow_schema",
+            "task_workflow_schema_overrides",
+            "object_type_schemas",
+        }
+
+        joined_fields = ", ".join(fields)
+        project_schema = self._session.query(
+            f"select {joined_fields} from ProjectSchema"
+            f" where id is '{project_schema_id}'"
+        ).first()
+
+
+        type_id = ft_entity["type_id"]
+        task_workflow_override_ids = {
+            task_override["id"]
+            for task_override in
+            project_schema["task_workflow_schema_overrides"]
+        }
+        joined_ids = join_filter_values(task_workflow_override_ids)
+        overrides_schema = self._session.query(
+            "select workflow_schema_id"
+            f" from ProjectSchemaOverride"
+            f" where id in ({joined_ids}) and type_id is '{type_id}'"
+        ).first()
+        workflow_id = project_schema["task_workflow_schema"]["id"]
+        if overrides_schema is not None:
+            workflow_id = overrides_schema["workflow_schema_id"]
+        workflow_statuses = self._session.query(
+            "select status_id"
+            " from WorkflowSchemaStatus"
+            f" where workflow_schema_id is '{workflow_id}'"
+        ).all()
+        return {
+            item["status_id"]
+            for item in workflow_statuses
+        }
+
     def project_exists_in_ayon(self):
         """Does project exists on AYON server by name.
 
@@ -202,6 +378,7 @@ class SyncFromFtrack:
         self.log.info(f"Project \"{project_name}\" created on server")
 
         self.sync_project_types(ft_project, ft_session)
+        self.sync_statuses(ft_project, ft_session)
         project_entity = self._entity_hub.project_entity
         for key, value in attributes.items():
             project_entity.attribs[key] = value
