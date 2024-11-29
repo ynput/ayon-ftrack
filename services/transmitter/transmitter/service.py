@@ -158,6 +158,7 @@ def main_loop():
             time.sleep(10)
             continue
 
+        last_comments_sync = 0
         _GlobalContext.session_fail_logged = False
 
         processor = EventProcessor(session)
@@ -165,11 +166,18 @@ def main_loop():
             if session.closed:
                 print("Session closed. Reconnecting.")
                 break
+
+            if time.time() - last_comments_sync > 60:
+                last_comments_sync = time.time()
+                processor.sync_comments()
+                continue
+
             job_event = ayon_api.enroll_event_job(
                 SOURCE_TOPICS,
                 TARGET_TOPIC,
                 sender=sender,
                 ignore_sender_types={"ftrack"},
+                description="Sync AYON changes to ftrack",
             )
             if job_event is None:
                 time.sleep(1)
