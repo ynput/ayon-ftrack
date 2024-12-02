@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "ftrack-ayontof"
+name = "ftrack-transmitter"
 version = "1.2.2+dev"
 description = ""
 authors = ["Ynput s.r.o. <info@ynput.io>"]

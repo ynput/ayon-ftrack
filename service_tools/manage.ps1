@@ -48,7 +48,7 @@ function Start-Processor {
   & python "$($script_dir)\main.py" --service processor @arguments
 }
 
-function Start-AYONToftrack {
+function Start-Transmitter {
   & python "$($script_dir)\main.py" --service transmitter @arguments
 }
 
@@ -99,7 +99,7 @@ function main {
     } elseif ($FunctionName -eq "processor") {
       Start-Processor
     } elseif (($FunctionName -eq "transmitter") -or ($FunctionName -eq "ayon2ftrack")) {
-      Start-AYONToftrack
+      Start-Transmitter
     } elseif ($FunctionName -eq "ftrack2ayon") {
       Start-Leecher-Processor
     } elseif ($FunctionName -eq "services") {

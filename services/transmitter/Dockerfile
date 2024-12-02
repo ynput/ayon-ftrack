@@ -6,7 +6,7 @@ RUN apt-get update \
   && pip install poetry
 
 RUN mkdir /service
-COPY ./ayontof /service/ayontof
+COPY ./transmitter /service/transmitter
 COPY ./pyproject.toml /service/pyproject.toml
 WORKDIR /service
 
@@ -14,4 +14,4 @@ WORKDIR /service
 RUN poetry config virtualenvs.create false \
  && poetry install --no-interaction --no-ansi
 
-CMD ["python", "-m", "ayontof"]
+CMD ["python", "-m", "transmitter"]

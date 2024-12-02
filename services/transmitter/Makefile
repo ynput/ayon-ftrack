@@ -7,7 +7,7 @@ ifeq ("$(wildcard $(ENVFILE))","")
 endif
 
 VERSION=$(shell python -c "import os;import sys;content={};f=open('$(CURDIR)/../../package.py');exec(f.read(),content);f.close();print(content['version'])")
-BASE_NAME := ayon-ftrack-ayontof
+BASE_NAME := ayon-ftrack-transmitter
 IMAGE := ynput/$(BASE_NAME):$(VERSION)
 BASH_CONTAINER_NAME := $(BASE_NAME)-bash-$(VERSION)
 
