@@ -29,6 +29,11 @@ _NOT_SET = object()
 FTRACK_COMMENTS_TOPIC = "ftrack.sync.comments"
 COMMENTS_SYNC_INTERVAL = 60
 COMMENTS_SYNC_TIMEOUT = 60 * 5
+# Cleanup comment events after week
+COMMENT_EVENTS_CLEANUP_TIMEOUT_DAYS = 7
+COMMENT_EVENTS_CLEANUP_TIMEOUT = (
+    60 * 60 * 24 * COMMENT_EVENTS_CLEANUP_TIMEOUT_DAYS
+)
 
 # AYON attrib to ftrack entity attribute mapping
 DEFAULT_ATTRS_MAPPING = {
@@ -228,6 +233,29 @@ class EventProcessor:
                 event_id,
                 status="finished" if success else "failed",
             )
+
+    def cleanup_sync_comment_events(self):
+        self._log.info("Cleaning up comment sync events.")
+        cleanup_date = arrow.utcnow() - datetime.timedelta(
+            days=COMMENT_EVENTS_CLEANUP_TIMEOUT_DAYS
+        )
+        events_to_cleanup = list(ayon_api.get_events(
+            topics={FTRACK_COMMENTS_TOPIC},
+            older_than=cleanup_date.isoformat(),
+            fields={"id"}
+        ))
+        removed = 0
+        for event in events_to_cleanup:
+            try:
+                event_id = event["id"]
+                ayon_api.delete_event(event_id)
+                removed += 1
+            except Exception:
+                self._log.warning(
+                    f"Failed to delete event {event_id}.",
+                    exc_info=True
+                )
+        self._log.info(f"Cleaned up {removed} events.")
 
     def _process_reviewable_created(self, source_event: Dict[str, Any]):
         # TODO implement

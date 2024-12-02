@@ -9,7 +9,11 @@ from typing import Optional
 import ftrack_api
 import ayon_api
 
-from .logic import EventProcessor, COMMENTS_SYNC_INTERVAL
+from .logic import (
+    EventProcessor,
+    COMMENTS_SYNC_INTERVAL,
+    COMMENT_EVENTS_CLEANUP_TIMEOUT,
+)
 
 log = logging.getLogger(__name__)
 
@@ -159,6 +163,7 @@ def main_loop():
             continue
 
         last_comments_sync = 0
+        last_comments_cleanup = 0
         _GlobalContext.session_fail_logged = False
 
         processor = EventProcessor(session)
@@ -168,6 +173,11 @@ def main_loop():
                 break
 
             if time.time() - last_comments_sync > COMMENTS_SYNC_INTERVAL:
+                cleanup_diff = time.time() - last_comments_cleanup
+                if cleanup_diff > COMMENT_EVENTS_CLEANUP_TIMEOUT:
+                    last_comments_cleanup = time.time()
+                    processor.cleanup_sync_comment_events()
+
                 last_comments_sync = time.time()
                 processor.sync_comments()
                 continue
