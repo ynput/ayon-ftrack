@@ -9,7 +9,7 @@ from typing import Optional
 import ftrack_api
 import ayon_api
 
-from .logic import EventProcessor
+from .logic import EventProcessor, COMMENTS_SYNC_INTERVAL
 
 log = logging.getLogger(__name__)
 
@@ -167,7 +167,7 @@ def main_loop():
                 print("Session closed. Reconnecting.")
                 break
 
-            if time.time() - last_comments_sync > 60:
+            if time.time() - last_comments_sync > COMMENTS_SYNC_INTERVAL:
                 last_comments_sync = time.time()
                 processor.sync_comments()
                 continue

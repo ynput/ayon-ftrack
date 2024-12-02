@@ -27,6 +27,8 @@ log = logging.getLogger(__name__)
 
 _NOT_SET = object()
 FTRACK_COMMENTS_TOPIC = "ftrack.sync.comments"
+COMMENTS_SYNC_INTERVAL = 60
+COMMENTS_SYNC_TIMEOUT = 60 * 5
 
 # AYON attrib to ftrack entity attribute mapping
 DEFAULT_ATTRS_MAPPING = {
@@ -916,7 +918,7 @@ class EventProcessor:
         for event in in_progress_events:
             created_at = arrow.get(event["createdAt"]).to("local")
             delta = now - created_at
-            if delta.seconds < 60 * 5:
+            if delta.seconds < COMMENTS_SYNC_TIMEOUT:
                 any_in_progress = True
             else:
                 ayon_api.update_event(
@@ -941,7 +943,7 @@ class EventProcessor:
                 last_finished_event["createdAt"]
             ).to("local")
             delta = now - created_at
-            if delta.seconds < 60:
+            if delta.seconds < COMMENTS_SYNC_INTERVAL:
                 return
             activities_after_date = created_at
 
