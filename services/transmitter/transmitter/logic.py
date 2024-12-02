@@ -145,6 +145,62 @@ class EventProcessor:
         if not project_names:
             return
 
+        in_progress_events = list(ayon_api.get_events(
+            topics={FTRACK_COMMENTS_TOPIC},
+            statuses={"in_progress"},
+        ))
+
+        any_in_progress = False
+        now = arrow.utcnow()
+        for event in in_progress_events:
+            created_at = arrow.get(event["createdAt"]).to("local")
+            delta = now - created_at
+            if delta.seconds < COMMENTS_SYNC_TIMEOUT:
+                any_in_progress = True
+            else:
+                ayon_api.update_event(
+                    event["id"],
+                    status="failed",
+                )
+
+        if any_in_progress:
+            return
+
+        finished_events = list(ayon_api.get_events(
+            topics={FTRACK_COMMENTS_TOPIC},
+            statuses={"finished"},
+            limit=1,
+            order=ayon_api.SortOrder.descending,
+        ))
+        activities_after_date = None
+        if finished_events:
+            last_finished_event = finished_events[0]
+            created_at = arrow.get(
+                last_finished_event["createdAt"]
+            ).to("local")
+            delta = now - created_at
+            if delta.seconds < COMMENTS_SYNC_INTERVAL:
+                return
+            activities_after_date = created_at
+
+        if activities_after_date is None:
+            activities_after_date = now - datetime.timedelta(days=5)
+
+        response = ayon_api.dispatch_event(
+            FTRACK_COMMENTS_TOPIC,
+            description=(
+                "Synchronizing comments from ftrack to AYON."
+            ),
+            summary=None,
+            payload={},
+            finished=True,
+            store=True,
+        )
+        if isinstance(response, str):
+            event_id = response
+        else:
+            event_id = response["id"]
+
         ft_users = self._session.query(
             "select id, username, email from User"
         ).all()
@@ -154,21 +210,23 @@ class EventProcessor:
             for ft_user_id, ayon_username in ayon_username_by_ft_id.items()
             if ayon_username
         }
-        in_progress_events = list(ayon_api.get_events(
-            topics={FTRACK_COMMENTS_TOPIC},
-            project_names=project_names,
-            statuses={"in_progress"},
-        ))
-        in_progress_by_project = collections.defaultdict(list)
-        for event in in_progress_events:
-            project_name = event["project"]
-            in_progress_by_project[project_name].append(event)
+        success = True
+        try:
+            for project_name in project_names:
+                self._sync_project_comments(
+                    project_name,
+                    ft_id_by_ay_username,
+                    activities_after_date,
+                )
 
-        for project_name in project_names:
-            self._sync_comments(
-                project_name,
-                in_progress_by_project[project_name],
-                ft_id_by_ay_username,
+        except Exception:
+            success = False
+            self._log.warning("Failed to sync comments.", exc_info=True)
+
+        finally:
+            ayon_api.update_event(
+                event_id,
+                status="finished" if success else "failed",
             )
 
     def _process_reviewable_created(self, source_event: Dict[str, Any]):
@@ -907,84 +965,7 @@ class EventProcessor:
         self._session.commit()
         return note
 
-    def _sync_comments(
-        self,
-        project_name,
-        in_progress_events,
-        ft_id_by_ay_username,
-    ):
-        any_in_progress = False
-        now = arrow.utcnow()
-        for event in in_progress_events:
-            created_at = arrow.get(event["createdAt"]).to("local")
-            delta = now - created_at
-            if delta.seconds < COMMENTS_SYNC_TIMEOUT:
-                any_in_progress = True
-            else:
-                ayon_api.update_event(
-                    event["id"],
-                    status="failed",
-                )
-
-        if any_in_progress:
-            return
-
-        finished_events = list(ayon_api.get_events(
-            topics={FTRACK_COMMENTS_TOPIC},
-            project_names={project_name},
-            statuses={"finished"},
-            limit=1,
-            order=ayon_api.SortOrder.descending,
-        ))
-        activities_after_date = None
-        if finished_events:
-            last_finished_event = finished_events[0]
-            created_at = arrow.get(
-                last_finished_event["createdAt"]
-            ).to("local")
-            delta = now - created_at
-            if delta.seconds < COMMENTS_SYNC_INTERVAL:
-                return
-            activities_after_date = created_at
-
-        if activities_after_date is None:
-            activities_after_date = now - datetime.timedelta(days=3)
-
-        response = ayon_api.dispatch_event(
-            FTRACK_COMMENTS_TOPIC,
-            project_name=project_name,
-            description=(
-                "Synchronizing comments from ftrack to AYON."
-            ),
-            summary=None,
-            payload={},
-            finished=True,
-            store=True,
-        )
-        if isinstance(response, str):
-            event_id = response
-        else:
-            event_id = response["id"]
-
-        success = False
-        try:
-            self._real_sync_comments(
-                project_name,
-                ft_id_by_ay_username,
-                activities_after_date.isoformat(),
-            )
-            success = True
-
-        except Exception:
-            self._log.warning("Failed to sync comments.", exc_info=True)
-
-        finally:
-            ayon_api.update_event(
-                event_id,
-                status="finished" if success else "failed",
-            )
-
-    def _real_sync_comments(
+    def _sync_project_comments(
         self,
         project_name,
         ft_id_by_ay_username,
@@ -993,7 +974,7 @@ class EventProcessor:
         project_activities = list(ayon_api.get_activities(
             project_name,
             activity_types={"comment"},
-            changed_after=activities_after_date,
+            changed_after=activities_after_date.isoformat(),
         ))
         if not project_activities:
             return
