@@ -991,7 +991,7 @@ class EventProcessor:
                 entities = []
             elif entity_type == "folder":
                 entities = ayon_api.get_folders(
-                    project_name, entity_ids=entity_ids
+                    project_name, folder_ids=entity_ids
                 )
             elif entity_type == "task":
                 entities = ayon_api.get_tasks(
