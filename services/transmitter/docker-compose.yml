@@ -1,8 +1,8 @@
 name: ayon-ftrack-services
 services:
-  ayontof:
-    container_name: ayontof
-    image: ynput/ayon-ftrack-ayontof:1.2.2+dev
+  transmitter:
+    container_name: transmitter
+    image: ynput/ayon-ftrack-transmitter:1.2.2+dev
     restart: unless-stopped
     environment:
       - "AYON_SERVER_URL=${AYON_SERVER_URL}"
