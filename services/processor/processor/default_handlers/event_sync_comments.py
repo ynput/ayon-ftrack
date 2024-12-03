@@ -248,7 +248,7 @@ class SyncCommentsHandler(BaseEventHandler):
                 (
                     activity
                     for activity in activities
-                    if activity["id"] == activity_id
+                    if activity["activityId"] == activity_id
                 ),
                 None
             )
