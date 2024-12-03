@@ -30,6 +30,7 @@ FTRACK_COMMENTS_TOPIC = "ftrack.sync.comments"
 COMMENTS_SYNC_INTERVAL = 15
 COMMENTS_SYNC_TIMEOUT = 60 * 2
 # Cleanup comment events after week
+COMMENT_EVENTS_SOFT_CLEANUP_TIMEOUT = 60 * 5
 COMMENT_EVENTS_CLEANUP_TIMEOUT_DAYS = 7
 COMMENT_EVENTS_CLEANUP_TIMEOUT = (
     60 * 60 * 24 * COMMENT_EVENTS_CLEANUP_TIMEOUT_DAYS
@@ -227,6 +228,51 @@ class EventProcessor:
                 status="finished" if success else "failed",
                 payload={"synced_comments": synced_comments},
             )
+
+    def soft_cleanup_sync_comment_events(
+        self, last_comments_soft_cleanup: int
+    )-> bool:
+        """Remove sync comment events that did not sync any comments.
+
+        These comments are not relevant for any reference. The logic makes
+        sure that last finished event, important for comments sync, is not
+        removed.
+
+        """
+        self._log.debug("Soft cleaning up comment sync events.")
+        any_in_progress = self._cleanup_in_progress_comment_events()
+        if any_in_progress:
+            return False
+
+        last_finished_event = self._get_last_finished_event()
+        last_event_id = None
+        if last_finished_event:
+            last_event_id = last_finished_event["id"]
+
+        older_than = None
+        if last_comments_soft_cleanup:
+            cleanup_date = arrow.utcnow() - datetime.timedelta(
+                seconds=(last_comments_soft_cleanup + 20)
+            )
+            older_than = cleanup_date.isoformat()
+
+        events_to_cleanup = list(ayon_api.get_events(
+            topics={FTRACK_COMMENTS_TOPIC},
+            statuses={"finished"},
+            older_than=older_than,
+            fields={"id"}
+        ))
+        removed = 0
+        for event in events_to_cleanup:
+            event_id = event["id"]
+            if event_id == last_event_id:
+                continue
+            full_event = ayon_api.get_event(event_id)
+            if not full_event["payload"].get("synced_comments"):
+                removed += 1
+                ayon_api.delete_event(event_id)
+        self._log.debug(f"Soft cleaned up {removed} events")
+        return True
 
     def cleanup_sync_comment_events(self) -> bool:
         self._log.debug("Cleaning up comment sync events.")

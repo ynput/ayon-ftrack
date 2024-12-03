@@ -12,6 +12,7 @@ import ayon_api
 from .logic import (
     EventProcessor,
     COMMENTS_SYNC_INTERVAL,
+    COMMENT_EVENTS_SOFT_CLEANUP_TIMEOUT,
     COMMENT_EVENTS_CLEANUP_TIMEOUT,
 )
 
@@ -164,6 +165,7 @@ def main_loop():
 
         last_comments_sync = 0
         last_comments_cleanup = 0
+        last_comments_soft_cleanup = 0
         _GlobalContext.session_fail_logged = False
 
         processor = EventProcessor(session)
@@ -175,12 +177,19 @@ def main_loop():
             # Run comments sync
             now_time = time.time()
             sync_diff = now_time - last_comments_sync
+            soft_cleanup_diff = now_time - last_comments_soft_cleanup
             cleanup_diff = now_time - last_comments_cleanup
             if sync_diff > COMMENTS_SYNC_INTERVAL:
                 processor.sync_comments()
                 last_comments_sync = now_time
 
             # Run comments events cleanup
+            # NOTE Comments sync MUST run first
+            if soft_cleanup_diff > COMMENT_EVENTS_SOFT_CLEANUP_TIMEOUT:
+                if processor.soft_cleanup_sync_comment_events(
+                    last_comments_soft_cleanup
+                ):
+                    last_comments_soft_cleanup = now_time
 
             if cleanup_diff > COMMENT_EVENTS_CLEANUP_TIMEOUT:
                 if processor.cleanup_sync_comment_events():
