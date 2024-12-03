@@ -979,18 +979,25 @@ class EventProcessor:
         if ftrack_entity is None or "notes" not in ftrack_entity:
             return None
 
-        note = self._session.create(
-            "Note",
-            {
-                "content": activity["body"],
-                "user_id": user_id,
-                "metadata": {
-                    "ayon_activity_id": activity["activityId"],
+        note = None
+        try:
+            note = self._session.create(
+                "Note",
+                {
+                    "content": activity["body"],
+                    "user_id": user_id,
+                    "metadata": {
+                        "ayon_activity_id": activity["activityId"],
+                    }
                 }
-            }
-        )
-        ftrack_entity["notes"].append(note)
-        self._session.commit()
+            )
+            ftrack_entity["notes"].append(note)
+            self._session.commit()
+
+        except Exception:
+            self._session.recorded_operations.clear()
+            self._log.warning("Failed to create Note", exc_info=True)
+
         return note
 
     def _sync_project_comments(
