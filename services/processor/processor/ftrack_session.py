@@ -20,7 +20,7 @@ import ftrack_api.event
 from weakref import WeakMethod
 
 from ayon_api import (
-    get_service_addon_name,
+    get_service_name,
     enroll_event_job,
     get_event,
     get_events,
@@ -40,7 +40,7 @@ class ProcessEventHub(ftrack_api.event.hub.EventHub):
         return enroll_event_job(
             source_topic="ftrack.leech",
             target_topic="ftrack.proc",
-            sender=get_service_addon_name(),
+            sender=get_service_name(),
             description="Event processing",
             sequential=True,
         )
@@ -55,7 +55,7 @@ class ProcessEventHub(ftrack_api.event.hub.EventHub):
 
         update_event(
             event_id,
-            sender=get_service_addon_name(),
+            sender=get_service_name(),
             status="finished",
             description=description,
         )
