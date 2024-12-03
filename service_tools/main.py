@@ -3,6 +3,7 @@ import sys
 import argparse
 import subprocess
 import time
+import collections
 
 from ayon_api.constants import (
     DEFAULT_VARIANT_ENV_KEY,
@@ -10,6 +11,38 @@ from ayon_api.constants import (
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 ADDON_DIR = os.path.dirname(CURRENT_DIR)
+
+
+def _fix_ftrack_common_import():
+    # map 'common' modules to 'ftrack_common'
+    import common
+
+    common_dir = os.path.join(
+        ADDON_DIR, "client", "ayon_ftrack", "common"
+    )
+    new_prefix = "ftrack_common"
+
+    sys.modules[new_prefix] = common
+
+    import_queue = collections.deque()
+    import_queue.extend(os.listdir(common_dir))
+    while import_queue:
+        subpath = import_queue.popleft()
+        if subpath.endswith(".py"):
+            full_module_name = subpath[:-3].replace("/", ".")
+            module_name = full_module_name.split("/")[-1]
+            if module_name in ("__init__", "__main__"):
+                continue
+            new_name = f"{new_prefix}.{full_module_name}"
+            sys.modules[new_name] = __import__(f"common.{full_module_name}")
+            continue
+
+        module_path = os.path.join(common_dir, subpath)
+        if os.path.isdir(module_path):
+            import_queue.extend(
+                "/".join((subpath, filename))
+                for filename in os.listdir(module_path)
+            )
 
 
 def run_services(
@@ -105,11 +138,7 @@ def main():
     ):
         sys.path.insert(0, path)
 
-    # Fix 'ftrack_common' import
-    import common
-    import common.event_handlers
-    sys.modules["ftrack_common"] = common
-    sys.modules["ftrack_common.event_handlers"] = common.event_handlers
+    _fix_ftrack_common_import()
 
     if service_name == "processor":
         from processor import main as service_main
