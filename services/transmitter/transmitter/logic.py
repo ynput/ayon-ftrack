@@ -194,6 +194,15 @@ class EventProcessor:
             for ft_user_id, ayon_username in ayon_username_by_ft_id.items()
             if ayon_username
         }
+        default_ft_user_id = next(
+            (
+                user["id"]
+                for user in ft_users
+                if user["username"] == self._session.api_user
+            ),
+            None
+        )
+        ft_id_by_ay_username[None] = default_ft_user_id
         success = True
         try:
             for project_name in project_names:
@@ -1070,6 +1079,8 @@ class EventProcessor:
                 entity_type = activity["entityType"]
                 ayon_username = activity["author"]["name"]
                 ft_user_id = ft_id_by_ay_username.get(ayon_username)
+                if not ft_user_id:
+                    ft_user_id = ft_id_by_ay_username[None]
                 ft_note = self._create_ftrack_note(
                     project_name, entity, entity_type, activity, ft_user_id
                 )
