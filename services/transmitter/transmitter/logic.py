@@ -228,11 +228,11 @@ class EventProcessor:
                 payload={"synced_comments": synced_comments},
             )
 
-    def cleanup_sync_comment_events(self):
+    def cleanup_sync_comment_events(self) -> bool:
         self._log.debug("Cleaning up comment sync events.")
         any_in_progress = self._cleanup_in_progress_comment_events()
         if any_in_progress:
-            return
+            return False
 
         last_finished_event = self._get_last_finished_event()
         last_event_id = None
@@ -261,6 +261,7 @@ class EventProcessor:
                     exc_info=True
                 )
         self._log.debug(f"Cleaned up {removed} events.")
+        return True
 
     def _cleanup_in_progress_comment_events(self) -> bool:
         in_progress_events = list(ayon_api.get_events(

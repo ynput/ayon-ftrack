@@ -172,15 +172,19 @@ def main_loop():
                 print("Session closed. Reconnecting.")
                 break
 
-            if time.time() - last_comments_sync > COMMENTS_SYNC_INTERVAL:
-                cleanup_diff = time.time() - last_comments_cleanup
-                if cleanup_diff > COMMENT_EVENTS_CLEANUP_TIMEOUT:
-                    last_comments_cleanup = time.time()
-                    processor.cleanup_sync_comment_events()
-
-                last_comments_sync = time.time()
+            # Run comments sync
+            now_time = time.time()
+            sync_diff = now_time - last_comments_sync
+            cleanup_diff = now_time - last_comments_cleanup
+            if sync_diff > COMMENTS_SYNC_INTERVAL:
                 processor.sync_comments()
-                continue
+                last_comments_sync = now_time
+
+            # Run comments events cleanup
+
+            if cleanup_diff > COMMENT_EVENTS_CLEANUP_TIMEOUT:
+                if processor.cleanup_sync_comment_events():
+                    last_comments_cleanup = now_time
 
             job_event = ayon_api.enroll_event_job(
                 SOURCE_TOPICS,
