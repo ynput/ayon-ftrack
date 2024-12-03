@@ -154,15 +154,11 @@ class EventProcessor:
         if any_in_progress:
             return
 
-        finished_events = list(ayon_api.get_events(
-            topics={FTRACK_COMMENTS_TOPIC},
-            statuses={"finished"},
-            limit=1,
-            order=ayon_api.SortOrder.descending,
-        ))
+        now = arrow.utcnow()
         activities_after_date = None
-        if finished_events:
-            last_finished_event = finished_events[0]
+
+        last_finished_event = self._get_last_finished_event()
+        if last_finished_event is not None:
             created_at = arrow.get(
                 last_finished_event["createdAt"]
             ).to("local")
@@ -260,6 +256,17 @@ class EventProcessor:
                     status="failed",
                 )
         return any_in_progress
+
+    def _get_last_finished_event(self):
+        finished_events = list(ayon_api.get_events(
+            topics={FTRACK_COMMENTS_TOPIC},
+            statuses={"finished"},
+            limit=1,
+            order=ayon_api.SortOrder.descending,
+        ))
+        for event in finished_events:
+            return event
+        return None
 
     def _process_reviewable_created(self, source_event: Dict[str, Any]):
         # TODO implement
