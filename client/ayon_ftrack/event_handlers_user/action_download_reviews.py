@@ -24,8 +24,8 @@ class DownloadReviewMedia(LocalAction):
             if entity.entity_type.lower() in {
                 "assetversion", "reviewsession"
             }:
-                return True        
-        return True
+                return True
+        return False
 
     def launch(self, session, entities, event):
         asset_versions = self._extract_asset_versions(session, entities)
