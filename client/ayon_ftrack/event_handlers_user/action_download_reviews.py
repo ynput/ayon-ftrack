@@ -15,6 +15,8 @@ class DownloadReviewMedia(LocalAction):
     identifier = "download.reviewables"
     description = "Download review media from selected versions"
 
+    review_names = {"ftrackreview-mp4", "ftrackreview-image"}
+
     def discover(self, _session, entities, _event):
         # Only show this for Versions when a selection has been made
         if not entities:
@@ -58,14 +60,32 @@ class DownloadReviewMedia(LocalAction):
             version["id"]: version
             for version in asset_versions
         }
+        src_component_ids = set()
+        joined_review_names = self.join_filter_values(self.review_names)
         components = []
         for chunk_ids in create_chunks(asset_versions_by_id.keys()):
             joined_version_ids = self.join_filter_values(chunk_ids)
-            components.extend(session.query(
-                "select id, name, version_id from Component"
-                " where name in ('ftrackreview-mp4', 'ftrackreview-image')"
+            for component in session.query(
+                "select id, name, version_id, metadata from Component"
+                f" where name in ({joined_review_names})"
                 f" and version_id in ({joined_version_ids})"
-            ).all())
+            ).all():
+                source_component_id = component["metadata"].get(
+                    "source_component_id"
+                )
+                if not source_component_id:
+                    components.append(component)
+                    continue
+                src_component_ids.add(source_component_id)
+
+        if src_component_ids:
+            joined_comp_ids = self.join_filter_values(src_component_ids)
+            components.extend(
+                session.query(
+                    "select id, name, version_id from Component"
+                    f" where id in ({joined_comp_ids})"
+                ).all()
+            )
 
         if not components:
             return {
@@ -115,7 +135,12 @@ class DownloadReviewMedia(LocalAction):
                 session.commit()
 
     def _download_components(
-        self, session, components, asset_versions_by_id, assets_by_id, job
+        self,
+        session,
+        components,
+        asset_versions_by_id,
+        assets_by_id,
+        job,
     ):
         download_dir = user_downloads_dir()
         total_count = len(components)
@@ -132,14 +157,18 @@ class DownloadReviewMedia(LocalAction):
             download_url = url_item["value"]
 
             ext = component["file_type"].lstrip(".")
-            asset_version_id = component["version_id"]
-            asset_version = asset_versions_by_id[asset_version_id]
-            asset_id = asset_version["asset_id"]
-            asset = assets_by_id[asset_id]
 
-            version = asset_version["version"]
-            asset_name = asset["name"]
-            basename = f"{asset_name}_{version:0>3}"
+            basename = component["name"]
+            if component["name"] in self.review_names:
+                asset_version_id = component["version_id"]
+                asset_version = asset_versions_by_id[asset_version_id]
+                asset_id = asset_version["asset_id"]
+                asset = assets_by_id[asset_id]
+
+                version = asset_version["version"]
+                asset_name = asset["name"]
+
+                basename = f"{asset_name}_{version:0>3}"
 
             # Calculate the full download path and URL to pull from
             download_path = os.path.join(
