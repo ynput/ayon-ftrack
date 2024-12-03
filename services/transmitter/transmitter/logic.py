@@ -1065,7 +1065,7 @@ class EventProcessor:
 
         note = None
         try:
-            note = self._session.create(
+            new_note = self._session.create(
                 "Note",
                 {
                     "content": activity["body"],
@@ -1075,8 +1075,11 @@ class EventProcessor:
                     }
                 }
             )
-            ftrack_entity["notes"].append(note)
+            # Access 'id' to create one now
+            _new_note_id = new_note["id"]
+            ftrack_entity["notes"].append(new_note)
             self._session.commit()
+            note = new_note
 
         except Exception:
             self._session.recorded_operations.clear()
@@ -1149,18 +1152,15 @@ class EventProcessor:
                     project_name, entity, entity_type, activity, ft_user_id
                 )
             else:
-                changed = False
                 if ft_note["content"] != activity["body"]:
-                    changed = True
                     ft_note["content"] = activity["body"]
 
                 activity_id = activity["activityId"]
                 if ft_note["metadata"].get("ayon_activity_id") != activity_id:
-                    changed = True
                     ft_note["metadata"]["ayon_activity_id"] = activity_id
 
-                if changed:
-                    self._session.commit()
+            if self._session.recorded_operations:
+                self._session.commit()
 
             if ft_note is None:
                 continue
