@@ -204,9 +204,10 @@ class EventProcessor:
         )
         ft_id_by_ay_username[None] = default_ft_user_id
         success = True
+        synced_comments = 0
         try:
             for project_name in project_names:
-                self._sync_project_comments(
+                synced_comments += self._sync_project_comments(
                     project_name,
                     ft_id_by_ay_username,
                     activities_after_date,
@@ -219,7 +220,12 @@ class EventProcessor:
         finally:
             ayon_api.update_event(
                 event_id,
+                description=(
+                    f"Synchronized {synced_comments} comments"
+                    " from AYON to ftrack."
+                ),
                 status="finished" if success else "failed",
+                payload={"synced_comments": synced_comments},
             )
 
     def cleanup_sync_comment_events(self):
@@ -1022,17 +1028,17 @@ class EventProcessor:
 
     def _sync_project_comments(
         self,
-        project_name,
-        ft_id_by_ay_username,
-        activities_after_date,
-    ):
+        project_name: str,
+        ft_id_by_ay_username: Dict[Union[str, None], Optional[str]],
+        activities_after_date: arrow.Arrow,
+    ) -> int:
         project_activities = list(ayon_api.get_activities(
             project_name,
             activity_types={"comment"},
             changed_after=activities_after_date.isoformat(),
         ))
         if not project_activities:
-            return
+            return 0
 
         entity_ids_by_entity_type = collections.defaultdict(set)
         for activity in project_activities:
@@ -1108,3 +1114,4 @@ class EventProcessor:
                     activity["activityId"],
                     data=ftrack_data,
                 )
+        return len(project_activities)
