@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ftrack-processor"
-version = "1.2.2+dev"
+version = "1.2.4+dev"
 description = ""
 authors = ["Ynput s.r.o. <info@ynput.io>"]
 
@@ -8,6 +8,7 @@ authors = ["Ynput s.r.o. <info@ynput.io>"]
 python = ">=3.9,<3.10"
 ayon-python-api = "1.0.11"
 ftrack-python-api = "2.3.3"
+platformdirs = "*"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
