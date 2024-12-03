@@ -2,7 +2,7 @@ import datetime
 import collections
 import logging
 import typing
-from typing import Optional, Dict, Set, Any, TypedDict, Literal
+from typing import Optional, Dict, Set, Any, TypedDict, Literal, Union
 from dataclasses import dataclass
 
 import arrow
