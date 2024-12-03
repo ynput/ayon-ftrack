@@ -99,9 +99,10 @@ class ProcessEventHub(ftrack_api.event.hub.EventHub):
 
                 if self.load_event_from_jobs():
                     last_loaded_job = time.time()
+                elif time.time() - last_loaded_job > 5 * 60:
+                    if not self._check_stuck_events():
+                        time.sleep(5)
                 else:
-                    if time.time() - last_loaded_job > 5 * 60:
-                        self._check_stuck_events()
                     time.sleep(0.1)
                 continue
 
@@ -126,9 +127,10 @@ class ProcessEventHub(ftrack_api.event.hub.EventHub):
 
         return super()._handle_packet(code, packet_identifier, path, data)
 
-    def _check_stuck_events(self):
+    def _check_stuck_events(self) -> bool:
         """Check if there are stuck events and mark them as failed"""
         now = arrow.utcnow()
+        changed_status = False
         for event in get_events(
             topics={"ftrack.proc"},
             statuses={"pending"},
@@ -138,12 +140,14 @@ class ProcessEventHub(ftrack_api.event.hub.EventHub):
             if delta.seconds > EVENT_PROCESS_TIMEOUT:
                 event_id = event["id"]
                 print(f"Failing stuck event '{event_id}'")
+                changed_status = True
                 update_event(
                     event_id,
                     sender=get_service_name(),
                     status="failed",
                     description="Stuck event",
                 )
+        return changed_status
 
 
 class CustomEventHubSession(ftrack_api.session.Session):
