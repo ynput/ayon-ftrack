@@ -150,24 +150,7 @@ class EventProcessor:
         if not project_names:
             return
 
-        in_progress_events = list(ayon_api.get_events(
-            topics={FTRACK_COMMENTS_TOPIC},
-            statuses={"in_progress"},
-        ))
-
-        any_in_progress = False
-        now = arrow.utcnow()
-        for event in in_progress_events:
-            created_at = arrow.get(event["createdAt"]).to("local")
-            delta = now - created_at
-            if delta.seconds < COMMENTS_SYNC_TIMEOUT:
-                any_in_progress = True
-            else:
-                ayon_api.update_event(
-                    event["id"],
-                    status="failed",
-                )
-
+        any_in_progress = self._cleanup_in_progress_comment_events()
         if any_in_progress:
             return
 
@@ -256,6 +239,27 @@ class EventProcessor:
                     exc_info=True
                 )
         self._log.info(f"Cleaned up {removed} events.")
+
+    def _cleanup_in_progress_comment_events(self) -> bool:
+        in_progress_events = list(ayon_api.get_events(
+            topics={FTRACK_COMMENTS_TOPIC},
+            statuses={"in_progress"},
+            fields={"id", "createdAt"}
+        ))
+
+        any_in_progress = False
+        now = arrow.utcnow()
+        for event in in_progress_events:
+            created_at = arrow.get(event["createdAt"]).to("local")
+            delta = now - created_at
+            if delta.seconds < COMMENTS_SYNC_TIMEOUT:
+                any_in_progress = True
+            else:
+                ayon_api.update_event(
+                    event["id"],
+                    status="failed",
+                )
+        return any_in_progress
 
     def _process_reviewable_created(self, source_event: Dict[str, Any]):
         # TODO implement
