@@ -56,6 +56,12 @@ class SyncCommentsHandler(BaseEventHandler):
         project_name = self.get_project_name_from_event(
             session, event, project_id
         )
+        ayon_project = self.get_ayon_project_from_event(event, project_name)
+        if not ayon_project:
+            self.log.debug(
+                f"Project \"{project_name}\" not found in AYON"
+            )
+            return
         project_settings = self.get_project_settings_from_event(
             event, project_name
         )
