@@ -1071,19 +1071,19 @@ class EventProcessor:
 
         note = None
         try:
-            new_note = self._session.create(
-                "Note",
-                {
-                    "content": activity["body"],
-                    "author": ft_user,
-                    "metadata": {
-                        "ayon_activity_id": activity["activityId"],
-                    },
+            new_note = ftrack_entity.create_note(
+                activity["body"],
+                ft_user,
+            )
+            self._session.create(
+                "Metadata",
+            {
+                    "parent_id": new_note["id"],
+                    "parent_type": "Note",
+                    "key": "ayon_activity_id",
+                    "value": activity["activityId"]
                 }
             )
-            # Access 'id' to create one now
-            _new_note_id = new_note["id"]
-            ftrack_entity["notes"].append(new_note)
             self._session.commit()
             note = new_note
 
