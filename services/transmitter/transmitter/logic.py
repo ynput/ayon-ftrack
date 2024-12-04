@@ -22,6 +22,7 @@ from .structures import JobEventType
 
 if typing.TYPE_CHECKING:
     import ftrack_api.entity.base
+    import ftrack_api.entity.user
 
 log = logging.getLogger(__name__)
 
@@ -206,11 +207,16 @@ class EventProcessor:
         ft_id_by_ay_username[None] = default_ft_user_id
         success = True
         synced_comments = 0
+        ft_users_by_id = {
+            ft_user["id"]: ft_user
+            for ft_user in ft_users
+        }
         try:
             for project_name in project_names:
                 synced_comments += self._sync_project_comments(
                     project_name,
                     ft_id_by_ay_username,
+                    ft_users_by_id,
                     activities_after_date,
                 )
 
@@ -1050,7 +1056,7 @@ class EventProcessor:
         return project_names
 
     def _create_ftrack_note(
-        self, project_name, entity, entity_type, activity, user_id
+        self, project_name, entity, entity_type, activity, ft_user
     ):
         if entity is None:
             return None
@@ -1069,10 +1075,10 @@ class EventProcessor:
                 "Note",
                 {
                     "content": activity["body"],
-                    "user_id": user_id,
+                    "author": ft_user,
                     "metadata": {
                         "ayon_activity_id": activity["activityId"],
-                    }
+                    },
                 }
             )
             # Access 'id' to create one now
@@ -1091,6 +1097,7 @@ class EventProcessor:
         self,
         project_name: str,
         ft_id_by_ay_username: Dict[Union[str, None], Optional[str]],
+        ft_users_by_id: Dict[str, "ftrack_api.entity.user.User"],
         activities_after_date: arrow.Arrow,
     ) -> int:
         project_activities = list(ayon_api.get_activities(
@@ -1148,8 +1155,9 @@ class EventProcessor:
                 ft_user_id = ft_id_by_ay_username.get(ayon_username)
                 if not ft_user_id:
                     ft_user_id = ft_id_by_ay_username[None]
+                ft_user = ft_users_by_id[ft_user_id]
                 ft_note = self._create_ftrack_note(
-                    project_name, entity, entity_type, activity, ft_user_id
+                    project_name, entity, entity_type, activity, ft_user
                 )
             else:
                 if ft_note["content"] != activity["body"]:
