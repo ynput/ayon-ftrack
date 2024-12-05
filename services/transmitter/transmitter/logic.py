@@ -1076,7 +1076,9 @@ class EventProcessor:
             parent_type = "AssetVersion"
 
         note_id = str(uuid.uuid4())
-        # Skip append note to parent entity
+        # Use direct call to ftrack without using recorded operations
+        # - skip append note to parent entity, it is causing issues in
+        #   ftrack backend, and looks like it works without it.
         batch = [
             {
                 "action": "create",
@@ -1105,6 +1107,7 @@ class EventProcessor:
             }
         ]
 
+        # Store note id to AYON activity data
         activity_data = activity["activityData"]
         ftrack_data = activity_data.setdefault("ftrack", {})
         ftrack_data["id"] = note_id
@@ -1118,9 +1121,7 @@ class EventProcessor:
             self._session.call(batch)
 
         except Exception:
-            self._session.recorded_operations.clear()
             self._log.warning("Failed to create Note", exc_info=True)
-
 
     def _sync_project_comments(
         self,
@@ -1163,6 +1164,16 @@ class EventProcessor:
                 for entity in entities
             })
 
+        # NOTE Because we have to wait 1 second between creating notes
+        #   we might want to optimize this in the future to process
+        #   activities per entity, and if comment cannot be created because
+        #   we should wait, then go to other entities until the time comes.
+        # With 5 entities each having 2 new comments during one batch process
+        #   we have to wait total 5 seconds, at least. More entities and
+        #   comments, the bigger wait time is.
+        # With optimization per entity, the wait time would be the biggest
+        #   amount of new comments per entity (entity count is not important).
+        #   That would be 1 second in case above.
         last_created_by_entity_id = {}
         for activity in project_activities:
             activity_data = activity["activityData"]
