@@ -5,7 +5,8 @@ client_dir = "ayon_ftrack"
 
 services = {
     "leecher": {"image": f"ynput/ayon-ftrack-leecher:{version}"},
-    "processor": {"image": f"ynput/ayon-ftrack-processor:{version}"}
+    "processor": {"image": f"ynput/ayon-ftrack-processor:{version}"},
+    "transmitter": {"image": f"ynput/ayon-ftrack-transmitter:{version}"},
 }
 
 plugin_for = ["ayon_server"]
