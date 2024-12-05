@@ -1070,6 +1070,10 @@ class EventProcessor:
         if ftrack_entity is None or "notes" not in ftrack_entity:
             return
 
+        parent_type = "TypedContext"
+        if entity_type == "version":
+            parent_type = "AssetVersion"
+
         try:
             new_note = ftrack_entity.create_note(
                 activity["body"],
@@ -1092,6 +1096,8 @@ class EventProcessor:
                 activity["activityId"],
                 data=activity_data,
             )
+            new_note["parent_id"] = ftrack_entity["id"]
+            new_note["parent_type"] = parent_type
             self._session.commit()
 
         except Exception:
