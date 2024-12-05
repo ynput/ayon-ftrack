@@ -225,6 +225,7 @@ def update_docker_version(logger):
     for service_name in (
         "leecher",
         "processor",
+        "transmitter",
     ):
         service_dir = os.path.join(
             CURRENT_ROOT, "services", service_name
