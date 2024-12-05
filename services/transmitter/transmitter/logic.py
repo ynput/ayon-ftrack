@@ -1074,31 +1074,47 @@ class EventProcessor:
         if entity_type == "version":
             parent_type = "AssetVersion"
 
-        try:
-            new_note = ftrack_entity.create_note(
-                activity["body"],
-                ft_user,
-            )
-            self._session.create(
-                "Metadata",
+        note_id = str(uuid.uuid4())
+        # Skip append note to parent entity
+        batch = [
             {
-                    "parent_id": new_note["id"],
-                    "parent_type": "Note",
+                "action": "create",
+                "entity_data": {
+                    "__entity_type__": "Note",
+                    "user_id": ft_user["id"],
+                    "content": activity["body"],
+                    "id": note_id,
+                    "is_todo": False,
+                    "parent_id": ftrack_entity["id"],
+                    "parent_type": parent_type
+                },
+                "entity_key": [note_id],
+                "entity_type": "Note"
+            }, {
+                "action": "create",
+                "entity_data": {
+                    "__entity_type__": "Metadata",
                     "key": "ayon_activity_id",
+                    "parent_id": note_id,
+                    "parent_type": "Note",
                     "value": activity["activityId"]
-                }
-            )
-            activity_data = activity["activityData"]
-            ftrack_data = activity_data.setdefault("ftrack", {})
-            ftrack_data["id"] = new_note["id"]
-            ayon_api.update_activity(
-                project_name,
-                activity["activityId"],
-                data=activity_data,
-            )
-            new_note["parent_id"] = ftrack_entity["id"]
-            new_note["parent_type"] = parent_type
-            self._session.commit()
+                },
+                "entity_key": [note_id, "ayon_activity_id"],
+                "entity_type": "Metadata"
+            }
+        ]
+
+        activity_data = activity["activityData"]
+        ftrack_data = activity_data.setdefault("ftrack", {})
+        ftrack_data["id"] = note_id
+        ayon_api.update_activity(
+            project_name,
+            activity["activityId"],
+            data=activity_data,
+        )
+
+        try:
+            self._session.call(batch)
 
         except Exception:
             self._session.recorded_operations.clear()
