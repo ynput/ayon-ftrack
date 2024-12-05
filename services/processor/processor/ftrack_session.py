@@ -8,6 +8,7 @@ import queue
 import collections
 
 import appdirs
+import arrow
 import requests
 import ftrack_api
 import ftrack_api.session
@@ -19,11 +20,15 @@ import ftrack_api.event
 from weakref import WeakMethod
 
 from ayon_api import (
-    get_service_addon_name,
+    get_service_name,
     enroll_event_job,
     get_event,
+    get_events,
     update_event,
 )
+
+# 10 minutes
+EVENT_PROCESS_TIMEOUT = 60 * 10
 
 
 class ProcessEventHub(ftrack_api.event.hub.EventHub):
@@ -35,7 +40,7 @@ class ProcessEventHub(ftrack_api.event.hub.EventHub):
         return enroll_event_job(
             source_topic="ftrack.leech",
             target_topic="ftrack.proc",
-            sender=get_service_addon_name(),
+            sender=get_service_name(),
             description="Event processing",
             sequential=True,
         )
@@ -50,7 +55,7 @@ class ProcessEventHub(ftrack_api.event.hub.EventHub):
 
         update_event(
             event_id,
-            sender=get_service_addon_name(),
+            sender=get_service_name(),
             status="finished",
             description=description,
         )
@@ -72,6 +77,7 @@ class ProcessEventHub(ftrack_api.event.hub.EventHub):
         """
 
         started = time.time()
+        last_loaded_job = 0
         while True:
             job = None
             empty_queue = False
@@ -91,7 +97,12 @@ class ProcessEventHub(ftrack_api.event.hub.EventHub):
                 if not self.connected:
                     break
 
-                if not self.load_event_from_jobs():
+                if self.load_event_from_jobs():
+                    last_loaded_job = time.time()
+                elif time.time() - last_loaded_job > 5 * 60:
+                    if not self._check_stuck_events():
+                        time.sleep(5)
+                else:
                     time.sleep(0.1)
                 continue
 
@@ -115,6 +126,28 @@ class ProcessEventHub(ftrack_api.event.hub.EventHub):
             return
 
         return super()._handle_packet(code, packet_identifier, path, data)
+
+    def _check_stuck_events(self) -> bool:
+        """Check if there are stuck events and mark them as failed"""
+        now = arrow.utcnow()
+        changed_status = False
+        for event in get_events(
+            topics={"ftrack.proc"},
+            statuses={"pending"},
+        ):
+            created_at = arrow.get(event["createdAt"]).to("local")
+            delta = now - created_at
+            if delta.seconds > EVENT_PROCESS_TIMEOUT:
+                event_id = event["id"]
+                print(f"Failing stuck event '{event_id}'")
+                changed_status = True
+                update_event(
+                    event_id,
+                    sender=get_service_name(),
+                    status="failed",
+                    description="Stuck event",
+                )
+        return changed_status
 
 
 class CustomEventHubSession(ftrack_api.session.Session):
