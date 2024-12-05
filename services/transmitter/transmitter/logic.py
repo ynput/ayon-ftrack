@@ -191,6 +191,10 @@ class EventProcessor:
         ft_users = self._session.query(
             "select id, username, email from User"
         ).all()
+        ft_users_by_id = {
+            ft_user["id"]: ft_user
+            for ft_user in ft_users
+        }
         ayon_username_by_ft_id = map_ftrack_users_to_ayon_users(ft_users)
         ft_id_by_ay_username = {
             ayon_username: ft_user_id
@@ -208,10 +212,6 @@ class EventProcessor:
         ft_id_by_ay_username[None] = default_ft_user_id
         success = True
         synced_comments = 0
-        ft_users_by_id = {
-            ft_user["id"]: ft_user
-            for ft_user in ft_users
-        }
         try:
             for project_name in project_names:
                 synced_comments += self._sync_project_comments(
@@ -1117,9 +1117,8 @@ class EventProcessor:
 
         entities_by_id = {}
         for entity_type, entity_ids in entity_ids_by_entity_type.items():
-            if entity_type == "project":
-                entities = []
-            elif entity_type == "folder":
+            entities = []
+            if entity_type == "folder":
                 entities = ayon_api.get_folders(
                     project_name, folder_ids=entity_ids
                 )
@@ -1131,8 +1130,6 @@ class EventProcessor:
                 entities = ayon_api.get_versions(
                     project_name, version_ids=entity_ids
                 )
-            else:
-                entities = []
             entities_by_id.update({
                 entity["id"]: entity
                 for entity in entities
