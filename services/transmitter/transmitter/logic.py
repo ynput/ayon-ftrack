@@ -1,9 +1,13 @@
+import time
+import datetime
 import collections
 import logging
 import typing
-from typing import Optional, Dict, Set, Any, TypedDict, Literal
+import uuid
+from typing import Optional, Dict, Set, Any, TypedDict, Literal, Union
 from dataclasses import dataclass
 
+import arrow
 import ayon_api
 import ftrack_api
 import ftrack_api.operation
@@ -20,10 +24,20 @@ from .structures import JobEventType
 
 if typing.TYPE_CHECKING:
     import ftrack_api.entity.base
+    import ftrack_api.entity.user
 
 log = logging.getLogger(__name__)
 
 _NOT_SET = object()
+FTRACK_COMMENTS_TOPIC = "ftrack.sync.comments"
+COMMENTS_SYNC_INTERVAL = 15
+COMMENTS_SYNC_TIMEOUT = 60 * 2
+# Cleanup comment events after week
+COMMENT_EVENTS_SOFT_CLEANUP_TIMEOUT = 60 * 5
+COMMENT_EVENTS_CLEANUP_TIMEOUT_DAYS = 7
+COMMENT_EVENTS_CLEANUP_TIMEOUT = (
+    60 * 60 * 24 * COMMENT_EVENTS_CLEANUP_TIMEOUT_DAYS
+)
 
 # AYON attrib to ftrack entity attribute mapping
 DEFAULT_ATTRS_MAPPING = {
@@ -68,9 +82,31 @@ class EntityEventData:
     # 'update_key' and 'changes' are filled when action is 'updated'
     update_key: Optional[str]
     changes: Optional[EntityDataChangesData]
+    _ayon_project_entity: Optional[Dict[str, Any]] = _NOT_SET
     _ayon_entity: Optional[Dict[str, Any]] = _NOT_SET
 
+    def get_ayon_project(self) -> Optional[Dict[str, Any]]:
+        if self.entity_type == "project":
+            project_entity = _get_entity_by_id(
+                self.project_name,
+                self.entity_type,
+                self.entity_id,
+            )
+            self._ayon_project_entity = project_entity
+            self._ayon_entity = project_entity
+            return project_entity
+
+        self._ayon_project_entity = _get_entity_by_id(
+            self.project_name,
+            "project",
+            self.project_name,
+        )
+        return self._ayon_project_entity
+
     def get_ayon_entity(self) -> Optional[Dict[str, Any]]:
+        if not self.get_ayon_project():
+            return None
+
         if self._ayon_entity is _NOT_SET:
             self._ayon_entity = _get_entity_by_id(
                 self.project_name,
@@ -111,6 +147,207 @@ class EventProcessor:
                 job_event["id"],
                 status=job_status
             )
+
+    def sync_comments(self):
+        self._log.info("Synchronizing comments from AYON to ftrack.")
+        project_names = self._get_sync_project_names()
+        if not project_names:
+            return
+
+        any_in_progress = self._cleanup_in_progress_comment_events()
+        if any_in_progress:
+            return
+
+        now = arrow.utcnow()
+        activities_after_date = None
+
+        last_finished_event = self._get_last_finished_event()
+        if last_finished_event is not None:
+            created_at = arrow.get(
+                last_finished_event["createdAt"]
+            ).to("local")
+            delta = now - created_at
+            if delta.seconds < COMMENTS_SYNC_INTERVAL:
+                return
+            activities_after_date = created_at
+
+        if activities_after_date is None:
+            activities_after_date = now - datetime.timedelta(days=5)
+
+        response = ayon_api.dispatch_event(
+            FTRACK_COMMENTS_TOPIC,
+            description=(
+                "Synchronizing comments from ftrack to AYON."
+            ),
+            summary=None,
+            payload={},
+            finished=True,
+            store=True,
+        )
+        if isinstance(response, str):
+            event_id = response
+        else:
+            event_id = response["id"]
+
+        ft_users = self._session.query(
+            "select id, username, email from User"
+        ).all()
+        ft_users_by_id = {
+            ft_user["id"]: ft_user
+            for ft_user in ft_users
+        }
+        ayon_username_by_ft_id = map_ftrack_users_to_ayon_users(ft_users)
+        ft_id_by_ay_username = {
+            ayon_username: ft_user_id
+            for ft_user_id, ayon_username in ayon_username_by_ft_id.items()
+            if ayon_username
+        }
+        default_ft_user_id = next(
+            (
+                user["id"]
+                for user in ft_users
+                if user["username"] == self._session.api_user
+            ),
+            None
+        )
+        ft_id_by_ay_username[None] = default_ft_user_id
+        success = True
+        synced_comments = 0
+        try:
+            for project_name in project_names:
+                synced_comments += self._sync_project_comments(
+                    project_name,
+                    ft_id_by_ay_username,
+                    ft_users_by_id,
+                    activities_after_date,
+                )
+
+        except Exception:
+            success = False
+            self._log.warning("Failed to sync comments.", exc_info=True)
+
+        finally:
+            ayon_api.update_event(
+                event_id,
+                description=(
+                    f"Synchronized {synced_comments} comments"
+                    " from AYON to ftrack."
+                ),
+                status="finished" if success else "failed",
+                payload={"synced_comments": synced_comments},
+            )
+
+    def soft_cleanup_sync_comment_events(
+        self, last_comments_soft_cleanup: int
+    )-> bool:
+        """Remove sync comment events that did not sync any comments.
+
+        These comments are not relevant for any reference. The logic makes
+        sure that last finished event, important for comments sync, is not
+        removed.
+
+        """
+        self._log.debug("Soft cleaning up comment sync events.")
+        any_in_progress = self._cleanup_in_progress_comment_events()
+        if any_in_progress:
+            return False
+
+        last_finished_event = self._get_last_finished_event()
+        last_event_id = None
+        if last_finished_event:
+            last_event_id = last_finished_event["id"]
+
+        older_than = None
+        if last_comments_soft_cleanup:
+            cleanup_date = arrow.utcnow() - datetime.timedelta(
+                seconds=(last_comments_soft_cleanup + 20)
+            )
+            older_than = cleanup_date.isoformat()
+
+        events_to_cleanup = list(ayon_api.get_events(
+            topics={FTRACK_COMMENTS_TOPIC},
+            statuses={"finished"},
+            older_than=older_than,
+            fields={"id"}
+        ))
+        removed = 0
+        for event in events_to_cleanup:
+            event_id = event["id"]
+            if event_id == last_event_id:
+                continue
+            full_event = ayon_api.get_event(event_id)
+            if not full_event["payload"].get("synced_comments"):
+                removed += 1
+                ayon_api.delete_event(event_id)
+        self._log.debug(f"Soft cleaned up {removed} events")
+        return True
+
+    def cleanup_sync_comment_events(self) -> bool:
+        self._log.debug("Cleaning up comment sync events.")
+        any_in_progress = self._cleanup_in_progress_comment_events()
+        if any_in_progress:
+            return False
+
+        last_finished_event = self._get_last_finished_event()
+        last_event_id = None
+        if last_finished_event:
+            last_event_id = last_finished_event["id"]
+
+        cleanup_date = arrow.utcnow() - datetime.timedelta(
+            days=COMMENT_EVENTS_CLEANUP_TIMEOUT_DAYS
+        )
+        events_to_cleanup = list(ayon_api.get_events(
+            topics={FTRACK_COMMENTS_TOPIC},
+            older_than=cleanup_date.isoformat(),
+            fields={"id"}
+        ))
+        removed = 0
+        for event in events_to_cleanup:
+            event_id = event["id"]
+            if last_event_id == event_id:
+                continue
+            try:
+                ayon_api.delete_event(event_id)
+                removed += 1
+            except Exception:
+                self._log.warning(
+                    f"Failed to delete event {event_id}.",
+                    exc_info=True
+                )
+        self._log.debug(f"Cleaned up {removed} events.")
+        return True
+
+    def _cleanup_in_progress_comment_events(self) -> bool:
+        in_progress_events = list(ayon_api.get_events(
+            topics={FTRACK_COMMENTS_TOPIC},
+            statuses={"in_progress"},
+            fields={"id", "createdAt"}
+        ))
+
+        any_in_progress = False
+        now = arrow.utcnow()
+        for event in in_progress_events:
+            created_at = arrow.get(event["createdAt"]).to("local")
+            delta = now - created_at
+            if delta.seconds < COMMENTS_SYNC_TIMEOUT:
+                any_in_progress = True
+            else:
+                ayon_api.update_event(
+                    event["id"],
+                    status="failed",
+                )
+        return any_in_progress
+
+    def _get_last_finished_event(self):
+        finished_events = list(ayon_api.get_events(
+            topics={FTRACK_COMMENTS_TOPIC},
+            statuses={"finished"},
+            limit=1,
+            order=ayon_api.SortOrder.descending,
+        ))
+        for event in finished_events:
+            return event
+        return None
 
     def _process_reviewable_created(self, source_event: Dict[str, Any]):
         # TODO implement
@@ -156,9 +393,11 @@ class EventProcessor:
 
         elif change_type == "deleted":
             action = "deleted"
-            entity_data = source_event["payload"]["entityData"]
-            if entity_id is None:
+            entity_data = {}
+            if entity_type != "project":
+                entity_data = source_event["payload"]["entityData"]
                 entity_id = entity_data["id"]
+
         else:
             action = "updated"
             if entity_id is None:
@@ -798,3 +1037,193 @@ class EventProcessor:
             old_value,
             new_value
         )
+
+    def _get_sync_project_names(self):
+        """Get project names that are enabled for ftrack sync."""
+        ayon_project_names = set(ayon_api.get_project_names())
+        ft_project_names = {
+            project["full_name"]
+            for project in self._session.query(
+                "select full_name from Project"
+            ).all()
+        }
+
+        project_names = []
+        for project_name in ayon_project_names & ft_project_names:
+            project_settings = ayon_api.get_addons_settings(
+                project_name=project_name
+            )
+            if is_ftrack_enabled_in_settings(project_settings["ftrack"]):
+                project_names.append(project_name)
+        return project_names
+
+    def _create_ftrack_note(
+        self, project_name, entity, entity_type, activity, ft_user
+    ):
+        if entity is None:
+            return
+
+        ftrack_entity = self._find_ftrack_entity(
+            project_name,
+            entity_type,
+            entity,
+        )
+        if ftrack_entity is None or "notes" not in ftrack_entity:
+            return
+
+        parent_type = "TypedContext"
+        if entity_type == "version":
+            parent_type = "AssetVersion"
+
+        note_id = str(uuid.uuid4())
+        # Use direct call to ftrack without using recorded operations
+        # - skip append note to parent entity, it is causing issues in
+        #   ftrack backend, and looks like it works without it.
+        batch = [
+            {
+                "action": "create",
+                "entity_data": {
+                    "__entity_type__": "Note",
+                    "user_id": ft_user["id"],
+                    "content": activity["body"],
+                    "id": note_id,
+                    "is_todo": False,
+                    "parent_id": ftrack_entity["id"],
+                    "parent_type": parent_type
+                },
+                "entity_key": [note_id],
+                "entity_type": "Note"
+            }, {
+                "action": "create",
+                "entity_data": {
+                    "__entity_type__": "Metadata",
+                    "key": "ayon_activity_id",
+                    "parent_id": note_id,
+                    "parent_type": "Note",
+                    "value": activity["activityId"]
+                },
+                "entity_key": [note_id, "ayon_activity_id"],
+                "entity_type": "Metadata"
+            }
+        ]
+
+        # Store note id to AYON activity data
+        activity_data = activity["activityData"]
+        ftrack_data = activity_data.setdefault("ftrack", {})
+        ftrack_data["id"] = note_id
+        ayon_api.update_activity(
+            project_name,
+            activity["activityId"],
+            data=activity_data,
+        )
+
+        try:
+            self._session.call(batch)
+
+        except Exception:
+            self._log.warning("Failed to create Note", exc_info=True)
+
+    def _sync_project_comments(
+        self,
+        project_name: str,
+        ft_id_by_ay_username: Dict[Union[str, None], Optional[str]],
+        ft_users_by_id: Dict[str, "ftrack_api.entity.user.User"],
+        activities_after_date: arrow.Arrow,
+    ) -> int:
+        project_activities = list(ayon_api.get_activities(
+            project_name,
+            activity_types={"comment"},
+            changed_after=activities_after_date.isoformat(),
+        ))
+        if not project_activities:
+            return 0
+
+        entity_ids_by_entity_type = collections.defaultdict(set)
+        for activity in project_activities:
+            entity_id = activity["entityId"]
+            entity_type = activity["entityType"]
+            entity_ids_by_entity_type[entity_type].add(entity_id)
+
+        entities_by_id = {}
+        for entity_type, entity_ids in entity_ids_by_entity_type.items():
+            entities = []
+            if entity_type == "folder":
+                entities = ayon_api.get_folders(
+                    project_name, folder_ids=entity_ids
+                )
+            elif entity_type == "task":
+                entities = ayon_api.get_tasks(
+                    project_name, task_ids=entity_ids
+                )
+            elif entity_type == "version":
+                entities = ayon_api.get_versions(
+                    project_name, version_ids=entity_ids
+                )
+            entities_by_id.update({
+                entity["id"]: entity
+                for entity in entities
+            })
+
+        # NOTE Because we have to wait 1 second between creating notes
+        #   we might want to optimize this in the future to process
+        #   activities per entity, and if comment cannot be created because
+        #   we should wait, then go to other entities until the time comes.
+        # With 5 entities each having 2 new comments during one batch process
+        #   we have to wait total 5 seconds, at least. More entities and
+        #   comments, the bigger wait time is.
+        # With optimization per entity, the wait time would be the biggest
+        #   amount of new comments per entity (entity count is not important).
+        #   That would be 1 second in case above.
+        last_created_by_entity_id = {}
+        for activity in project_activities:
+            activity_data = activity["activityData"]
+            ftrack_data = activity_data.setdefault("ftrack", {})
+            orig_ftrack_id = ftrack_data.get("id")
+            ft_note = None
+            if orig_ftrack_id:
+                ft_note = self._session.query(
+                    "select id, content, metadata from Note"
+                    f" where id is '{orig_ftrack_id}'"
+                ).first()
+
+            if ft_note is None:
+                entity_id = activity["entityId"]
+                entity = entities_by_id.get(entity_id)
+                entity_type = activity["entityType"]
+                ayon_username = activity["author"]["name"]
+                ft_user_id = ft_id_by_ay_username.get(ayon_username)
+                if not ft_user_id:
+                    ft_user_id = ft_id_by_ay_username[None]
+                ft_user = ft_users_by_id[ft_user_id]
+                # Make sure there is at least 1 second difference between
+                #   note creation to keep order of notes in ftrack
+                last_created = last_created_by_entity_id.get(entity_id)
+                diff = time.time() - (last_created or 0)
+                if diff < 1.0:
+                    time.sleep(1.0 - diff)
+                self._create_ftrack_note(
+                    project_name, entity, entity_type, activity, ft_user
+                )
+                last_created_by_entity_id[entity_id] = time.time()
+
+            else:
+                if ft_note["content"] != activity["body"]:
+                    ft_note["content"] = activity["body"]
+
+                activity_id = activity["activityId"]
+                metadata_id = ft_note["metadata"].get("ayon_activity_id")
+                if metadata_id != activity_id:
+                    ft_note["metadata"]["ayon_activity_id"] = activity_id
+
+                if orig_ftrack_id != ft_note["id"]:
+                    ftrack_data["id"] = ft_note["id"]
+                    ayon_api.update_activity(
+                        project_name,
+                        activity["activityId"],
+                        data=activity_data,
+                    )
+
+            if self._session.recorded_operations:
+                self._session.commit()
+
+        return len(project_activities)
