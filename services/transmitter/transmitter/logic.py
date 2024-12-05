@@ -1138,61 +1138,58 @@ class EventProcessor:
                 for entity in entities
             })
 
-        acitivities_by_entity_id = collections.defaultdict(list)
+        last_created_by_entity_id = {}
         for activity in project_activities:
-            acitivities_by_entity_id[activity["entityId"]].append(activity)
+            data = activity["activityData"]
+            ftrack_data = data.setdefault("ftrack", {})
+            orig_ftrack_id = ftrack_data.get("id")
+            ft_note = None
+            if orig_ftrack_id:
+                ft_note = self._session.query(
+                    "select id, content, metadata from Note"
+                    f" where id is '{orig_ftrack_id}'"
+                ).first()
 
-        for entity_id, activities in acitivities_by_entity_id.items():
-            last_created = 0
-            for activity in activities:
-                data = activity["activityData"]
-                ftrack_data = data.setdefault("ftrack", {})
-                orig_ftrack_id = ftrack_data.get("id")
-                ft_note = None
-                if orig_ftrack_id:
-                    ft_note = self._session.query(
-                        "select id, content, metadata from Note"
-                        f" where id is '{orig_ftrack_id}'"
-                    ).first()
+            if ft_note is None:
+                entity_id = activity["entityId"]
+                entity = entities_by_id.get(entity_id)
+                entity_type = activity["entityType"]
+                ayon_username = activity["author"]["name"]
+                ft_user_id = ft_id_by_ay_username.get(ayon_username)
+                if not ft_user_id:
+                    ft_user_id = ft_id_by_ay_username[None]
+                ft_user = ft_users_by_id[ft_user_id]
+                # Make sure there is at least 1 second difference between
+                #   note creation to keep order of notes in ftrack
+                last_created = last_created_by_entity_id.get(entity_id)
+                diff = time.time() - (last_created or 0)
+                if diff < 1.0:
+                    time.sleep(1.0 - diff)
+                ft_note = self._create_ftrack_note(
+                    project_name, entity, entity_type, activity, ft_user
+                )
+                last_created_by_entity_id[entity_id] = time.time()
 
-                if ft_note is None:
-                    entity = entities_by_id.get(activity["entityId"])
-                    entity_type = activity["entityType"]
-                    ayon_username = activity["author"]["name"]
-                    ft_user_id = ft_id_by_ay_username.get(ayon_username)
-                    if not ft_user_id:
-                        ft_user_id = ft_id_by_ay_username[None]
-                    ft_user = ft_users_by_id[ft_user_id]
-                    # Make sure there is at least 1 second difference between
-                    #   note creation to keep order of notes in ftrack
-                    diff = time.time() - last_created
-                    if diff < 1.0:
-                        time.sleep(1.0 - diff)
-                    ft_note = self._create_ftrack_note(
-                        project_name, entity, entity_type, activity, ft_user
-                    )
-                    last_created = time.time()
+            else:
+                if ft_note["content"] != activity["body"]:
+                    ft_note["content"] = activity["body"]
 
-                else:
-                    if ft_note["content"] != activity["body"]:
-                        ft_note["content"] = activity["body"]
+                activity_id = activity["activityId"]
+                metadata_id = ft_note["metadata"].get("ayon_activity_id")
+                if metadata_id != activity_id:
+                    ft_note["metadata"]["ayon_activity_id"] = activity_id
 
-                    activity_id = activity["activityId"]
-                    metadata_id = ft_note["metadata"].get("ayon_activity_id")
-                    if metadata_id != activity_id:
-                        ft_note["metadata"]["ayon_activity_id"] = activity_id
+            if self._session.recorded_operations:
+                self._session.commit()
 
-                if self._session.recorded_operations:
-                    self._session.commit()
+            if ft_note is None:
+                continue
 
-                if ft_note is None:
-                    continue
-
-                if orig_ftrack_id != ft_note["id"]:
-                    ftrack_data["id"] = ft_note["id"]
-                    ayon_api.update_activity(
-                        project_name,
-                        activity["activityId"],
-                        data=ftrack_data,
-                    )
+            if orig_ftrack_id != ft_note["id"]:
+                ftrack_data["id"] = ft_note["id"]
+                ayon_api.update_activity(
+                    project_name,
+                    activity["activityId"],
+                    data=ftrack_data,
+                )
         return len(project_activities)
