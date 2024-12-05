@@ -258,7 +258,7 @@ class SyncCommentsHandler(BaseEventHandler):
                 ),
                 None
             )
-            if matching_activity:
+            if matching_activity is not None:
                 data = matching_activity["activityData"]
                 data_id = data.get("ftrack", {}).get("id")
                 ftrack_id_filled = data_id == note_id

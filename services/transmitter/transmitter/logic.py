@@ -1060,7 +1060,7 @@ class EventProcessor:
         self, project_name, entity, entity_type, activity, ft_user
     ):
         if entity is None:
-            return None
+            return
 
         ftrack_entity = self._find_ftrack_entity(
             project_name,
@@ -1068,9 +1068,8 @@ class EventProcessor:
             entity,
         )
         if ftrack_entity is None or "notes" not in ftrack_entity:
-            return None
+            return
 
-        note = None
         try:
             new_note = ftrack_entity.create_note(
                 activity["body"],
@@ -1085,14 +1084,20 @@ class EventProcessor:
                     "value": activity["activityId"]
                 }
             )
+            activity_data = activity["activityData"]
+            ftrack_data = activity_data.setdefault("ftrack", {})
+            ftrack_data["id"] = new_note["id"]
+            ayon_api.update_activity(
+                project_name,
+                activity["activityId"],
+                data=activity_data,
+            )
             self._session.commit()
-            note = new_note
 
         except Exception:
             self._session.recorded_operations.clear()
             self._log.warning("Failed to create Note", exc_info=True)
 
-        return note
 
     def _sync_project_comments(
         self,
@@ -1137,8 +1142,8 @@ class EventProcessor:
 
         last_created_by_entity_id = {}
         for activity in project_activities:
-            data = activity["activityData"]
-            ftrack_data = data.setdefault("ftrack", {})
+            activity_data = activity["activityData"]
+            ftrack_data = activity_data.setdefault("ftrack", {})
             orig_ftrack_id = ftrack_data.get("id")
             ft_note = None
             if orig_ftrack_id:
@@ -1162,7 +1167,7 @@ class EventProcessor:
                 diff = time.time() - (last_created or 0)
                 if diff < 1.0:
                     time.sleep(1.0 - diff)
-                ft_note = self._create_ftrack_note(
+                self._create_ftrack_note(
                     project_name, entity, entity_type, activity, ft_user
                 )
                 last_created_by_entity_id[entity_id] = time.time()
@@ -1176,17 +1181,15 @@ class EventProcessor:
                 if metadata_id != activity_id:
                     ft_note["metadata"]["ayon_activity_id"] = activity_id
 
+                if orig_ftrack_id != ft_note["id"]:
+                    ftrack_data["id"] = ft_note["id"]
+                    ayon_api.update_activity(
+                        project_name,
+                        activity["activityId"],
+                        data=activity_data,
+                    )
+
             if self._session.recorded_operations:
                 self._session.commit()
 
-            if ft_note is None:
-                continue
-
-            if orig_ftrack_id != ft_note["id"]:
-                ftrack_data["id"] = ft_note["id"]
-                ayon_api.update_activity(
-                    project_name,
-                    activity["activityId"],
-                    data=ftrack_data,
-                )
         return len(project_activities)
