@@ -564,7 +564,7 @@ class EventProcessor:
         folder_id = folder_ft_entity["id"]
         assets = self._session.query(
             "select id, name from Asset"
-            f" where parent_id is '{folder_id}'"
+            f" where context_id is '{folder_id}'"
         ).all()
         matching_asset = None
         for asset in assets:
