@@ -107,24 +107,6 @@ class IntegrateHierarchyToFtrackModel(BaseSettingsModel):
     )
 
 
-class IntegrateFtrackNoteModel(BaseSettingsModel):
-    _isGroup = True
-    enabled: bool = True
-    note_template: str = SettingsField(
-        "",
-        title="Note template",
-        description=(
-            "Template may contain formatting keys <b>intent</b>,"
-            " <b>comment</b>, <b>host_name</b>, <b>app_name</b>,"
-            " <b>app_label</b>, <b>published_paths</b> and <b>source</b>."
-        )
-    )
-    note_labels: list[str] = SettingsField(
-        title="Note labels",
-        default_factory=list,
-    )
-
-
 class IntegrateFtrackDescriptionModel(BaseSettingsModel):
     _isGroup = True
     enabled: bool = True
@@ -340,10 +322,6 @@ class FtrackPublishPlugins(BaseSettingsModel):
             )
         )
     )
-    IntegrateFtrackNote: IntegrateFtrackNoteModel = SettingsField(
-        title="Integrate ftrack Note",
-        default_factory=IntegrateFtrackNoteModel,
-    )
     IntegrateFtrackDescription: IntegrateFtrackDescriptionModel = (
         SettingsField(
             title="Integrate ftrack Description",
@@ -551,11 +529,6 @@ DEFAULT_PUBLISH_SETTINGS = {
     },
     "IntegrateHierarchyToFtrack": {
         "create_task_status_profiles": []
-    },
-    "IntegrateFtrackNote": {
-        "enabled": True,
-        "note_template": "{comment}",
-        "note_labels": []
     },
     "IntegrateFtrackDescription": {
         "enabled": False,

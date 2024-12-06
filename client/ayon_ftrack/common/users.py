@@ -1,18 +1,24 @@
-from typing import Dict, List, Set, Union, Any, Optional
+import typing
+from typing import Dict, List, Set, Any, Optional
 
 import ayon_api
-import ftrack_api.entity.user
+
+if typing.TYPE_CHECKING:
+    from typing import Union
+    import ftrack_api.entity.user
 
 
 def map_ftrack_users_to_ayon_users(
-    ftrack_users: List[ftrack_api.entity.user.User],
+    ftrack_users: List["ftrack_api.entity.user.User"],
     ayon_users: Optional[List[Dict[str, Any]]] = None,
-) -> Dict[str, Union[str, None]]:
+) -> Dict[str, "Union[str, None]"]:
     """Map ftrack users to AYON users.
 
     Mapping is based on 2 possible keys, email and username where email has
     higher priority. Once AYON user is mapped it cannot be mapped again to
     different user.
+
+    Fields used from ftrack users: 'id', 'username', 'email'.
 
     Args:
         ftrack_users (List[ftrack_api.entity.user.User]): List of ftrack users.
@@ -26,7 +32,7 @@ def map_ftrack_users_to_ayon_users(
     if ayon_users is None:
         ayon_users = ayon_api.get_users()
 
-    mapping: Dict[str, Union[str, None]] = {
+    mapping: Dict[str, "Union[str, None]"] = {
         user["id"]: None
         for user in ftrack_users
     }

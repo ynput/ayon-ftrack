@@ -34,3 +34,11 @@ jobs:
       - name: Push processor image
         id: push-processor-docker-image
         run: make dist -C ./services/processor
+
+      - name: Build transmitter image
+        id: build-transmitter-docker-image
+        run: make build -C ./services/transmitter
+
+      - name: Push transmitter image
+        id: push-transmitter-docker-image
+        run: make dist -C ./services/transmitter
