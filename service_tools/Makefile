@@ -47,11 +47,25 @@ processor:
 		. $(CURDIR)/venv/bin/activate && \
 		python "$(CURDIR)/main.py" --service processor $@
 
+transmitter:
+		export AYON_ADDON_NAME="ftrack" && \
+		export AYON_ADDON_VERSION=$(VERSION) && \
+		. $(CURDIR)/venv/bin/activate && \
+		python "$(CURDIR)/main.py" --service transmitter $@
+
+ayon2ftrack: transmitter
+
+ftrack2ayon:
+		export AYON_ADDON_NAME="ftrack" && \
+		export AYON_ADDON_VERSION=$(VERSION) && \
+		. $(CURDIR)/venv/bin/activate && \
+		python "$(CURDIR)/main.py" --service ftrack2ayon $@
+
 services:
 		export AYON_ADDON_NAME="ftrack" && \
 		export AYON_ADDON_VERSION=$(VERSION) && \
 		. $(CURDIR)/venv/bin/activate && \
-		python "$(CURDIR)/main.py" --service both $@
+		python "$(CURDIR)/main.py" --service all $@
 
 info: help
 default: help

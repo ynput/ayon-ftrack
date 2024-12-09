@@ -14,8 +14,10 @@ from ftrack_common import (
     get_service_ftrack_icon_url,
     get_ayon_attr_configs,
     query_custom_attribute_values,
+    map_ftrack_users_to_ayon_users,
 )
-from processor.lib import SyncFromFtrack, map_ftrack_users_to_ayon_users
+
+from processor.lib import SyncFromFtrack
 
 
 class PrepareProjectServer(ServerAction):

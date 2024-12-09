@@ -25,10 +25,13 @@ function Default-Func {
   Write-Host "--variant [variant] (Define settings variant. default: 'production')"
   Write-Host ""
   Write-Host "Runtime targets:"
-  Write-Host "  install    Install requirements to currently actie python (recommended to create venv)"
-  Write-Host "  leecher    Start leecher of ftrack events"
-  Write-Host "  processor  Main processing logic"
-  Write-Host "  services   Start both leecher and processor (experimental)"
+  Write-Host "  install      Install requirements to currently actie python (recommended to create venv)"
+  Write-Host "  leecher      Start leecher of ftrack events"
+  Write-Host "  processor    Main processing logic"
+  Write-Host "  transmitter  AYON to ftrack sync"
+  Write-Host "  ftrack2ayon  Services related to ftrack to AYON sync"
+  Write-Host "  ayon2ftrack  Services related to AYON to ftrack sync"
+  Write-Host "  services     Start both leecher and processor (experimental)"
   Write-Host ""
 }
 
@@ -45,8 +48,16 @@ function Start-Processor {
   & python "$($script_dir)\main.py" --service processor @arguments
 }
 
-function Start-Both {
-  & python "$($script_dir)\main.py" --service both @arguments
+function Start-Transmitter {
+  & python "$($script_dir)\main.py" --service transmitter @arguments
+}
+
+function Start-Leecher-Processor {
+  & python "$($script_dir)\main.py" --service ftrack2ayon @arguments
+}
+
+function Start-All {
+  & python "$($script_dir)\main.py" --service all @arguments
 }
 
 function Load-Env {
@@ -87,8 +98,12 @@ function main {
       Start-Leecher
     } elseif ($FunctionName -eq "processor") {
       Start-Processor
+    } elseif (($FunctionName -eq "transmitter") -or ($FunctionName -eq "ayon2ftrack")) {
+      Start-Transmitter
+    } elseif ($FunctionName -eq "ftrack2ayon") {
+      Start-Leecher-Processor
     } elseif ($FunctionName -eq "services") {
-      Start-Both
+      Start-All
     } else {
       Write-Host "Unknown function ""$FunctionName"""
       Default-Func

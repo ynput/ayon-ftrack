@@ -45,41 +45,50 @@ def _fix_ftrack_common_import():
             )
 
 
-def run_both():
-    both_idx = sys.argv.index("both")
-    leecher_args = list(sys.argv)
-    processor_args = list(sys.argv)
+def run_services(
+    run_leecher: bool,
+    run_processor: bool,
+    run_transmitter: bool,
+    command_index: int
+):
+    processes = []
+    for (run_service, name) in (
+        (run_leecher, "leecher"),
+        (run_processor, "processor"),
+        (run_transmitter, "transmitter"),
+     ):
+        if not run_service:
+            continue
 
-    leecher_args[both_idx] = "leecher"
-    processor_args[both_idx] = "processor"
+        args = list(sys.argv)
+        args[command_index] = name
+        args.insert(0, sys.executable)
 
-    leecher_args.insert(0, sys.executable)
-    processor_args.insert(0, sys.executable)
+        processes.append(subprocess.Popen(args))
 
-    leecher = subprocess.Popen(leecher_args)
-    processor = subprocess.Popen(processor_args)
     try:
         while True:
-            l_poll = leecher.poll()
-            p_poll = processor.poll()
-            if l_poll is not None and p_poll is not None:
-                break
+            any_died = False
+            for process in processes:
+                if process.poll() is not None:
+                    any_died = True
+                    break
 
-            if p_poll is None:
-                if l_poll is not None:
-                    processor.kill()
+            if any_died:
+                all_died = True
+                for process in processes:
+                    if process.poll() is None:
+                        process.kill()
+                        all_died = False
 
-            if l_poll is None:
-                if p_poll is not None:
-                    leecher.kill()
+                if all_died:
+                    break
 
             time.sleep(0.1)
     finally:
-        if leecher.poll() is None:
-            leecher.kill()
-
-        if processor.poll() is None:
-            processor.kill()
+        for process in processes:
+            if process.poll() is None:
+                process.kill()
 
 
 def main():
@@ -87,7 +96,7 @@ def main():
     parser.add_argument(
         "--service",
         help="Run processor service",
-        choices=["processor", "leecher", "both"],
+        choices=["processor", "leecher", "transmitter", "ftrack2ayon", "all"],
     )
     parser.add_argument(
         "--variant",
@@ -106,8 +115,21 @@ def main():
         )
 
     service_name = opts.service
-    if service_name == "both":
-        return run_both()
+    if service_name == "all":
+        return run_services(
+            True,
+            True,
+            True,
+            sys.argv.index("all")
+        )
+
+    if service_name == "ftrack2ayon":
+        return run_services(
+            True,
+            True,
+            False,
+            sys.argv.index("ftrack2ayon")
+        )
 
     for path in (
         os.path.join(ADDON_DIR, "client", "ayon_ftrack"),
@@ -120,8 +142,13 @@ def main():
 
     if service_name == "processor":
         from processor import main as service_main
-    else:
+    elif service_name == "leecher":
         from leecher import main as service_main
+    elif service_name == "transmitter":
+        from transmitter import main as service_main
+    else:
+        raise ValueError(f"Unknown service name {service_name}")
+
     service_main()
 
 
