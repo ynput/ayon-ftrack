@@ -17,8 +17,6 @@ class CollectFtrackJobEnvVars(pyblish.api.ContextPlugin):
 
     def process(self, context):
         env = context.data.setdefault(FARM_JOB_ENV_DATA_KEY, {})
-
-        # Disable colored logs on farm
         for key in [
             "FTRACK_SERVER",
             "FTRACK_API_USER",
