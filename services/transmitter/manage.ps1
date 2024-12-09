@@ -70,7 +70,7 @@ function dev {
   try {
     & docker run --rm -ti `
       -v "$($script_dir):/service" `
-      --hostname ftrackproc `
+      --hostname ftracktransmitter `
       --env AYON_API_KEY=$env:AYON_API_KEY `
       --env AYON_SERVER_URL=$env:AYON_SERVER_URL `
       --env AYON_ADDON_NAME=ftrack `

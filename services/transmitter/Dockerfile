@@ -7,6 +7,7 @@ RUN apt-get update \
 
 RUN mkdir /service
 COPY ./transmitter /service/transmitter
+COPY ./ftrack_common /service/ftrack_common
 COPY ./pyproject.toml /service/pyproject.toml
 WORKDIR /service
 
