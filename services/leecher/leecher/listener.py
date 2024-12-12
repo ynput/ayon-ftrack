@@ -146,8 +146,6 @@ def create_session():
     }
     if tb_content is None:
         _GlobalContext.session_fail_logged = 2
-        event_data["summary"] = error_summary
-
     else:
         _GlobalContext.session_fail_logged = 1
         event_data["payload"]["traceback"] = tb_content
