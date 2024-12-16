@@ -2,9 +2,104 @@ import os
 import json
 import itertools
 import collections
+import typing
+from typing import Optional, Dict, List, Any
+
+import ayon_api
+import ftrack_api
 
 from .lib import join_filter_values, create_chunks
 from .constants import CUST_ATTR_GROUP
+
+if typing.TYPE_CHECKING:
+    import ftrack_api.entity.base.Entity
+
+
+class MappedAYONAttribute:
+    def __init__(
+        self,
+        ayon_attribute_name: str,
+        is_hierarchical: bool = True,
+        attr_confs: Optional[List["ftrack_api.entity.base.Entity"]] = None,
+    ):
+        self.ayon_attribute_name: str = ayon_attribute_name
+        self.is_hierarchical: bool = is_hierarchical
+        if attr_confs is None:
+            attr_confs = []
+        self._attr_confs: List["ftrack_api.entity.base.Entity"] = attr_confs
+
+    def has_confs(self) -> bool:
+        return bool(self.attr_confs)
+
+    def add_attr_conf(self, attr_conf: "ftrack_api.entity.base.Entity"):
+        self._attr_confs.append(attr_conf)
+
+    def get_attr_confs(self) -> List["ftrack_api.entity.base.Entity"]:
+        return list(self._attr_confs)
+
+    attr_confs: List["ftrack_api.entity.base.Entity"] = property(
+        get_attr_confs
+    )
+
+    def get_attr_conf_for_entity_type(
+        self, entity_type: str, object_type_id: Optional[str]
+    ) -> Optional["ftrack_api.entity.base.Entity"]:
+        if not self.attr_confs:
+            return None
+        if self.is_hierarchical:
+            return self.attr_confs[0]
+
+        for attr_conf in self.attr_confs:
+            if (
+                attr_conf["entity_type"] == entity_type
+                and attr_conf["object_type_id"] == object_type_id
+            ):
+                return attr_conf
+        return None
+
+    def get_attr_conf_for_entity(
+        self, entity: "ftrack_api.entity.base.Entity"
+    ) -> Optional["ftrack_api.entity.base.Entity"]:
+        if entity is None:
+            return None
+
+        entity_type = entity.entity_type.lower()
+        object_type_id = None
+        if "context_type" in entity:
+            entity_type = entity["context_type"]
+            if entity_type == "task":
+                object_type_id = entity["object_type_id"]
+        return self.get_attr_conf_for_entity_type(
+            entity_type, object_type_id
+        )
+
+
+class CustomAttributesMapping:
+    def __init__(self):
+        self._items: Dict[str, MappedAYONAttribute] = {}
+
+    def items(self):
+        return self._items.items()
+
+    def values(self):
+        return self._items.values()
+
+    def keys(self):
+        return self._items.keys()
+
+    def get(self, key, default=None):
+        return self._items.get(key, default)
+
+    def add_mapping_item(self, item: MappedAYONAttribute):
+        self._items[item.ayon_attribute_name] = item
+
+    def get_mapping_item_by_key(
+        self, ft_entity: "ftrack_api.entity.base.Entity", key: str
+    ) -> Optional[MappedAYONAttribute]:
+        for mapping_item in self.values():
+            attr_conf = mapping_item.get_attr_conf_for_entity(ft_entity)
+            if attr_conf and attr_conf["key"] == key:
+                return mapping_item
 
 
 def get_ayon_attr_configs(session, query_keys=None, split_hierarchical=True):
@@ -55,6 +150,110 @@ def get_ayon_attr_configs(session, query_keys=None, split_hierarchical=True):
     if not split_hierarchical:
         return custom_attributes
     return custom_attributes, hier_custom_attributes
+
+
+def get_custom_attributes_mapping(
+    session: ftrack_api.Session,
+    addon_settings: Dict[str, Any],
+    attr_confs: Optional[List[object]] = None,
+    ayon_attributes: Optional[List[object]] = None,
+) -> CustomAttributesMapping:
+    """Query custom attribute configurations from ftrack server.
+
+    Returns:
+        Dict[str, List[object]]: ftrack custom attributes.
+
+    """
+    cust_attr = addon_settings["custom_attributes"]
+    # "custom_attributes/attributes_mapping/mapping"
+    attributes_mapping = cust_attr["attributes_mapping"]
+
+    if attr_confs is None:
+        query_keys = ", ".join({
+            "id",
+            "key",
+            "entity_type",
+            "object_type_id",
+            "is_hierarchical",
+            "default",
+        })
+        attr_confs = session.query(
+            f"select {query_keys} from CustomAttributeConfiguration"
+        ).all()
+
+    if ayon_attributes is None:
+        ayon_attributes = ayon_api.get_attributes_schema()["attributes"]
+
+    ayon_attribute_names = {
+        attr["name"]
+        for attr in ayon_attributes
+    }
+
+    hier_attrs = []
+    nonhier_attrs = []
+    for attr_conf in attr_confs:
+        if attr_conf["is_hierarchical"]:
+            hier_attrs.append(attr_conf)
+        else:
+            nonhier_attrs.append(attr_conf)
+
+    output = CustomAttributesMapping()
+    if not attributes_mapping["enabled"]:
+        builtin_attrs = {
+            attr["name"]
+            for attr in ayon_attributes
+            if attr["builtin"]
+        }
+        for attr_conf in hier_attrs:
+            attr_name = attr_conf["key"]
+            # Use only AYON attribute hierarchical equivalent
+            if (
+                attr_name in output
+                or attr_name not in ayon_attribute_names
+            ):
+                continue
+
+            # Attribute must be in builtin attributes or openpype/ayon group
+            # NOTE get rid of group name check when only mapping is used
+            if (
+                attr_name in builtin_attrs
+                or attr_conf["group"]["name"] in ("openpype", CUST_ATTR_GROUP)
+            ):
+                output.add_mapping_item(MappedAYONAttribute(
+                    attr_name,
+                    True,
+                    [attr_conf],
+                ))
+
+    else:
+        for item in attributes_mapping["mapping"]:
+            ayon_attr_name = item["name"]
+            if ayon_attr_name not in ayon_attribute_names:
+                continue
+
+            is_hierarchical = item["attr_type"] == "hierarchical"
+
+            mapped_item = MappedAYONAttribute(
+                ayon_attr_name, is_hierarchical, []
+            )
+
+            if is_hierarchical:
+                attr_name = item["hierarchical"]
+                for attr_conf in hier_attrs:
+                    if attr_conf["key"] == attr_name:
+                        mapped_item.add_attr_conf(attr_conf)
+                        break
+            else:
+                attr_names = item["nonhierarchical"]
+                for attr_conf in nonhier_attrs:
+                    if attr_conf["key"] in attr_names:
+                        mapped_item.add_attr_conf(attr_conf)
+
+    for attr_name in ayon_attribute_names:
+        if attr_name not in output:
+            output.add_mapping_item(MappedAYONAttribute(attr_name))
+
+    return output
 
 
 def query_custom_attribute_values(session, attr_ids, entity_ids):
