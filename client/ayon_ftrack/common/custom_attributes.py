@@ -1,6 +1,5 @@
 import os
 import json
-import itertools
 import collections
 import typing
 from typing import Optional, Dict, List, Any
@@ -307,7 +306,6 @@ def get_custom_attributes_by_entity_id(
     session,
     entity_ids,
     attr_configs,
-    hier_attr_configs,
     skip_none_values=True,
     store_by_key=True
 ):
@@ -322,8 +320,7 @@ def get_custom_attributes_by_entity_id(
         session (ftrack_api.Session): Connected ftrack session.
         entity_ids (Iterable[str]): Entity ids for which custom attribute
             values should be returned.
-        attr_configs: Non-hierarchical attribute configurations.
-        hier_attr_configs: Hierarchical attribute configurations.
+        attr_configs: Custom attribute configurations.
         skip_none_values (bool): Custom attribute with value set to 'None'
             won't be in output.
         store_by_key (bool): Output will be stored by attribute keys if true
@@ -331,16 +328,17 @@ def get_custom_attributes_by_entity_id(
 
     Returns:
         Dict[str, Dict[str, Any]]: Custom attribute values by entity id.
-    """
 
+    """
     entity_ids = set(entity_ids)
     hier_attr_ids = {
         attr_conf["id"]
-        for attr_conf in hier_attr_configs
+        for attr_conf in attr_configs
+        if attr_conf["is_hierarchical"]
     }
     attr_by_id = {
         attr_conf["id"]: attr_conf["key"]
-        for attr_conf in itertools.chain(attr_configs, hier_attr_configs)
+        for attr_conf in attr_configs
     }
 
     value_items = query_custom_attribute_values(
@@ -356,13 +354,14 @@ def get_custom_attributes_by_entity_id(
         entity_id = value_item["entity_id"]
         entity_values = output[entity_id]
         attr_id = value_item["configuration_id"]
-        if store_by_key:
-            attr_key = attr_by_id[attr_id]
-            # Hierarchical attributes are always preferred
-            if attr_id in hier_attr_ids or attr_key not in entity_values:
-                entity_values[attr_key] = value
-        else:
+        if not store_by_key:
             entity_values[attr_id] = value
+            continue
+
+        attr_key = attr_by_id[attr_id]
+        # Hierarchical attributes are always preferred
+        if attr_id in hier_attr_ids or attr_key not in entity_values:
+            entity_values[attr_key] = value
 
     return output
 
