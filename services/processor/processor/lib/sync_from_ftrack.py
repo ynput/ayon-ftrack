@@ -2,13 +2,16 @@ import re
 import collections
 import time
 import logging
+import typing
 from typing import Any, Dict
+from urllib.parse import non_hierarchical
 
 import arrow
 from ayon_api import (
     get_project,
     create_project,
     slugify_string,
+    get_addons_settings,
 )
 from ayon_api.entity_hub import EntityHub, BaseEntity
 import ftrack_api
@@ -20,11 +23,16 @@ from ftrack_common import (
     FTRACK_PATH_ATTRIB,
     REMOVED_ID_VALUE,
     create_chunks,
+    MappedAYONAttribute,
+    CustomAttributesMapping,
+    get_custom_attributes_mapping,
     get_custom_attributes_by_entity_id,
-    get_ayon_attr_configs,
     map_ftrack_users_to_ayon_users,
     join_filter_values,
 )
+
+if typing.TYPE_CHECKING:
+    import ftrack_api.entity.base.Entity
 
 
 def _get_ftrack_project(session, project_name):
@@ -74,6 +82,9 @@ class SyncFromFtrack:
 
         # Create entity hub which handle entity changes
         self._entity_hub = EntityHub(project_name)
+        self._project_settings = get_addons_settings(
+            project_name=project_name
+        )
 
         self._report_items = []
 
@@ -417,27 +428,31 @@ class SyncFromFtrack:
         self.log.info(f"Synchronization of project \"{project_name}\" started")
 
         # Get ftrack custom attributes to sync
-        attr_confs, hier_attr_confs = get_ayon_attr_configs(ft_session)
+        attr_confs = ft_session.query(
+            "select id, key, is_hierarchical, default"
+            " from CustomAttributeConfiguration"
+        ).all()
+
         # Check if there is custom attribute to store server id
-        server_id_conf = None
-        server_path_conf = None
-        sync_failed_conf = None
-        for attr_conf in hier_attr_confs:
+        server_id_conf_id = None
+        server_path_conf_id = None
+        sync_failed_conf_id = None
+        for attr_conf in attr_confs:
             if attr_conf["key"] == CUST_ATTR_KEY_SERVER_ID:
-                server_id_conf = attr_conf
+                server_id_conf_id = attr_conf["id"]
             elif attr_conf["key"] == CUST_ATTR_KEY_SERVER_PATH:
-                server_path_conf = attr_conf
+                server_path_conf_id = attr_conf["id"]
             elif attr_conf["key"] == CUST_ATTR_KEY_SYNC_FAIL:
-                sync_failed_conf = attr_conf
+                sync_failed_conf_id = attr_conf["id"]
 
         missing_attrs = []
-        if not server_id_conf:
+        if not server_id_conf_id:
             missing_attrs.append(CUST_ATTR_KEY_SERVER_ID)
 
-        if not server_path_conf:
+        if not server_path_conf_id:
             missing_attrs.append(CUST_ATTR_KEY_SERVER_PATH)
 
-        if not sync_failed_conf:
+        if not sync_failed_conf_id:
             missing_attrs.append(CUST_ATTR_KEY_SYNC_FAIL)
 
         if missing_attrs:
@@ -513,13 +528,11 @@ class SyncFromFtrack:
             ft_entities_by_id[entity_id] = entity
             ft_entities_by_parent_id[parent_id].append(entity)
 
-        ft_entity_ids = set(ft_entities_by_id.keys())
-
-        cust_attr_value_by_entity_id = collections.defaultdict(dict)
-        for entity_id, values_by_key in get_custom_attributes_by_entity_id(
-            ft_session, ft_entity_ids, attr_confs, hier_attr_confs
-        ).items():
-            cust_attr_value_by_entity_id[entity_id] = values_by_key
+        cust_attr_value_by_entity_id = self._prepare_attribute_values(
+            ft_session,
+            attr_confs,
+            ft_entities_by_id,
+        )
 
         self.log.info("Checking changes of immutable entities")
         self.match_immutable_entities(
@@ -553,9 +566,9 @@ class SyncFromFtrack:
         self.update_ftrack_attributes(
             ft_entities_by_id,
             cust_attr_value_by_entity_id,
-            server_id_conf,
-            server_path_conf,
-            sync_failed_conf
+            server_id_conf_id,
+            server_path_conf_id,
+            sync_failed_conf_id
         )
         self.create_report(ft_entities_by_id)
         t_end = time.perf_counter()
@@ -693,8 +706,8 @@ class SyncFromFtrack:
         parent_entity,
         ft_entity,
         ft_object_type_name_by_id,
-        ft_type_names_by_id,
-        cust_attr_value_by_entity_id,
+        ft_type_names_by_id: Dict[str, str],
+        cust_attr_value_by_entity_id: Dict[str, Dict[str, Any]],
     ):
         ftrack_id = ft_entity["id"]
         custom_attributes = cust_attr_value_by_entity_id[ftrack_id]
@@ -732,8 +745,8 @@ class SyncFromFtrack:
         ft_project,
         ft_entities_by_parent_id,
         ft_object_type_name_by_id,
-        ft_type_names_by_id,
-        cust_attr_value_by_entity_id,
+        ft_type_names_by_id: Dict[str, str],
+        cust_attr_value_by_entity_id: Dict[str, Dict[str, Any]],
     ):
         """Match exiting entities on both sides.
 
@@ -752,6 +765,8 @@ class SyncFromFtrack:
                 object type ids to their names.
             ft_type_names_by_id (Dict[str, str]): Mapping of ftrack task type
                 ids to their names.
+            cust_attr_value_by_entity_id (Dict[str, Dict[str, Any]): Custom
+                attribute values by key stored by entity id.
         """
 
         fill_queue = collections.deque()
@@ -877,7 +892,7 @@ class SyncFromFtrack:
 
     def _set_entity_status(
         self,
-        ft_entity: ftrack_api.entity.base.Entity,
+        ft_entity: "ftrack_api.entity.base.Entity",
         entity: BaseEntity,
         ftrack_statuses: Dict[str, str],
         ayon_statuses: Dict[str, Any],
@@ -954,7 +969,9 @@ class SyncFromFtrack:
             ayon_task.assignees = list(new_assignees)
 
     def update_attributes_from_ftrack(
-        self, cust_attr_value_by_entity_id, ft_entities_by_id
+        self,
+        cust_attr_value_by_entity_id: Dict[str, Dict[str, Any]],
+        ft_entities_by_id: Dict[str, "ftrack_api.entity.base.Entity"]
     ):
         ftrack_statuses = {
             status["id"]: status["name"]
@@ -1024,6 +1041,41 @@ class SyncFromFtrack:
                 if key in entity.attribs:
                     entity.attribs[key] = value
 
+    def _prepare_attribute_values(
+        self, ft_session, attr_confs, ft_entities_by_id
+    ):
+        ft_entity_ids = set(ft_entities_by_id.keys())
+        attr_mapping: CustomAttributesMapping = (
+            get_custom_attributes_mapping(
+                ft_session,
+                self._project_settings["ftrack"],
+                attr_confs,
+            )
+        )
+        mapped_confs_by_id = {}
+        for mapping_item in attr_mapping.values():
+            for mapped_conf in mapping_item.attr_confs:
+                mapped_confs_by_id[mapped_conf["id"]] = mapped_conf
+
+        val_by_entity_id = get_custom_attributes_by_entity_id(
+            ft_session, ft_entity_ids, list(mapped_confs_by_id.values())
+        )
+
+        cust_attr_value_by_entity_id = collections.defaultdict(dict)
+        for entity_id, entity in ft_entities_by_id.items():
+            values_by_attr_id = val_by_entity_id[entity_id]
+            values_by_key = {}
+            for ayon_attr_name, mapping_item in attr_mapping.items():
+                attr_conf = mapping_item.get_attr_conf_for_entity(entity)
+                if attr_conf is None:
+                    continue
+                value = values_by_attr_id.get(attr_conf["id"])
+                if value is not None:
+                    values_by_key[ayon_attr_name] = value
+
+            cust_attr_value_by_entity_id[entity_id] = values_by_key
+        return cust_attr_value_by_entity_id
+
     def _create_ft_operation(
         self, conf_id, entity_id, is_new, new_value, old_value=None
     ):
@@ -1050,9 +1102,9 @@ class SyncFromFtrack:
         self,
         ft_entities_by_id,
         cust_attr_value_by_entity_id,
-        server_id_conf,
-        server_path_conf,
-        sync_failed_conf
+        server_id_conf_id,
+        server_path_conf_id,
+        sync_failed_conf_id
     ):
         operations = []
         for ftrack_id, ft_entity in ft_entities_by_id.items():
@@ -1080,7 +1132,7 @@ class SyncFromFtrack:
             if sync_failed != oring_sync_failed:
                 operations.append(
                     self._create_ft_operation(
-                        sync_failed_conf["id"],
+                        sync_failed_conf_id,
                         ftrack_id,
                         CUST_ATTR_KEY_SYNC_FAIL not in custom_attributes,
                         sync_failed,
@@ -1091,7 +1143,7 @@ class SyncFromFtrack:
             if orig_id != entity_id:
                 operations.append(
                     self._create_ft_operation(
-                        server_id_conf["id"],
+                        server_id_conf_id,
                         ftrack_id,
                         CUST_ATTR_KEY_SERVER_ID not in custom_attributes,
                         entity_id,
@@ -1106,7 +1158,7 @@ class SyncFromFtrack:
             if path != orig_path:
                 operations.append(
                     self._create_ft_operation(
-                        server_path_conf["id"],
+                        server_path_conf_id,
                         ftrack_id,
                         CUST_ATTR_KEY_SERVER_PATH not in custom_attributes,
                         path,
