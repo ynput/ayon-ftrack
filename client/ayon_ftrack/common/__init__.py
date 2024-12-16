@@ -21,9 +21,6 @@ __all__ = (
     "FPS_KEYS",
     "CUST_ATTR_INTENT",
 
-    "CUST_ATTR_APPLICATIONS",
-    "CUST_ATTR_TOOLS",
-
     "InvalidFpsValue",
 
     "import_filepath",
@@ -44,8 +41,6 @@ __all__ = (
     "query_custom_attribute_values",
     "get_custom_attributes_by_entity_id",
     "default_custom_attributes_definition",
-    "app_definitions_from_app_manager",
-    "tool_definitions_from_app_manager",
 
     "get_folder_path_for_entities",
     "get_datetime_data",
@@ -74,9 +69,6 @@ from .constants import (
 
     FPS_KEYS,
     CUST_ATTR_INTENT,
-
-    CUST_ATTR_APPLICATIONS,
-    CUST_ATTR_TOOLS,
 )
 
 from .exceptions import (
@@ -106,8 +98,6 @@ from .custom_attributes import (
     query_custom_attribute_values,
     get_custom_attributes_by_entity_id,
     default_custom_attributes_definition,
-    app_definitions_from_app_manager,
-    tool_definitions_from_app_manager,
 )
 from .utils import (
     get_folder_path_for_entities,

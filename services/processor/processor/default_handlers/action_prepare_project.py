@@ -46,8 +46,6 @@ class PrepareProjectServer(ServerAction):
         "resolutionHeight",
         "resolutionWidth",
         "pixelAspect",
-        "applications",
-        "tools_env",
         "library_project",
     )
 

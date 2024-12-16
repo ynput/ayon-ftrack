@@ -2,8 +2,6 @@
 This action creates/updates custom attributes.
 ## First part take care about special attributes
     - AYON attributes defined in code because they use constants
-    - `applications` based on applications usages
-    - `tools` based on tools usages
 
 ## Second part is based on json file in ftrack module.
 File location: `./common/custom_attributes.json`
@@ -114,10 +112,6 @@ import datetime
 import arrow
 
 from ayon_core.settings import get_studio_settings
-try:
-    from ayon_applications import ApplicationManager
-except ImportError:
-    ApplicationManager = None
 
 from ayon_ftrack.common import (
     LocalAction,
@@ -129,12 +123,8 @@ from ayon_ftrack.common import (
     CUST_ATTR_KEY_SYNC_FAIL,
     FPS_KEYS,
     CUST_ATTR_INTENT,
-    CUST_ATTR_APPLICATIONS,
-    CUST_ATTR_TOOLS,
 
     default_custom_attributes_definition,
-    app_definitions_from_app_manager,
-    tool_definitions_from_app_manager,
 )
 from ayon_ftrack.lib import get_ftrack_icon_url
 
@@ -144,8 +134,7 @@ class CustAttrException(Exception):
 
 
 class CreateUpdateContext:
-    def __init__(self, session, app_manager):
-        self.app_manager = app_manager
+    def __init__(self, session):
         self._session = session
         self._types_per_name = None
         self._security_roles = None
@@ -357,20 +346,11 @@ class CustomAttributes(LocalAction):
         )
         session.commit()
 
-        # TODO how to get custom attributes from different addons?
-        app_manager = None
-        if ApplicationManager is not None:
-            app_manager = ApplicationManager()
-        else:
-            self.log.info("Applications addon is not available.")
-
-        context = CreateUpdateContext(session, app_manager)
+        context = CreateUpdateContext(session)
 
         generic_message = "Custom attributes creation failed."
         try:
             self.create_ayon_attributes(context, event)
-            self.applications_attribute(context, event)
-            self.tools_attribute(context, event)
             # self.intent_attribute(event)
             self.create_default_custom_attributes(context, event)
 
@@ -479,44 +459,6 @@ class CustomAttributes(LocalAction):
             }
         ]:
             self.process_attr_data(context, item, event)
-
-    def applications_attribute(self, context, event):
-        if context.app_manager is None:
-            return
-
-        apps_data = app_definitions_from_app_manager(context.app_manager)
-
-        applications_custom_attr_data = {
-            "label": "Applications",
-            "key": CUST_ATTR_APPLICATIONS,
-            "type": "enumerator",
-            "entity_type": "show",
-            "group": CUST_ATTR_GROUP,
-            "config": {
-                "multiselect": True,
-                "data": apps_data
-            }
-        }
-        self.process_attr_data(context, applications_custom_attr_data, event)
-
-    def tools_attribute(self, context, event):
-        if context.app_manager is None:
-            return
-
-        tools_data = tool_definitions_from_app_manager(context.app_manager)
-
-        tools_custom_attr_data = {
-            "label": "Tools",
-            "key": CUST_ATTR_TOOLS,
-            "type": "enumerator",
-            "is_hierarchical": True,
-            "group": CUST_ATTR_GROUP,
-            "config": {
-                "multiselect": True,
-                "data": tools_data
-            }
-        }
-        self.process_attr_data(context, tools_custom_attr_data, event)
 
     def intent_attribute(self, context, event):
         intent_key_values = context.ftrack_settings["intent"]["items"]

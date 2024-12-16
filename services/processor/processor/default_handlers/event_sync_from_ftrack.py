@@ -27,7 +27,6 @@ from ftrack_common import (
     CUST_ATTR_KEY_SYNC_FAIL,
 
     CUST_ATTR_AUTO_SYNC,
-    CUST_ATTR_TOOLS,
     FPS_KEYS,
 
     is_ftrack_enabled_in_settings,
@@ -1426,8 +1425,6 @@ class SyncProcess:
 
                 if default_attr_key is not None:
                     dst_key = default_attr_key
-                elif key == CUST_ATTR_TOOLS:
-                    dst_key = "tools"
                 else:
                     dst_key = key
 

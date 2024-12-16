@@ -16,7 +16,6 @@ from ftrack_common import (
     CUST_ATTR_KEY_SERVER_ID,
     CUST_ATTR_KEY_SERVER_PATH,
     CUST_ATTR_KEY_SYNC_FAIL,
-    CUST_ATTR_TOOLS,
     FTRACK_ID_ATTRIB,
     FTRACK_PATH_ATTRIB,
     REMOVED_ID_VALUE,
@@ -517,12 +516,9 @@ class SyncFromFtrack:
         ft_entity_ids = set(ft_entities_by_id.keys())
 
         cust_attr_value_by_entity_id = collections.defaultdict(dict)
-        # Fix custom attributes for tools
         for entity_id, values_by_key in get_custom_attributes_by_entity_id(
             ft_session, ft_entity_ids, attr_confs, hier_attr_confs
         ).items():
-            if CUST_ATTR_TOOLS in values_by_key:
-                values_by_key["tools"] = values_by_key.pop(CUST_ATTR_TOOLS)
             cust_attr_value_by_entity_id[entity_id] = values_by_key
 
         self.log.info("Checking changes of immutable entities")
