@@ -22,7 +22,6 @@ from ftrack_common import (
     FTRACK_PATH_ATTRIB,
     REMOVED_ID_VALUE,
     create_chunks,
-    MappedAYONAttribute,
     CustomAttributesMapping,
     get_custom_attributes_mapping,
     get_custom_attributes_by_entity_id,
