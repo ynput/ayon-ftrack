@@ -77,6 +77,9 @@ class CustomAttributesMapping:
     def __init__(self):
         self._items: Dict[str, MappedAYONAttribute] = {}
 
+    def __contains__(self, item):
+        return item in self._items
+
     def items(self):
         return self._items.items()
 

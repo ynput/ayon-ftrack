@@ -4,7 +4,6 @@ import time
 import logging
 import typing
 from typing import Any, Dict
-from urllib.parse import non_hierarchical
 
 import arrow
 from ayon_api import (
@@ -1052,23 +1051,41 @@ class SyncFromFtrack:
                 attr_confs,
             )
         )
+        default_attrs = {}
+        for attr_conf in attr_confs:
+            if attr_conf["key"] in (
+                CUST_ATTR_KEY_SERVER_ID,
+                CUST_ATTR_KEY_SERVER_PATH,
+                CUST_ATTR_KEY_SYNC_FAIL,
+            ):
+                default_attrs[attr_conf["id"]] = attr_conf["key"]
+
         mapped_confs_by_id = {}
         for mapping_item in attr_mapping.values():
             for mapped_conf in mapping_item.attr_confs:
                 mapped_confs_by_id[mapped_conf["id"]] = mapped_conf
 
         val_by_entity_id = get_custom_attributes_by_entity_id(
-            ft_session, ft_entity_ids, list(mapped_confs_by_id.values())
+            ft_session,
+            ft_entity_ids,
+            list(mapped_confs_by_id.values()),
+            store_by_key=False,
         )
 
         cust_attr_value_by_entity_id = collections.defaultdict(dict)
         for entity_id, entity in ft_entities_by_id.items():
             values_by_attr_id = val_by_entity_id[entity_id]
             values_by_key = {}
+            for attr_id, default_key in default_attrs.items():
+                value = values_by_attr_id.get(attr_id)
+                if value is None:
+                    values_by_key[default_key] = None
+
             for ayon_attr_name, mapping_item in attr_mapping.items():
                 attr_conf = mapping_item.get_attr_conf_for_entity(entity)
                 if attr_conf is None:
                     continue
+
                 value = values_by_attr_id.get(attr_conf["id"])
                 if value is not None:
                     values_by_key[ayon_attr_name] = value
