@@ -12,7 +12,6 @@ from ftrack_common import (
     FTRACK_PATH_ATTRIB,
     ServerAction,
     get_service_ftrack_icon_url,
-    get_ayon_attr_configs,
     query_custom_attribute_values,
     map_ftrack_users_to_ayon_users,
 )
@@ -91,16 +90,11 @@ class PrepareProjectServer(ServerAction):
         return output
 
     def _get_autosync_value(self, session, project_entity):
-        custom_attrs, _ = get_ayon_attr_configs(session)
-        auto_sync_attr = None
-        for attr in custom_attrs:
-            if (
-                attr["entity_type"] == "show"
-                and attr["key"] == CUST_ATTR_AUTO_SYNC
-            ):
-                auto_sync_attr = attr
-                break
-
+        auto_sync_attr = session.query(
+            "select id"
+            " from CustomAttributeConfiguration"
+            f" where key is '{CUST_ATTR_AUTO_SYNC}'"
+        ).first()
         if auto_sync_attr is None:
             return None
 
@@ -588,12 +582,17 @@ class PrepareProjectServer(ServerAction):
         return new_value
 
     def _set_ftrack_attributes(self, session, project_entity, values):
-        custom_attrs, hier_custom_attrs = get_ayon_attr_configs(session)
-        project_attrs = [
-            attr
-            for attr in custom_attrs
-            if attr["entity_type"] == "show"
-        ]
+        project_attrs = []
+        hier_custom_attrs = []
+        for attr_conf in session.query(
+            "select id, key, entity_type, is_hierarchical"
+            " from CustomAttributeConfiguration"
+        ).all():
+            if attr_conf["is_hierarchical"]:
+                hier_custom_attrs.append(attr_conf)
+            elif attr_conf["entity_type"] == "show":
+                project_attrs.append(attr_conf)
+
         hier_attrs_by_name = {
             attr["key"]: attr for attr in hier_custom_attrs
         }
