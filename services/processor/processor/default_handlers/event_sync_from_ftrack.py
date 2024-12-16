@@ -1583,7 +1583,7 @@ class SyncProcess:
 
         attr_key_by_id = {
             attr["id"]: attr["key"]
-            for attr in server_id_attr, path_attr, fail_attr
+            for attr in (server_id_attr, path_attr, fail_attr)
         }
 
         value_items = query_custom_attribute_values(
