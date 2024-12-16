@@ -2,7 +2,7 @@ import os
 import json
 import collections
 import typing
-from typing import Optional, Dict, List, Any
+from typing import Optional, Dict, List, Any, Iterable
 
 import ayon_api
 import ftrack_api
@@ -11,7 +11,7 @@ from .lib import join_filter_values, create_chunks
 from .constants import CUST_ATTR_GROUP
 
 if typing.TYPE_CHECKING:
-    import ftrack_api.entity.base.Entity
+    import ftrack_api.entity.base
 
 
 class MappedAYONAttribute:
@@ -154,6 +154,44 @@ def get_ayon_attr_configs(session, query_keys=None, split_hierarchical=True):
     return custom_attributes, hier_custom_attributes
 
 
+def get_all_attr_configs(
+    session: ftrack_api.Session,
+    fields: Optional[Iterable[str]] = None,
+) -> List["ftrack_api.entity.base._EntityBase"]:
+    """Query custom attribute configurations from ftrack server.
+
+    Args:
+        session (ftrack_api.Session): Connected ftrack session.
+        fields (Optional[Iterable[str]]): Field to query for
+            attribute configurations.
+
+    Returns:
+        List[ftrack_api.entity.base._EntityBase]: ftrack custom attributes.
+
+    """
+    if not fields:
+        fields = {
+            "id",
+            "key",
+            "entity_type",
+            "object_type_id",
+            "is_hierarchical",
+            "default",
+            "group_id",
+            "type_id",
+            # "config",
+            # "label",
+            # "sort",
+            # "project_id",
+        }
+
+    joined_fields = ", ".join(set(fields))
+
+    return session.query(
+        f"select {joined_fields} from CustomAttributeConfiguration"
+    ).all()
+
+
 def get_custom_attributes_mapping(
     session: ftrack_api.Session,
     addon_settings: Dict[str, Any],
@@ -171,17 +209,7 @@ def get_custom_attributes_mapping(
     attributes_mapping = cust_attr["attributes_mapping"]
 
     if attr_confs is None:
-        query_keys = ", ".join({
-            "id",
-            "key",
-            "entity_type",
-            "object_type_id",
-            "is_hierarchical",
-            "default",
-        })
-        attr_confs = session.query(
-            f"select {query_keys} from CustomAttributeConfiguration"
-        ).all()
+        attr_confs = get_all_attr_configs(session)
 
     if ayon_attributes is None:
         ayon_attributes = ayon_api.get_attributes_schema()["attributes"]
