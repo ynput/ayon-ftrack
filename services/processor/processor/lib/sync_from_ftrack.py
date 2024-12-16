@@ -1051,16 +1051,19 @@ class SyncFromFtrack:
                 attr_confs,
             )
         )
+        mapped_confs_by_id = {}
         default_attrs = {}
         for attr_conf in attr_confs:
-            if attr_conf["key"] in (
+            attr_key = attr_conf["key"]
+            if attr_key in (
                 CUST_ATTR_KEY_SERVER_ID,
                 CUST_ATTR_KEY_SERVER_PATH,
                 CUST_ATTR_KEY_SYNC_FAIL,
             ):
-                default_attrs[attr_conf["id"]] = attr_conf["key"]
+                attr_id = attr_conf["id"]
+                default_attrs[attr_id] = attr_key
+                mapped_confs_by_id[attr_id] = attr_conf
 
-        mapped_confs_by_id = {}
         for mapping_item in attr_mapping.values():
             for mapped_conf in mapping_item.attr_confs:
                 mapped_confs_by_id[mapped_conf["id"]] = mapped_conf
@@ -1078,8 +1081,8 @@ class SyncFromFtrack:
             values_by_key = {}
             for attr_id, default_key in default_attrs.items():
                 value = values_by_attr_id.get(attr_id)
-                if value is None:
-                    values_by_key[default_key] = None
+                if value is not None:
+                    values_by_key[default_key] = value
 
             for ayon_attr_name, mapping_item in attr_mapping.items():
                 attr_conf = mapping_item.get_attr_conf_for_entity(entity)

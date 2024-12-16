@@ -250,6 +250,7 @@ def get_custom_attributes_mapping(
                 for attr_conf in nonhier_attrs:
                     if attr_conf["key"] in attr_names:
                         mapped_item.add_attr_conf(attr_conf)
+            output.add_mapping_item(mapped_item)
 
     for attr_name in ayon_attribute_names:
         if attr_name not in output:
@@ -363,7 +364,7 @@ def get_custom_attributes_by_entity_id(
 
         attr_key = attr_by_id[attr_id]
         # Hierarchical attributes are always preferred
-        if attr_id in hier_attr_ids or attr_key not in entity_values:
+        if attr_key not in entity_values or attr_id in hier_attr_ids:
             entity_values[attr_key] = value
 
     return output
