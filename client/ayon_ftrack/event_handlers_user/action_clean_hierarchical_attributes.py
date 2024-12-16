@@ -3,7 +3,8 @@ import ftrack_api
 
 from ayon_ftrack.common import (
     LocalAction,
-    get_ayon_attr_configs,
+    create_chunks,
+    query_custom_attribute_values,
 )
 from ayon_ftrack.lib import get_ftrack_icon_url
 
@@ -15,14 +16,6 @@ class CleanHierarchicalAttrsAction(LocalAction):
     description = "Unset empty hierarchical attribute values."
     icon = get_ftrack_icon_url("AYONAdmin.svg")
 
-    all_project_entities_query = (
-        "select id, name, parent_id, link"
-        " from TypedContext where project_id is \"{}\""
-    )
-    cust_attr_query = (
-        "select value, entity_id from CustomAttributeValue"
-        " where entity_id in ({}) and configuration_id is \"{}\""
-    )
     settings_key = "clean_hierarchical_attr"
 
     def discover(self, session, entities, event):
@@ -36,60 +29,65 @@ class CleanHierarchicalAttrsAction(LocalAction):
         return self.valid_roles(session, entities, event)
 
     def launch(self, session, entities, event):
-        project = entities[0]
+        project_id = entities[0]["id"]
 
         user_message = "This may take some time"
         self.show_message(event, user_message, result=True)
         self.log.debug("Preparing entities for cleanup.")
 
         all_entities = session.query(
-            self.all_project_entities_query.format(project["id"])
+            "select id from TypedContext"
+            f" where project_id is \"{project_id}\""
         ).all()
 
-        all_entities_ids = [
-            "\"{}\"".format(entity["id"])
+        entity_ids = {
+            entity["id"]
             for entity in all_entities
             if entity.entity_type.lower() != "task"
-        ]
+        }
         self.log.debug(
-            "Collected {} entities to process.".format(len(all_entities_ids))
+            f"Collected {len(entity_ids)} entities to process."
         )
-        entity_ids_joined = ", ".join(all_entities_ids)
 
-        attrs, hier_attrs = get_ayon_attr_configs(session)
+        all_attr_confs = session.query(
+            "select id, key, is_hierarchical"
+            " from CustomAttributeConfiguration"
+        ).all()
+        hier_attr_conf_by_id = {
+            attr_conf["id"]: attr_conf
+            for attr_conf in all_attr_confs
+            if attr_conf["is_hierarchical"]
+        }
+        self.log.debug(
+            f"Looking for cleanup of {len(hier_attr_conf_by_id)}"
+            " hierarchical custom attributes."
+        )
+        attr_value_items = query_custom_attribute_values(
+            session, hier_attr_conf_by_id.keys(), entity_ids
+        )
+        values_by_attr_id = {
+            attr_id: []
+            for attr_id in hier_attr_conf_by_id
+        }
+        for value_item in attr_value_items:
+            attr_id = value_item["configuration_id"]
+            if value_item["value"] is None:
+                values_by_attr_id[attr_id].append(value_item)
 
-        for attr in hier_attrs:
-            configuration_key = attr["key"]
-            self.log.debug(
-                "Looking for cleanup of custom attribute \"{}\"".format(
-                    configuration_key
-                )
-            )
-            configuration_id = attr["id"]
-            values = session.query(
-                self.cust_attr_query.format(
-                    entity_ids_joined, configuration_id
-                )
-            ).all()
-
-            data = {}
-            for item in values:
-                value = item["value"]
-                if value is None:
-                    data[item["entity_id"]] = value
-
-            if not data:
-                self.log.debug(
-                    "Nothing to clean for \"{}\".".format(configuration_key)
-                )
+        for attr_id, none_values in values_by_attr_id.items():
+            if not none_values:
                 continue
 
-            self.log.debug("Cleaning up {} values for \"{}\".".format(
-                len(data), configuration_key
-            ))
-            for entity_id, value in data.items():
+            attr = hier_attr_conf_by_id[attr_id]
+            attr_key = attr["key"]
+            self.log.debug(
+                f"Attribute \"{attr_key}\" has {len(none_values)}"
+                " empty values. Cleaning up."
+            )
+            for item in none_values:
+                entity_id = item["entity_id"]
                 entity_key = collections.OrderedDict((
-                    ("configuration_id", configuration_id),
+                    ("configuration_id", attr_id),
                     ("entity_id", entity_id)
                 ))
                 session.recorded_operations.push(
