@@ -100,7 +100,7 @@ class CustomAttributesMapping:
     ) -> Optional[MappedAYONAttribute]:
         for mapping_item in self.values():
             attr_conf = mapping_item.get_attr_conf_for_entity(ft_entity)
-            if attr_conf and attr_conf["key"] == key:
+            if attr_conf is not None and attr_conf["key"] == key:
                 return mapping_item
 
 
