@@ -104,56 +104,6 @@ class CustomAttributesMapping:
                 return mapping_item
 
 
-def get_ayon_attr_configs(session, query_keys=None, split_hierarchical=True):
-    """Query custom attribute configurations from ftrack server.
-
-    Args:
-        session (ftrack_api.Session): Connected ftrack session.
-        query_keys (Union[Iterable[str], None]): Key to query for
-            attribute configurations.
-        split_hierarchical (bool): Change output type. Attributes are split
-            into 2 lists if enabled.
-
-    Returns:
-        Union[List[Any], Tuple[List[Any], List[Any]]: ftrack custom attributes.
-    """
-
-    custom_attributes = []
-    hier_custom_attributes = []
-    if not query_keys:
-        query_keys = {
-            "id",
-            "key",
-            "entity_type",
-            "object_type_id",
-            "is_hierarchical",
-            "default"
-        }
-
-    query_keys = set(query_keys)
-    if split_hierarchical:
-        query_keys.add("is_hierarchical")
-
-    cust_attrs_query = (
-        "select {}"
-        " from CustomAttributeConfiguration"
-        " where group.name in ({})"
-    ).format(
-        ", ".join(query_keys),
-        join_filter_values({"openpype", CUST_ATTR_GROUP})
-    )
-    all_attrs = session.query(cust_attrs_query).all()
-    for cust_attr in all_attrs:
-        if split_hierarchical and cust_attr["is_hierarchical"]:
-            hier_custom_attributes.append(cust_attr)
-        else:
-            custom_attributes.append(cust_attr)
-
-    if not split_hierarchical:
-        return custom_attributes
-    return custom_attributes, hier_custom_attributes
-
-
 def get_all_attr_configs(
     session: ftrack_api.Session,
     fields: Optional[Iterable[str]] = None,

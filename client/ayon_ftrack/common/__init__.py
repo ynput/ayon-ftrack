@@ -39,7 +39,6 @@ __all__ = (
 
     "MappedAYONAttribute",
     "CustomAttributesMapping",
-    "get_ayon_attr_configs",
     "get_all_attr_configs",
     "get_custom_attributes_mapping",
     "query_custom_attribute_values",
@@ -100,7 +99,6 @@ from .users import map_ftrack_users_to_ayon_users
 from .custom_attributes import (
     MappedAYONAttribute,
     CustomAttributesMapping,
-    get_ayon_attr_configs,
     get_all_attr_configs,
     get_custom_attributes_mapping,
     query_custom_attribute_values,
