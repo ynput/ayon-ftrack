@@ -1,6 +1,7 @@
 import re
 import collections
 import time
+import copy
 import logging
 import typing
 from typing import Any, Dict
@@ -82,9 +83,7 @@ class SyncFromFtrack:
 
         # Create entity hub which handle entity changes
         self._entity_hub = EntityHub(project_name)
-        self._project_settings = get_addons_settings(
-            project_name=project_name
-        )
+        self._ftrack_settings = None
 
         self._report_items = []
 
@@ -171,6 +170,11 @@ class SyncFromFtrack:
         # Update types on project entity from ftrack
         self.update_project_types(object_types, task_types)
         return object_types, task_types
+
+    def get_ftrack_settings(self):
+        if self._ftrack_settings is None:
+            self._ftrack_settings = get_addons_settings()["ftrack"]
+        return copy.deepcopy(self._ftrack_settings)
 
     def sync_statuses(self, ft_project, ft_session):
         fields = {
@@ -425,38 +429,7 @@ class SyncFromFtrack:
 
         ft_session = self._ft_session
 
-        try:
-            ensure_mandatory_custom_attributes_exists(
-                ft_session,
-                self._project_settings["ftrack"],
-            )
-        except ServerError:
-            self.log.error(
-                "Failed to create mandatory custom attributes in ftrack",
-                exc_info=True
-            )
-            self._report_items.extend([
-                {
-                    "type": "label",
-                    "value": (
-                        "## Failed to create AYON mandatory custom attributes"
-                    )
-                },
-                {
-                    "type": "label",
-                    "value": (
-                        "Sync ftrack > AYON requires some mandatory"
-                        " custom attributes. ftrack API key used for services does"
-                        " not have enough permissions to create them."
-                        "<br/><br/>Please add 'Manage settings' permissions"
-                        " to used ftrack API key, or use admin ftrack API key"
-                        " for services."
-                        "<br/><br/>NOTE: You can also run ftrack action"
-                        " 'AYON Admin - Create/Update custom attributes' to"
-                        " create them manually."
-                    )
-                }
-            ])
+        if not self.ensure_mandatory_custom_attributes_exists(ft_session):
             return
 
         self.log.info(
@@ -736,6 +709,42 @@ class SyncFromFtrack:
             for child in entity.children:
                 if child.immutable_for_hierarchy:
                     hierarchy_queue.append((child, expected_ftrack_id))
+
+    def ensure_mandatory_custom_attributes_exists(self, session):
+        try:
+            ensure_mandatory_custom_attributes_exists(
+                session,
+                self.get_ftrack_settings(),
+            )
+            return True
+        except ServerError:
+            self.log.error(
+                "Failed to create mandatory custom attributes in ftrack",
+                exc_info=True
+            )
+            self._report_items.extend([
+                {
+                    "type": "label",
+                    "value": (
+                        "## Failed to create AYON mandatory custom attributes"
+                    )
+                },
+                {
+                    "type": "label",
+                    "value": (
+                        "Sync ftrack > AYON requires some mandatory"
+                        " custom attributes. ftrack API key used for services does"
+                        " not have enough permissions to create them."
+                        "<br/><br/>Please add 'Manage settings' permissions"
+                        " to used ftrack API key, or use admin ftrack API key"
+                        " for services."
+                        "<br/><br/>NOTE: You can also run ftrack action"
+                        " 'AYON Admin - Create/Update custom attributes' to"
+                        " create them manually."
+                    )
+                }
+            ])
+            return False
 
     def _create_new_entity(
         self,
@@ -1084,7 +1093,7 @@ class SyncFromFtrack:
         attr_mapping: CustomAttributesMapping = (
             get_custom_attributes_mapping(
                 ft_session,
-                self._project_settings["ftrack"],
+                self.get_ftrack_settings(),
                 attr_confs,
             )
         )
