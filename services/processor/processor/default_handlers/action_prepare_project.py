@@ -36,19 +36,6 @@ class PrepareProjectServer(ServerAction):
     settings_key = "prepare_project"
 
     item_splitter = {"type": "label", "value": "---"}
-    _keys_order = (
-        "fps",
-        "frameStart",
-        "frameEnd",
-        "handleStart",
-        "handleEnd",
-        "clipIn",
-        "clipOut",
-        "resolutionHeight",
-        "resolutionWidth",
-        "pixelAspect",
-        "library_project",
-    )
 
     def discover(self, session, entities, event):
         """Show only on project."""
