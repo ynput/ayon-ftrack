@@ -43,6 +43,7 @@ __all__ = (
     "get_custom_attributes_mapping",
     "query_custom_attribute_values",
     "get_custom_attributes_by_entity_id",
+    "ensure_mandatory_custom_attributes_exists",
     "default_custom_attributes_definition",
 
     "get_folder_path_for_entities",
@@ -103,6 +104,7 @@ from .custom_attributes import (
     get_custom_attributes_mapping,
     query_custom_attribute_values,
     get_custom_attributes_by_entity_id,
+    ensure_mandatory_custom_attributes_exists,
     default_custom_attributes_definition,
 )
 from .utils import (
