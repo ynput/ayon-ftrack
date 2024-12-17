@@ -224,7 +224,7 @@ def get_custom_attributes_mapping(
                         mapped_item.add_attr_conf(attr_conf)
                         break
             else:
-                attr_names = item["nonhierarchical"]
+                attr_names = item["standard"]
                 for attr_conf in nonhier_attrs:
                     if attr_conf["key"] in attr_names:
                         mapped_item.add_attr_conf(attr_conf)

@@ -4,7 +4,7 @@ from ayon_server.settings import BaseSettingsModel, SettingsField
 def _attr_types():
     return [
         {"value": "hierarchical", "label": "Hierarchical"},
-        {"value": "nonhierarchical", "label": "Non-hierarchical"},
+        {"value": "standard", "label": "Standard"},
     ]
 
 
@@ -20,7 +20,7 @@ class CustomAttributeMappingModel(BaseSettingsModel):
         "",
         title="ftrack attribute name",
     )
-    nonhierarchical: list[str] = SettingsField(
+    standard: list[str] = SettingsField(
         default_factory=list,
         title="ftrack attribute names",
     )
@@ -132,63 +132,63 @@ DEFAULT_CUSTOM_ATTRIBUTES_SETTINGS = {
         "mapping": [
             {
                 "name": "resolutionWidth",
-                "attr_type": "nonhierarchical",
+                "attr_type": "standard",
                 "hierarchical": "resolutionWidth",
-                "nonhierarchical": [],
+                "standard": [],
             },
             {
                 "name": "resolutionHeight",
-                "attr_type": "nonhierarchical",
+                "attr_type": "standard",
                 "hierarchical": "resolutionHeight",
-                "nonhierarchical": [],
+                "standard": [],
             },
             {
                 "name": "pixelAspect",
-                "attr_type": "nonhierarchical",
+                "attr_type": "standard",
                 "hierarchical": "pixelAspect",
-                "nonhierarchical": [],
+                "standard": [],
             },
             {
                 "name": "fps",
-                "attr_type": "nonhierarchical",
+                "attr_type": "standard",
                 "hierarchical": "fps",
-                "nonhierarchical": ["fps"],
+                "standard": ["fps"],
             },
             {
                 "name": "frameStart",
-                "attr_type": "nonhierarchical",
+                "attr_type": "standard",
                 "hierarchical": "frameStart",
-                "nonhierarchical": ["fstart"],
+                "standard": ["fstart"],
             },
             {
                 "name": "frameEnd",
-                "attr_type": "nonhierarchical",
+                "attr_type": "standard",
                 "hierarchical": "frameEnd",
-                "nonhierarchical": ["fend"],
+                "standard": ["fend"],
             },
             {
                 "name": "handleStart",
-                "attr_type": "nonhierarchical",
+                "attr_type": "standard",
                 "hierarchical": "handleStart",
-                "nonhierarchical": [],
+                "standard": [],
             },
             {
                 "name": "handleEnd",
-                "attr_type": "nonhierarchical",
+                "attr_type": "standard",
                 "hierarchical": "handleEnd",
-                "nonhierarchical": [],
+                "standard": [],
             },
             {
                 "name": "clipIn",
-                "attr_type": "nonhierarchical",
+                "attr_type": "standard",
                 "hierarchical": "clipIn",
-                "nonhierarchical": [],
+                "standard": [],
             },
             {
                 "name": "clipOut",
-                "attr_type": "nonhierarchical",
+                "attr_type": "standard",
                 "hierarchical": "clipOut",
-                "nonhierarchical": [],
+                "standard": [],
             },
         ]
     }
