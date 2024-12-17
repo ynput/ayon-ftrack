@@ -14,6 +14,7 @@ from ayon_api import (
 )
 from ayon_api.entity_hub import EntityHub, BaseEntity
 import ftrack_api
+from ftrack_api.exception import ServerError
 from ftrack_common import (
     CUST_ATTR_KEY_SERVER_ID,
     CUST_ATTR_KEY_SERVER_PATH,
@@ -25,6 +26,7 @@ from ftrack_common import (
     CustomAttributesMapping,
     get_custom_attributes_mapping,
     get_custom_attributes_by_entity_id,
+    ensure_mandatory_custom_attributes_exists,
     map_ftrack_users_to_ayon_users,
     join_filter_values,
 )
@@ -423,7 +425,43 @@ class SyncFromFtrack:
 
         ft_session = self._ft_session
 
-        self.log.info(f"Synchronization of project \"{project_name}\" started")
+        try:
+            ensure_mandatory_custom_attributes_exists(
+                ft_session,
+                self._project_settings["ftrack"],
+            )
+        except ServerError:
+            self.log.error(
+                "Failed to create mandatory custom attributes in ftrack",
+                exc_info=True
+            )
+            self._report_items.extend([
+                {
+                    "type": "label",
+                    "value": (
+                        "## Failed to create AYON mandatory custom attributes"
+                    )
+                },
+                {
+                    "type": "label",
+                    "value": (
+                        "Sync ftrack > AYON requires some mandatory"
+                        " custom attributes. ftrack API key used for services does"
+                        " not have enough permissions to create them."
+                        "<br/><br/>Please add 'Manage settings' permissions"
+                        " to used ftrack API key, or use admin ftrack API key"
+                        " for services."
+                        "<br/><br/>NOTE: You can also run ftrack action"
+                        " 'AYON Admin - Create/Update custom attributes' to"
+                        " create them manually."
+                    )
+                }
+            ])
+            return
+
+        self.log.info(
+            f"Synchronization of project \"{project_name}\" started"
+        )
 
         # Get ftrack custom attributes to sync
         attr_confs = ft_session.query(
