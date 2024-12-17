@@ -1,5 +1,6 @@
 import os
 import json
+import copy
 import collections
 import typing
 from typing import Optional, Dict, List, Any, Iterable
@@ -8,7 +9,13 @@ import ayon_api
 import ftrack_api
 
 from .lib import join_filter_values, create_chunks
-from .constants import CUST_ATTR_GROUP
+from .constants import (
+    CUST_ATTR_GROUP,
+    CUST_ATTR_KEY_SERVER_ID,
+    CUST_ATTR_KEY_SERVER_PATH,
+    CUST_ATTR_KEY_SYNC_FAIL,
+    CUST_ATTR_AUTO_SYNC,
+)
 
 if typing.TYPE_CHECKING:
     from ftrack_api.entity.base import Entity as FtrackEntity
@@ -366,3 +373,221 @@ def default_custom_attributes_definition():
     with open(json_file_path, "r") as json_stream:
         data = json.load(json_stream)
     return data
+
+
+def ensure_custom_attribute_group_exists(
+    session: ftrack_api.Session,
+    group: str,
+    groups: Optional[List["FtrackEntity"]] = None,
+) -> "FtrackEntity":
+    """Ensure custom attribute group in ftrack.
+
+    Args:
+        session (ftrack_api.Session): Connected ftrack session.
+        group (str): Name of group.
+        groups (Optional[List[FtrackEntity]]): Pre-fetched
+            custom attribute groups.
+
+    Returns:
+        FtrackEntity: Created custom attribute group.
+
+    """
+    if groups is None:
+        groups = session.query(
+            "select id, name from CustomAttributeGroup"
+        ).all()
+    low_name = group.lower()
+    for group in groups:
+        if group["name"].lower() == low_name:
+            return group
+
+    group = session.create(
+        "CustomAttributeGroup",
+        {"name": group}
+    )
+    session.commit()
+    return group
+
+
+def ensure_mandatory_custom_attributes_exists(
+    session: ftrack_api.Session,
+    addon_settings: Dict[str, Any],
+    attr_confs: Optional[List["FtrackEntity"]] = None,
+    custom_attribute_types: Optional[List["FtrackEntity"]] = None,
+    groups: Optional[List["FtrackEntity"]] = None,
+    security_roles: Optional[List["FtrackEntity"]] = None,
+):
+    """Make sure that mandatory custom attributes exists in ftrack.
+
+    Args:
+        session (ftrack_api.Session): Connected ftrack session.
+        addon_settings (Dict[str, Any]): Addon settings.
+        attr_confs (Optional[List[FtrackEntity]]): Pre-fetched all existing
+            custom attribute configurations in ftrack.
+        custom_attribute_types (Optional[List[FtrackEntity]]): Pre-fetched
+            custom attribute types.
+        groups (Optional[List[FtrackEntity]]): Pre-fetched custom attribute
+            groups.
+        security_roles (Optional[List[FtrackEntity]]): Pre-fetched security
+            roles.
+
+    """
+    if attr_confs is None:
+        attr_confs = get_all_attr_configs(session)
+
+    # Split existing custom attributes
+    attr_confs_by_entity_type = collections.defaultdict(list)
+    hier_confs = []
+    for attr_conf in attr_confs:
+        if attr_conf["is_hierarchical"]:
+            hier_confs.append(attr_conf)
+        else:
+            entity_type = attr_conf["entity_type"]
+            attr_confs_by_entity_type[entity_type].append(attr_conf)
+
+    # Prepare possible attribute types
+    if custom_attribute_types is None:
+        custom_attribute_types = session.query(
+            "select id, name from CustomAttributeType"
+        ).all()
+
+    attr_type_id_by_low_name = {
+        attr_type["name"].lower(): attr_type["id"]
+        for attr_type in custom_attribute_types
+    }
+
+    if security_roles is None:
+        security_roles = session.query(
+            "select id, name, type from SecurityRole"
+        ).all()
+
+    security_roles = {
+        role["name"].lower(): role
+        for role in security_roles
+    }
+    mandatory_attributes_settings = (
+        addon_settings
+        ["custom_attributes"]
+        ["mandatory_attributes"]
+    )
+
+    # Prepare group
+    group_entity = ensure_custom_attribute_group_exists(
+        session, CUST_ATTR_GROUP, groups
+    )
+    group_id = group_entity["id"]
+
+    for item in [
+        {
+            "key": CUST_ATTR_KEY_SERVER_ID,
+            "type": "text",
+            "label": "AYON ID",
+            "default": "",
+            "is_hierarchical": True,
+            "config": {"markdown": False},
+            "group_id": group_id,
+        },
+        {
+            "key": CUST_ATTR_KEY_SERVER_PATH,
+            "type": "text",
+            "label": "AYON path",
+            "default": "",
+            "is_hierarchical": True,
+            "config": {"markdown": False},
+            "group_id": group_id,
+        },
+        {
+            "key": CUST_ATTR_KEY_SYNC_FAIL,
+            "type": "boolean",
+            "label": "AYON sync failed",
+            "is_hierarchical": True,
+            "default": False,
+            "group_id": group_id,
+        },
+        {
+            "key": CUST_ATTR_AUTO_SYNC,
+            "type": "boolean",
+            "label": "AYON auto-sync",
+            "default": False,
+            "is_hierarchical": False,
+            "entity_type": "show",
+            "group_id": group_id,
+        }
+    ]:
+        key = item["key"]
+        attr_settings = mandatory_attributes_settings[key]
+        read_roles = []
+        write_roles = []
+        for role_names, roles in (
+            (attr_settings["read_security_roles"], read_roles),
+            (attr_settings["write_security_roles"], write_roles),
+        ):
+            if not role_names:
+                roles.extend(security_roles.values())
+                continue
+
+            for name in role_names:
+                role = security_roles.get(name.lower())
+                if role is not None:
+                    roles.append(role)
+
+        is_hierarchical = item["is_hierarchical"]
+        entity_type_confs = hier_confs
+        if not is_hierarchical:
+            entity_type = item["entity_type"]
+            entity_type_confs = attr_confs_by_entity_type.get(entity_type, [])
+        matching_attr_conf = next(
+            (
+                attr_conf
+                for attr_conf in entity_type_confs
+                if attr_conf["key"] == key
+            ),
+            None
+        )
+
+        entity_data = copy.deepcopy(item)
+        attr_type = entity_data.pop("type")
+        entity_data["type_id"] = attr_type_id_by_low_name[attr_type.lower()]
+        # Convert 'config' to json string
+        config = entity_data.get("config")
+        if isinstance(config, dict):
+            entity_data["config"] = json.dumps(config)
+
+        if matching_attr_conf is None:
+            # Make sure 'entity_type' is filled for hierarchical attribute
+            # - it is required to be able to create custom attribute
+            if is_hierarchical:
+                entity_data.setdefault("entity_type", "show")
+            # Make sure config is set to empty dictionary for creation
+            entity_data.setdefault("config", "{}")
+            entity_data["read_security_roles"] = read_roles
+            entity_data["write_security_roles"] = write_roles
+            session.create(
+                "CustomAttributeConfiguration",
+                entity_data
+            )
+            session.commit()
+            continue
+
+        changed = False
+        for key, value in entity_data.items():
+            if matching_attr_conf[key] != value:
+                matching_attr_conf[key] = value
+                changed = True
+
+        match_read_role_ids = {
+            role["id"] for role in matching_attr_conf["read_security_roles"]
+        }
+        match_write_role_ids = {
+            role["id"] for role in matching_attr_conf["write_security_roles"]
+        }
+        if match_read_role_ids != {role["id"] for role in read_roles}:
+            matching_attr_conf["read_security_roles"] = read_roles
+            changed = True
+        if match_write_role_ids != {role["id"] for role in write_roles}:
+            matching_attr_conf["write_security_roles"] = write_roles
+            changed = True
+
+        if changed:
+            session.commit()
+
