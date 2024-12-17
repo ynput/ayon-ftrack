@@ -34,6 +34,7 @@ class CustomAttributesMappingModel(BaseSettingsModel):
     mapping: list[CustomAttributeMappingModel] = SettingsField(
         default_factory=list,
         title="Attributes mapping",
+        description="Map AYON attributes to ftrack custom attributes",
     )
 
 
@@ -70,11 +71,18 @@ class MandatoryAttributesModel(BaseSettingsModel):
 class CustomAttributesModel(BaseSettingsModel):
     mandatory_attributes: MandatoryAttributesModel = SettingsField(
         default_factory=MandatoryAttributesModel,
-        title="Mandatory attributes",
+        title="Mandatory custom attributes",
+        description=(
+            "Set read/write roles of AYON mandatory custom attributes"
+        ),
     )
     attributes_mapping: CustomAttributesMappingModel = SettingsField(
         default_factory=CustomAttributesMappingModel,
         title="Attributes mapping",
+        description=(
+            "Use custom mapping of AYON attributes"
+            " to ftrack custom attributes"
+        ),
     )
 
 
