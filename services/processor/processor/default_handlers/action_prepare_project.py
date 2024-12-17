@@ -571,12 +571,13 @@ class PrepareProjectServer(ServerAction):
         return new_value
 
     def _set_ftrack_attributes(
-        self, session, project_settings, project_entity, values
+        self, session, project_entity, values
     ):
         attr_confs = get_all_attr_configs(session)
+        ftrack_settings = ayon_api.get_addons_settings()["ftrack"]
         attrs_mapping = get_custom_attributes_mapping(
             session,
-            project_settings["ftrack"],
+            ftrack_settings,
             attr_confs,
         )
         project_attrs = []
@@ -605,6 +606,8 @@ class PrepareProjectServer(ServerAction):
         }
         for attr_name, attr_value in values.items():
             mapping_item = attrs_mapping.get(attr_name)
+            if mapping_item is None:
+                continue
             attr = mapping_item.get_attr_conf_for_entity(project_entity)
             if attr is None:
                 continue
@@ -652,15 +655,30 @@ class PrepareProjectServer(ServerAction):
 
         project_entity = entities[0]
         project_name = project_entity["full_name"]
-        project_settings = self.get_project_settings_from_event(
-            event, project_name
-        )
         syncer = SyncFromFtrack(session, project_name, self.log)
         # TODO validate project code too
         if syncer.project_exists_in_ayon():
             return {
                 "message": "Project already exists in AYON.",
                 "success": True
+            }
+
+        if not syncer.ensure_mandatory_custom_attributes_exists(session):
+            report_items = syncer.report_items
+            if report_items:
+                self.show_interface(
+                    report_items,
+                    title="Prepare Project report",
+                    event=event
+                )
+            msg = (
+                "Failed to create AYON mandatory custom attributes"
+                " in ftrack."
+            )
+            self.log.info(msg)
+            return {
+                "success": False,
+                "message": msg,
             }
 
         attributes = {}
@@ -703,7 +721,7 @@ class PrepareProjectServer(ServerAction):
         auto_sync_project = event_values["auto_sync_project"]
         values[CUST_ATTR_AUTO_SYNC] = auto_sync_project
         self._set_ftrack_attributes(
-            session, project_settings, project_entity, values
+            session, project_entity, values
         )
 
         if not auto_sync_project:
