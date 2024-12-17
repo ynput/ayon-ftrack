@@ -104,10 +104,7 @@ DEFAULT_CUSTOM_ATTRIBUTES_SETTINGS = {
         },
         "ayon_path": {
             "write_security_roles": [],
-            "read_security_roles": [
-                "API",
-                "Administrator"
-            ]
+            "read_security_roles": []
         },
         "ayon_sync_failed": {
             "write_security_roles": [
