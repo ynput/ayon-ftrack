@@ -11,7 +11,7 @@ from .lib import join_filter_values, create_chunks
 from .constants import CUST_ATTR_GROUP
 
 if typing.TYPE_CHECKING:
-    import ftrack_api.entity.base
+    from ftrack_api.entity.base import Entity as FtrackEntity
 
 
 class MappedAYONAttribute:
@@ -19,30 +19,28 @@ class MappedAYONAttribute:
         self,
         ayon_attribute_name: str,
         is_hierarchical: bool = True,
-        attr_confs: Optional[List["ftrack_api.entity.base._EntityBase"]] = None,
+        attr_confs: Optional[List["FtrackEntity"]] = None,
     ):
         self.ayon_attribute_name: str = ayon_attribute_name
         self.is_hierarchical: bool = is_hierarchical
         if attr_confs is None:
             attr_confs = []
-        self._attr_confs: List["ftrack_api.entity.base._EntityBase"] = attr_confs
+        self._attr_confs: List["FtrackEntity"] = attr_confs
 
     def has_confs(self) -> bool:
         return bool(self.attr_confs)
 
-    def add_attr_conf(self, attr_conf: "ftrack_api.entity.base._EntityBase"):
+    def add_attr_conf(self, attr_conf: "FtrackEntity"):
         self._attr_confs.append(attr_conf)
 
-    def get_attr_confs(self) -> List["ftrack_api.entity.base._EntityBase"]:
+    def get_attr_confs(self) -> List["FtrackEntity"]:
         return list(self._attr_confs)
 
-    attr_confs: List["ftrack_api.entity.base._EntityBase"] = property(
-        get_attr_confs
-    )
+    attr_confs: List["FtrackEntity"] = property(get_attr_confs)
 
     def get_attr_conf_for_entity_type(
         self, entity_type: str, object_type_id: Optional[str]
-    ) -> Optional["ftrack_api.entity.base._EntityBase"]:
+    ) -> Optional["FtrackEntity"]:
         if not self.attr_confs:
             return None
         if self.is_hierarchical:
@@ -57,8 +55,8 @@ class MappedAYONAttribute:
         return None
 
     def get_attr_conf_for_entity(
-        self, entity: "ftrack_api.entity.base.Entity"
-    ) -> Optional["ftrack_api.entity.base._EntityBase"]:
+        self, entity: "FtrackEntity"
+    ) -> Optional["FtrackEntity"]:
         if entity is None:
             return None
 
@@ -96,7 +94,7 @@ class CustomAttributesMapping:
         self._items[item.ayon_attribute_name] = item
 
     def get_mapping_item_by_key(
-        self, ft_entity: "ftrack_api.entity.base.Entity", key: str
+        self, ft_entity: "FtrackEntity", key: str
     ) -> Optional[MappedAYONAttribute]:
         for mapping_item in self.values():
             attr_conf = mapping_item.get_attr_conf_for_entity(ft_entity)
@@ -107,7 +105,7 @@ class CustomAttributesMapping:
 def get_all_attr_configs(
     session: ftrack_api.Session,
     fields: Optional[Iterable[str]] = None,
-) -> List["ftrack_api.entity.base._EntityBase"]:
+) -> List["FtrackEntity"]:
     """Query custom attribute configurations from ftrack server.
 
     Args:
@@ -116,7 +114,7 @@ def get_all_attr_configs(
             attribute configurations.
 
     Returns:
-        List[ftrack_api.entity.base._EntityBase]: ftrack custom attributes.
+        List[FtrackEntity]: ftrack custom attributes.
 
     """
     if not fields:
