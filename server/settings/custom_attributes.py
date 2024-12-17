@@ -65,10 +65,6 @@ class MandatoryAttributesModel(BaseSettingsModel):
         default_factory=CustomAttributeModel,
         title="AYON auto-sync",
     )
-    library_project: CustomAttributeModel = CustomAttributeModel(
-        default_factory=CustomAttributeModel,
-        title="Library project",
-    )
 
 
 class CustomAttributesModel(BaseSettingsModel):
@@ -82,20 +78,9 @@ class CustomAttributesModel(BaseSettingsModel):
     )
 
 
-
 DEFAULT_CUSTOM_ATTRIBUTES_SETTINGS = {
     "mandatory_attributes": {
         "auto_sync_enabled": {
-            "write_security_roles": [
-                "API",
-                "Administrator"
-            ],
-            "read_security_roles": [
-                "API",
-                "Administrator"
-            ]
-        },
-        "library_project": {
             "write_security_roles": [
                 "API",
                 "Administrator"
