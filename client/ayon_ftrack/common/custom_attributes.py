@@ -19,30 +19,30 @@ class MappedAYONAttribute:
         self,
         ayon_attribute_name: str,
         is_hierarchical: bool = True,
-        attr_confs: Optional[List["ftrack_api.entity.base.Entity"]] = None,
+        attr_confs: Optional[List["ftrack_api.entity.base._EntityBase"]] = None,
     ):
         self.ayon_attribute_name: str = ayon_attribute_name
         self.is_hierarchical: bool = is_hierarchical
         if attr_confs is None:
             attr_confs = []
-        self._attr_confs: List["ftrack_api.entity.base.Entity"] = attr_confs
+        self._attr_confs: List["ftrack_api.entity.base._EntityBase"] = attr_confs
 
     def has_confs(self) -> bool:
         return bool(self.attr_confs)
 
-    def add_attr_conf(self, attr_conf: "ftrack_api.entity.base.Entity"):
+    def add_attr_conf(self, attr_conf: "ftrack_api.entity.base._EntityBase"):
         self._attr_confs.append(attr_conf)
 
-    def get_attr_confs(self) -> List["ftrack_api.entity.base.Entity"]:
+    def get_attr_confs(self) -> List["ftrack_api.entity.base._EntityBase"]:
         return list(self._attr_confs)
 
-    attr_confs: List["ftrack_api.entity.base.Entity"] = property(
+    attr_confs: List["ftrack_api.entity.base._EntityBase"] = property(
         get_attr_confs
     )
 
     def get_attr_conf_for_entity_type(
         self, entity_type: str, object_type_id: Optional[str]
-    ) -> Optional["ftrack_api.entity.base.Entity"]:
+    ) -> Optional["ftrack_api.entity.base._EntityBase"]:
         if not self.attr_confs:
             return None
         if self.is_hierarchical:
@@ -58,7 +58,7 @@ class MappedAYONAttribute:
 
     def get_attr_conf_for_entity(
         self, entity: "ftrack_api.entity.base.Entity"
-    ) -> Optional["ftrack_api.entity.base.Entity"]:
+    ) -> Optional["ftrack_api.entity.base._EntityBase"]:
         if entity is None:
             return None
 
@@ -358,8 +358,9 @@ def default_custom_attributes_definition():
     Returns:
         dict[str, Any]: Custom attribute configurations per entity type that
             can be used to create/update custom attributes.
-    """
 
+    """
+    # TODO use AYON built-in attributes as source of truth
     json_file_path = os.path.join(
         os.path.dirname(os.path.abspath(__file__)),
         "custom_attributes.json"
