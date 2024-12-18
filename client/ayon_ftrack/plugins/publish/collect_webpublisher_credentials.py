@@ -35,9 +35,11 @@ class CollectWebpublisherCredentials(plugin.FtrackPublishContextPlugin):
     """
 
     order = pyblish.api.CollectorOrder + 0.0015
-    label = "Collect webpublisher credentials"
+    label = "Collect Ftrack credentials for Webpublisher"
     hosts = ["webpublisher", "photoshop"]
     targets = ["webpublish"]
+
+    service_user_name = ""
 
     def process(self, context):
         service_api_key, service_username = self._get_username_key(context)
@@ -91,13 +93,19 @@ class CollectWebpublisherCredentials(plugin.FtrackPublishContextPlugin):
         api_key_secret = service_settings["api_key"]
         username_secret = service_settings["username"]
 
-        secrets_by_name = {
-            secret["name"]: secret["value"]
-            for secret in ayon_api.get_secrets()
-        }
+        con = ayon_api.get_server_api_connection()
+        with con.as_username(self.service_user_name):
+            secrets_by_name = {
+                secret["name"]: secret["value"]
+                for secret in ayon_api.get_secrets()
+            }
         api_key = secrets_by_name.get(api_key_secret)
         username = secrets_by_name.get(username_secret)
+
         if not api_key or not username:
-            raise KnownPublishError("Missing ftrack credentials in settings. "
-                                    "Please let admin fill in 'ayon+settings://ftrack/service_settings'")  # noqa
+            raise KnownPublishError(
+                "Missing ftrack credentials in settings. "
+                "Please let admin fill in "
+                "'ayon+settings://ftrack/service_settings'"
+            )
         return api_key, username
