@@ -471,13 +471,15 @@ class SyncFromFtrack:
         # Query ftrack project
         ft_project = _get_ftrack_project(ft_session, project_name)
 
+        self.sync_statuses(ft_project, ft_session)
+
         t_project_existence_1 = time.perf_counter()
         self.log.debug(
             f"Initial preparation took {t_project_existence_1 - t_start}"
         )
         self.log.debug("Loading entities from server")
         # Query entities from server (project, folders and tasks)
-        self._entity_hub.query_entities_from_server()
+        self._entity_hub.fetch_hierarchy_entities()
         self._ids_mapping.set_ftrack_to_server(
             ft_project["id"], self._entity_hub.project_entity.id
         )
