@@ -1287,8 +1287,8 @@ class SyncProcess:
         return
         project_entity = self.entity_hub.project_entity
         src_statuses = {
-            statuse.name.lower(): statuse
-            for statuse in project_entity.statuses
+            status.name.lower(): status
+            for status in project_entity.statuses
         }
         new_statuses = []
         project_schema = self.ft_project["project_schema"]
@@ -1359,11 +1359,10 @@ class SyncProcess:
                 ayon_status is None
                 or entity.entity_type not in ayon_status.scope
             ):
-                # TODO implement statuses sync to AYON project
-                continue
                 project_need_update = True
+                continue
 
-            to_change.append((entity, new_status_name))
+            to_change.append((entity, ayon_status.name))
 
         if project_need_update:
             self._update_project_statuses()
