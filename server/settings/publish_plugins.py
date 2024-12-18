@@ -66,6 +66,15 @@ class CollectFtrackCustomAttributeDataModel(BaseSettingsModel):
     )
 
 
+class CollectWebpublisherCredentialsModel(BaseSettingsModel):
+    _isGroup = True
+    enabled: bool = True
+    service_user_name: str = SettingsField(
+        title="Service user name",
+        description="User name with Webpublisher service was started with."
+    )
+
+
 class ValidateFtrackAttributesModel(BaseSettingsModel):
     _isGroup = True
     enabled: bool = True
@@ -308,6 +317,18 @@ class FtrackPublishPlugins(BaseSettingsModel):
             )
         )
     )
+    CollectWebpublisherCredentials: CollectWebpublisherCredentialsModel = (
+        SettingsField(
+            title="Collect Ftrack credentials for Webpublisher",
+            default_factory=CollectFtrackCustomAttributeDataModel,
+            description=(
+                "Translates user email to Ftrack user name to push to Ftrack "
+                "with correct username. \n"
+                "Applicable only for Webpublisher addon!"
+            )
+        )
+    )
+
     ValidateFtrackAttributes: ValidateFtrackAttributesModel = SettingsField(
         title="Validate ftrack Attributes",
         default_factory=ValidateFtrackAttributesModel,
@@ -526,6 +547,10 @@ DEFAULT_PUBLISH_SETTINGS = {
     "CollectFtrackCustomAttributeData": {
         "enabled": False,
         "custom_attribute_keys": []
+    },
+    "CollectWebpublisherCredentials": {
+        "enabled": True,
+        "service_user_name": "service"
     },
     "IntegrateHierarchyToFtrack": {
         "create_task_status_profiles": []
