@@ -1371,12 +1371,10 @@ class SyncProcess:
                 continue
 
             entity = None
-            object_type_id = None
             if info["entityType"] == "show":
                 entity = self.entity_hub.project_entity
 
             elif info["entityType"] == "task":
-                object_type_id = info["objectTypeId"]
                 if info["entity_type"] == "Task":
                     entity_ids = self.task_ids_by_ftrack_id[ftrack_id]
                     entity_types = ["task"]
