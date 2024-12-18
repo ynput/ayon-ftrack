@@ -471,7 +471,10 @@ class SyncFromFtrack:
         # Query ftrack project
         ft_project = _get_ftrack_project(ft_session, project_name)
 
+        self.sync_project_types(ft_project, ft_session)
         self.sync_statuses(ft_project, ft_session)
+
+        self._entity_hub.commit_changes()
 
         t_project_existence_1 = time.perf_counter()
         self.log.debug(
