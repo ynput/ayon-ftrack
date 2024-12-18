@@ -1067,7 +1067,7 @@ class SyncProcess:
                 continue
 
             entity_id = entity_ids[0]
-            entity = self.entity_hub.get_or_query_entity_by_id(
+            entity = self.entity_hub.get_or_fetch_entity_by_id(
                 entity_id, [entity_type])
             # Skip if entity was not found
             if entity is None:
