@@ -1067,7 +1067,7 @@ class SyncProcess:
                 continue
 
             entity_id = entity_ids[0]
-            entity = self.entity_hub.get_or_query_entity_by_id(
+            entity = self.entity_hub.get_or_fetch_entity_by_id(
                 entity_id, [entity_type])
             # Skip if entity was not found
             if entity is None:
@@ -1283,25 +1283,150 @@ class SyncProcess:
         project_entity.task_types = new_task_types
 
     def _update_project_statuses(self):
-        # TODO implement statuses sync to AYON project
-        return
-        project_entity = self.entity_hub.project_entity
-        src_statuses = {
-            statuse.name.lower(): statuse
-            for statuse in project_entity.statuses
+        ft_project = self.ft_project
+        ft_session = self.session
+        fields = {
+            "asset_version_workflow_schema",
+            "task_workflow_schema",
+            "task_workflow_schema_overrides",
+            "object_type_schemas",
         }
-        new_statuses = []
-        project_schema = self.ft_project["project_schema"]
-        for task_type in project_schema["task_type_schema"]["types"]:
-            status_name = task_type["name"]
-            ayon_status = src_statuses.get(status_name.lower())
-            if ayon_status is None:
-                new_statuses.append({
-                    "name": status_name,
-                    "color": task_type["color"]
-                })
+        project_schema_id = ft_project["project_schema_id"]
 
-        project_entity.statuses = new_statuses
+        joined_fields = ", ".join(fields)
+        project_schema = ft_session.query(
+            f"select {joined_fields} from ProjectSchema"
+            f" where id is '{project_schema_id}'"
+        ).first()
+
+        # Folder statuses
+        schema_ids = {
+            schema["id"]
+            for schema in project_schema["object_type_schemas"]
+        }
+        object_type_schemas = []
+        if schema_ids:
+            joined_schema_ids = join_filter_values(schema_ids)
+            object_type_schemas = ft_session.query(
+                "select id, object_type_id from Schema"
+                f" where id in ({joined_schema_ids})"
+            ).all()
+
+        object_type_schema_ids = {
+            schema["id"]
+            for schema in object_type_schemas
+        }
+        folder_statuses_ids = set()
+        if object_type_schema_ids:
+            joined_ot_schema_ids = join_filter_values(object_type_schema_ids)
+            schema_statuses = ft_session.query(
+                "select status_id from SchemaStatus"
+                f" where schema_id in ({joined_ot_schema_ids})"
+            ).all()
+            folder_statuses_ids = {
+                status["status_id"]
+                for status in schema_statuses
+            }
+
+        # Task statues
+        task_workflow_override_ids = {
+            task_override["id"]
+            for task_override in (
+                project_schema["task_workflow_schema_overrides"]
+            )
+        }
+        workflow_ids = set()
+        if task_workflow_override_ids:
+            joined_ids = join_filter_values(task_workflow_override_ids)
+            override_schemas = ft_session.query(
+                "select workflow_schema_id"
+                f" from ProjectSchemaOverride"
+                f" where id in ({joined_ids})"
+            ).all()
+            workflow_ids = {
+                override_schema["workflow_schema_id"]
+                for override_schema in override_schemas
+            }
+
+        workflow_ids.add(project_schema["task_workflow_schema"]["id"])
+        joined_workflow_ids = join_filter_values(workflow_ids)
+        workflow_statuses = ft_session.query(
+            "select status_id"
+            " from WorkflowSchemaStatus"
+            f" where workflow_schema_id in ({joined_workflow_ids})"
+        ).all()
+        task_status_ids = {
+            item["status_id"]
+            for item in workflow_statuses
+        }
+
+        # Version statuses
+        av_workflow_schema_id = (
+            project_schema["asset_version_workflow_schema"]["id"]
+        )
+        version_statuse_ids = {
+            item["status_id"]
+            for item in ft_session.query(
+                "select status_id"
+                " from WorkflowSchemaStatus"
+                f" where workflow_schema_id is '{av_workflow_schema_id}'"
+            ).all()
+        }
+
+        statuses_by_id = {
+            status["id"]: status
+            for status in ft_session.query(
+                "select id, name, color, state, sort from Status"
+            ).all()
+        }
+        all_status_ids = (
+            folder_statuses_ids
+            | task_status_ids
+            | version_statuse_ids
+        )
+        state_mapping = {
+            "Blocked": "blocked",
+            "Not Started": "not_started",
+            "In Progress": "in_progress",
+            "Done": "done",
+        }
+        statuses_data = []
+        for status_id in all_status_ids:
+            status = statuses_by_id[status_id]
+            scope = ["representation", "workfile"]
+            if status_id in folder_statuses_ids:
+                scope.append("folder")
+            if status_id in task_status_ids:
+                scope.append("task")
+            if status_id in version_statuse_ids:
+                scope.append("product")
+                scope.append("version")
+
+            ft_state = status["state"]["name"]
+            ayon_state = state_mapping[ft_state]
+            statuses_data.append({
+                "name": status["name"],
+                "color": status["color"],
+                "state": ayon_state,
+                "scope": scope,
+                "sort": status["sort"],
+            })
+        statuses_data.sort(key=lambda i: i["sort"])
+
+        statuses = self._entity_hub.project_entity.statuses
+        for idx, status_data in enumerate(statuses_data):
+            status_item = statuses.get_status_by_slugified_name(
+                status_data["name"]
+            )
+            if status_item is None:
+                statuses.insert(idx, status_data)
+                continue
+            status_item.name = status_data["name"]
+            status_item.color = status_data["color"]
+            status_item.state = status_data["state"]
+            status_item.scope = status_data["scope"]
+            statuses.insert(idx, status_item)
+        self._entity_hub.commit_changes()
 
     def _propagate_task_type_changes(self, task_type_changes):
         if not task_type_changes:
@@ -1359,11 +1484,10 @@ class SyncProcess:
                 ayon_status is None
                 or entity.entity_type not in ayon_status.scope
             ):
-                # TODO implement statuses sync to AYON project
-                continue
                 project_need_update = True
+                continue
 
-            to_change.append((entity, new_status_name))
+            to_change.append((entity, ayon_status.name))
 
         if project_need_update:
             self._update_project_statuses()
