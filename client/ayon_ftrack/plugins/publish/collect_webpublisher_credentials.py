@@ -39,8 +39,6 @@ class CollectWebpublisherCredentials(plugin.FtrackPublishContextPlugin):
     hosts = ["webpublisher", "photoshop"]
     targets = ["webpublish"]
 
-    service_user_name = ""
-
     def process(self, context):
         service_api_key, service_username = self._get_username_key(context)
         os.environ["FTRACK_API_USER"] = service_username
@@ -94,14 +92,13 @@ class CollectWebpublisherCredentials(plugin.FtrackPublishContextPlugin):
         username_secret = service_settings["username"]
 
         con = ayon_api.get_server_api_connection()
-        with con.as_username(self.service_user_name):
+        with con.as_username(None):
             secrets_by_name = {
                 secret["name"]: secret["value"]
                 for secret in ayon_api.get_secrets()
             }
         api_key = secrets_by_name.get(api_key_secret)
         username = secrets_by_name.get(username_secret)
-
         if not api_key or not username:
             raise KnownPublishError(
                 "Missing ftrack credentials in settings. "
