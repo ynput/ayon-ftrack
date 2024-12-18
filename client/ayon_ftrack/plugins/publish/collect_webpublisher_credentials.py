@@ -35,7 +35,7 @@ class CollectWebpublisherCredentials(plugin.FtrackPublishContextPlugin):
     """
 
     order = pyblish.api.CollectorOrder + 0.0015
-    label = "Collect Ftrack credentials for Webpublisher"
+    label = "Collect ftrack credentials for Webpublisher"
     hosts = ["webpublisher", "photoshop"]
     targets = ["webpublish"]
 
