@@ -3,7 +3,6 @@ import collections
 import json
 import time
 import atexit
-from typing import Dict
 
 import arrow
 import ftrack_api
@@ -28,7 +27,6 @@ from ftrack_common import (
     CUST_ATTR_KEY_SYNC_FAIL,
 
     CUST_ATTR_AUTO_SYNC,
-    FPS_KEYS,
 
     MappedAYONAttribute,
     CustomAttributesMapping,

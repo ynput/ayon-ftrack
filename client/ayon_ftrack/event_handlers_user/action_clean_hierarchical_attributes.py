@@ -3,7 +3,6 @@ import ftrack_api
 
 from ayon_ftrack.common import (
     LocalAction,
-    create_chunks,
     query_custom_attribute_values,
 )
 from ayon_ftrack.lib import get_ftrack_icon_url
