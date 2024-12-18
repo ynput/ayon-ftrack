@@ -196,41 +196,50 @@ class SyncFromFtrack:
             schema["id"]
             for schema in project_schema["object_type_schemas"]
         }
-        joined_schema_ids = join_filter_values(schema_ids)
-        object_type_schemas = ft_session.query(
-            "select id, object_type_id from Schema"
-            f" where id in ({joined_schema_ids})"
-        ).all()
+        object_type_schemas = []
+        if schema_ids:
+            joined_schema_ids = join_filter_values(schema_ids)
+            object_type_schemas = ft_session.query(
+                "select id, object_type_id from Schema"
+                f" where id in ({joined_schema_ids})"
+            ).all()
 
         object_type_schema_ids = {
             schema["id"]
             for schema in object_type_schemas
         }
-        joined_ot_schema_ids = join_filter_values(object_type_schema_ids)
-        schema_statuses = ft_session.query(
-            "select status_id from SchemaStatus"
-            f" where schema_id in ({joined_ot_schema_ids})"
-        ).all()
-        folder_statuse_ids = {
-            status["status_id"]
-            for status in schema_statuses
-        }
+        folder_statuses_ids = set()
+        if object_type_schema_ids:
+            joined_ot_schema_ids = join_filter_values(object_type_schema_ids)
+            schema_statuses = ft_session.query(
+                "select status_id from SchemaStatus"
+                f" where schema_id in ({joined_ot_schema_ids})"
+            ).all()
+            folder_statuses_ids = {
+                status["status_id"]
+                for status in schema_statuses
+            }
 
         # Task statues
         task_workflow_override_ids = {
             task_override["id"]
-            for task_override in project_schema["task_workflow_schema_overrides"]
+            for task_override in (
+                project_schema["task_workflow_schema_overrides"]
+            )
         }
-        joined_ids = join_filter_values(task_workflow_override_ids)
-        override_schemas = ft_session.query(
-            "select workflow_schema_id"
-            f" from ProjectSchemaOverride"
-            f" where id in ({joined_ids})"
-        ).all()
-        workflow_ids = {
-            override_schema["workflow_schema_id"]
-            for override_schema in override_schemas
-        }
+        workflow_ids = set()
+        if task_workflow_override_ids:
+            joined_ids = join_filter_values(task_workflow_override_ids)
+            override_schemas = ft_session.query(
+                "select workflow_schema_id"
+                f" from ProjectSchemaOverride"
+                f" where id in ({joined_ids})"
+            ).all()
+            workflow_ids = {
+                override_schema["workflow_schema_id"]
+                for override_schema in override_schemas
+            }
+
         workflow_ids.add(project_schema["task_workflow_schema"]["id"])
         joined_workflow_ids = join_filter_values(workflow_ids)
         workflow_statuses = ft_session.query(
@@ -263,7 +272,7 @@ class SyncFromFtrack:
             ).all()
         }
         all_status_ids = (
-            folder_statuse_ids
+            folder_statuses_ids
             | task_status_ids
             | version_statuse_ids
         )
@@ -277,7 +286,7 @@ class SyncFromFtrack:
         for status_id in all_status_ids:
             status = statuses_by_id[status_id]
             scope = ["representation", "workfile"]
-            if status_id in folder_statuse_ids:
+            if status_id in folder_statuses_ids:
                 scope.append("folder")
             if status_id in task_status_ids:
                 scope.append("task")
@@ -335,12 +344,15 @@ class SyncFromFtrack:
             for task_override in
             project_schema["task_workflow_schema_overrides"]
         }
-        joined_ids = join_filter_values(task_workflow_override_ids)
-        overrides_schema = self._session.query(
-            "select workflow_schema_id"
-            f" from ProjectSchemaOverride"
-            f" where id in ({joined_ids}) and type_id is '{type_id}'"
-        ).first()
+        overrides_schema = None
+        if task_workflow_override_ids:
+            joined_ids = join_filter_values(task_workflow_override_ids)
+            overrides_schema = self._session.query(
+                "select workflow_schema_id"
+                f" from ProjectSchemaOverride"
+                f" where id in ({joined_ids}) and type_id is '{type_id}'"
+            ).first()
+
         workflow_id = project_schema["task_workflow_schema"]["id"]
         if overrides_schema is not None:
             workflow_id = overrides_schema["workflow_schema_id"]

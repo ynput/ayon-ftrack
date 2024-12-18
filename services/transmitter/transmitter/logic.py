@@ -725,12 +725,15 @@ class EventProcessor:
             for task_override in
             project_schema["task_workflow_schema_overrides"]
         }
-        joined_ids = join_filter_values(task_workflow_override_ids)
-        overrides_schema = self._session.query(
-            "select workflow_schema_id"
-            f" from ProjectSchemaOverride"
-            f" where id in ({joined_ids}) and type_id is '{type_id}'"
-        ).first()
+        overrides_schema = None
+        if task_workflow_override_ids:
+            joined_ids = join_filter_values(task_workflow_override_ids)
+            overrides_schema = self._session.query(
+                "select workflow_schema_id"
+                f" from ProjectSchemaOverride"
+                f" where id in ({joined_ids}) and type_id is '{type_id}'"
+            ).first()
+
         workflow_id = project_schema["task_workflow_schema"]["id"]
         if overrides_schema is not None:
             workflow_id = overrides_schema["workflow_schema_id"]
