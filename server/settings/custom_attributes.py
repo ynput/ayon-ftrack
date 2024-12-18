@@ -1,6 +1,43 @@
 from ayon_server.settings import BaseSettingsModel, SettingsField
 
 
+def _attr_types():
+    return [
+        {"value": "hierarchical", "label": "Hierarchical"},
+        {"value": "standard", "label": "Standard"},
+    ]
+
+
+class CustomAttributeMappingModel(BaseSettingsModel):
+    name: str = SettingsField("", title="AYON attribute")
+    attr_type: str = SettingsField(
+        "hierarchical",
+        title="Attribute type",
+        enum_resolver=_attr_types,
+        conditionalEnum=True,
+    )
+    hierarchical: str = SettingsField(
+        "",
+        title="ftrack attribute name",
+    )
+    standard: list[str] = SettingsField(
+        default_factory=list,
+        title="ftrack attribute names",
+    )
+
+
+class CustomAttributesMappingModel(BaseSettingsModel):
+    enabled: bool = SettingsField(
+        True,
+        description="Use custom attributes mapping",
+    )
+    mapping: list[CustomAttributeMappingModel] = SettingsField(
+        default_factory=list,
+        title="Attributes mapping",
+        description="Map AYON attributes to ftrack custom attributes",
+    )
+
+
 class CustomAttributeModel(BaseSettingsModel):
     write_security_roles: list[str] = SettingsField(
         default_factory=list,
@@ -12,22 +49,7 @@ class CustomAttributeModel(BaseSettingsModel):
     )
 
 
-class ProjectCustomAttributesModel(BaseSettingsModel):
-    auto_sync_enabled: CustomAttributeModel = CustomAttributeModel(
-        default_factory=CustomAttributeModel,
-        title="AYON auto-sync",
-    )
-    library_project: CustomAttributeModel = CustomAttributeModel(
-        default_factory=CustomAttributeModel,
-        title="Library project",
-    )
-    applications: CustomAttributeModel = CustomAttributeModel(
-        default_factory=CustomAttributeModel,
-        title="Applications",
-    )
-
-
-class HierarchicalAttributesModel(BaseSettingsModel):
+class MandatoryAttributesModel(BaseSettingsModel):
     ayon_id: CustomAttributeModel = CustomAttributeModel(
         default_factory=CustomAttributeModel,
         title="AYON ID",
@@ -40,98 +62,33 @@ class HierarchicalAttributesModel(BaseSettingsModel):
         default_factory=CustomAttributeModel,
         title="AYON sync failed",
     )
-    tools_env: CustomAttributeModel = CustomAttributeModel(
+    auto_sync_enabled: CustomAttributeModel = CustomAttributeModel(
         default_factory=CustomAttributeModel,
-        title="Tools",
-    )
-    fps: CustomAttributeModel = CustomAttributeModel(
-        default_factory=CustomAttributeModel,
-        title="FPS",
-    )
-    frameStart: CustomAttributeModel = CustomAttributeModel(
-        default_factory=CustomAttributeModel,
-        title="Frame start",
-    )
-    frameEnd: CustomAttributeModel = CustomAttributeModel(
-        default_factory=CustomAttributeModel,
-        title="Frame end",
-    )
-    clipIn: CustomAttributeModel = CustomAttributeModel(
-        default_factory=CustomAttributeModel,
-        title="Clip in",
-    )
-    clipOut: CustomAttributeModel = CustomAttributeModel(
-        default_factory=CustomAttributeModel,
-        title="Clip out",
-    )
-    handleStart: CustomAttributeModel = CustomAttributeModel(
-        default_factory=CustomAttributeModel,
-        title="Handle start",
-    )
-    handleEnd: CustomAttributeModel = CustomAttributeModel(
-        default_factory=CustomAttributeModel,
-        title="Handle end",
-    )
-    resolutionWidth: CustomAttributeModel = CustomAttributeModel(
-        default_factory=CustomAttributeModel,
-        title="Resolution width",
-    )
-    resolutionHeight: CustomAttributeModel = CustomAttributeModel(
-        default_factory=CustomAttributeModel,
-        title="Resolution height",
-    )
-    pixelAspect: CustomAttributeModel = CustomAttributeModel(
-        default_factory=CustomAttributeModel,
-        title="Pixel aspect",
+        title="AYON auto-sync",
     )
 
 
 class CustomAttributesModel(BaseSettingsModel):
-    show: ProjectCustomAttributesModel = SettingsField(
-        default_factory=ProjectCustomAttributesModel,
-        title="Project Custom attributes",
+    mandatory_attributes: MandatoryAttributesModel = SettingsField(
+        default_factory=MandatoryAttributesModel,
+        title="Mandatory custom attributes",
+        description=(
+            "Set read/write roles of AYON mandatory custom attributes"
+        ),
     )
-    is_hierarchical: HierarchicalAttributesModel = SettingsField(
-        default_factory=HierarchicalAttributesModel,
-        title="Hierarchical Attributes",
+    attributes_mapping: CustomAttributesMappingModel = SettingsField(
+        default_factory=CustomAttributesMappingModel,
+        title="Attributes mapping",
+        description=(
+            "Use custom mapping of AYON attributes"
+            " to ftrack custom attributes"
+        ),
     )
 
 
 DEFAULT_CUSTOM_ATTRIBUTES_SETTINGS = {
-    "show": {
+    "mandatory_attributes": {
         "auto_sync_enabled": {
-            "write_security_roles": [
-                "API",
-                "Administrator"
-            ],
-            "read_security_roles": [
-                "API",
-                "Administrator"
-            ]
-        },
-        "library_project": {
-            "write_security_roles": [
-                "API",
-                "Administrator"
-            ],
-            "read_security_roles": [
-                "API",
-                "Administrator"
-            ]
-        },
-        "applications": {
-            "write_security_roles": [
-                "API",
-                "Administrator"
-            ],
-            "read_security_roles": [
-                "API",
-                "Administrator"
-            ]
-        }
-    },
-    "is_hierarchical": {
-        "tools_env": {
             "write_security_roles": [
                 "API",
                 "Administrator"
@@ -143,17 +100,11 @@ DEFAULT_CUSTOM_ATTRIBUTES_SETTINGS = {
         },
         "ayon_id": {
             "write_security_roles": [],
-            "read_security_roles": [
-                "API",
-                "Administrator"
-            ]
+            "read_security_roles": []
         },
         "ayon_path": {
             "write_security_roles": [],
-            "read_security_roles": [
-                "API",
-                "Administrator"
-            ]
+            "read_security_roles": []
         },
         "ayon_sync_failed": {
             "write_security_roles": [
@@ -165,45 +116,70 @@ DEFAULT_CUSTOM_ATTRIBUTES_SETTINGS = {
                 "Administrator"
             ]
         },
-        "fps": {
-            "write_security_roles": [],
-            "read_security_roles": []
-        },
-        "frameStart": {
-            "write_security_roles": [],
-            "read_security_roles": []
-        },
-        "frameEnd": {
-            "write_security_roles": [],
-            "read_security_roles": []
-        },
-        "clipIn": {
-            "write_security_roles": [],
-            "read_security_roles": []
-        },
-        "clipOut": {
-            "write_security_roles": [],
-            "read_security_roles": []
-        },
-        "handleStart": {
-            "write_security_roles": [],
-            "read_security_roles": []
-        },
-        "handleEnd": {
-            "write_security_roles": [],
-            "read_security_roles": []
-        },
-        "resolutionWidth": {
-            "write_security_roles": [],
-            "read_security_roles": []
-        },
-        "resolutionHeight": {
-            "write_security_roles": [],
-            "read_security_roles": []
-        },
-        "pixelAspect": {
-            "write_security_roles": [],
-            "read_security_roles": []
-        }
+    },
+    "attributes_mapping": {
+        "enabled": True,
+        "mapping": [
+            {
+                "name": "resolutionWidth",
+                "attr_type": "standard",
+                "hierarchical": "resolutionWidth",
+                "standard": [],
+            },
+            {
+                "name": "resolutionHeight",
+                "attr_type": "standard",
+                "hierarchical": "resolutionHeight",
+                "standard": [],
+            },
+            {
+                "name": "pixelAspect",
+                "attr_type": "standard",
+                "hierarchical": "pixelAspect",
+                "standard": [],
+            },
+            {
+                "name": "fps",
+                "attr_type": "standard",
+                "hierarchical": "fps",
+                "standard": ["fps"],
+            },
+            {
+                "name": "frameStart",
+                "attr_type": "standard",
+                "hierarchical": "frameStart",
+                "standard": ["fstart"],
+            },
+            {
+                "name": "frameEnd",
+                "attr_type": "standard",
+                "hierarchical": "frameEnd",
+                "standard": ["fend"],
+            },
+            {
+                "name": "handleStart",
+                "attr_type": "standard",
+                "hierarchical": "handleStart",
+                "standard": [],
+            },
+            {
+                "name": "handleEnd",
+                "attr_type": "standard",
+                "hierarchical": "handleEnd",
+                "standard": [],
+            },
+            {
+                "name": "clipIn",
+                "attr_type": "standard",
+                "hierarchical": "clipIn",
+                "standard": [],
+            },
+            {
+                "name": "clipOut",
+                "attr_type": "standard",
+                "hierarchical": "clipOut",
+                "standard": [],
+            },
+        ]
     }
 }

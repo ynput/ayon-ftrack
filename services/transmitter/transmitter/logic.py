@@ -18,6 +18,8 @@ from ftrack_common import (
     is_ftrack_enabled_in_settings,
     join_filter_values,
     query_custom_attribute_values,
+    get_all_attr_configs,
+    get_custom_attributes_mapping,
 )
 
 from .structures import JobEventType
@@ -497,7 +499,7 @@ class EventProcessor:
         elif entity_data.update_key == "status":
             self._handle_status_change(entity_data)
         elif entity_data.update_key == "attrib":
-            self._handle_attrib_change(entity_data)
+            self._handle_attrib_change(entity_data, project_settings)
         else:
             self._log.info("Unhandled entity update event")
 
@@ -843,7 +845,9 @@ class EventProcessor:
         if self._session.recorded_operations:
             self._session.commit()
 
-    def _handle_attrib_change(self, entity_data: EntityEventData):
+    def _handle_attrib_change(
+        self, entity_data: EntityEventData, project_settings: Dict[str, Any]
+    ):
         ft_entity = self._get_ftrack_entity(entity_data)
         if ft_entity is None:
             self._log.info("Entity was not found in ftrack.")
@@ -882,28 +886,28 @@ class EventProcessor:
         if not new_attrib_names:
             return
 
-        # TODO handle specific cases of AYON attributes that are not
-        #   custom attributes in ftrack (e.g. description)
-        fields = {
-            "id",
-            "key",
-            "entity_type",
-            "object_type_id",
-            "is_hierarchical"
-        }
-        joined_fields = ", ".join(fields)
-        joined_keys = join_filter_values(new_attribs)
+        attr_configs = get_all_attr_configs(self._session)
+        attrs_mapping = get_custom_attributes_mapping(
+            self._session,
+            project_settings["ftrack"],
+            attr_configs,
+        )
+        mapped_configs = {}
+        valid_conf_ids = set()
+        for attr_name in new_attrib_names:
+            mapping_item = attrs_mapping.get(attr_name)
+            attr_conf = None
+            if mapping_item is not None:
+                attr_conf = mapping_item.get_attr_conf_for_entity(ft_entity)
 
-        attr_configs = self._session.query(
-            f"select {joined_fields}"
-            " from CustomAttributeConfiguration"
-            f" where key in ({joined_keys})"
-        ).all()
-        attr_configs_by_key = collections.defaultdict(list)
-        for attr_config in attr_configs:
-            attr_configs_by_key[attr_config["key"]].append(attr_config)
+            if (
+                attr_conf is not None
+                and self._is_attr_conf_valid(attr_conf, entity_data)
+            ):
+                mapped_configs[attr_name] = attr_conf
+                valid_conf_ids.add(attr_conf["id"])
 
-        missing = new_attrib_names - set(attr_configs_by_key)
+        missing = new_attrib_names - set(mapped_configs)
         if missing:
             joined_missing = ", ".join([f'"{key}"' for key in missing])
             self._log.info(
@@ -911,21 +915,6 @@ class EventProcessor:
             )
 
         if not attr_configs:
-            return
-
-        filtered_attr_confs = {}
-        valid_conf_ids = set()
-        for key, attr_confs in attr_configs_by_key.items():
-            valid_confs = []
-            for attr_conf in attr_confs:
-                if self._is_attr_conf_valid(attr_conf, entity_data):
-                    valid_confs.append(attr_conf)
-                    valid_conf_ids.add(attr_conf["id"])
-
-            if valid_confs:
-                filtered_attr_confs[key] = valid_confs
-
-        if not filtered_attr_confs:
             return
 
         value_items = query_custom_attribute_values(
@@ -939,30 +928,29 @@ class EventProcessor:
         }
         ayon_entity = entity_data.get_ayon_entity()
         any_changed = False
-        for key, attr_confs in filtered_attr_confs.items():
+        for key, attr_conf in mapped_configs.items():
             new_value = new_attribs[key]
-            for attr_conf in attr_confs:
-                attr_id = attr_conf["id"]
-                is_new = attr_id not in values_by_attr_id
-                old_value = values_by_attr_id.get(attr_id)
-                if new_value is None and not attr_conf["is_hierarchical"]:
-                    # NOTE Hack, non-hierarchical attributes will be set
-                    #   to current value on entity if new value is 'None'
-                    new_value = ayon_entity["attrib"][key]
+            attr_id = attr_conf["id"]
+            is_new = attr_id not in values_by_attr_id
+            old_value = values_by_attr_id.get(attr_id)
+            if new_value is None and not attr_conf["is_hierarchical"]:
+                # NOTE Hack, non-hierarchical attributes will be set
+                #   to current value on entity if new value is 'None'
+                new_value = ayon_entity["attrib"][key]
 
-                # Value is already same (or both are unset)
-                if new_value == old_value:
-                    continue
+            # Value is already same (or both are unset)
+            if new_value == old_value:
+                continue
 
-                any_changed = True
-                op = self._get_ft_attr_value_operation(
-                    attr_id,
-                    ft_entity["id"],
-                    is_new,
-                    new_value,
-                    old_value
-                )
-                self._session.recorded_operations.push(op)
+            any_changed = True
+            op = self._get_ft_attr_value_operation(
+                attr_id,
+                ft_entity["id"],
+                is_new,
+                new_value,
+                old_value
+            )
+            self._session.recorded_operations.push(op)
 
         if any_changed:
             try:

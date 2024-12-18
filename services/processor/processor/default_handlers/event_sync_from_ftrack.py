@@ -27,11 +27,11 @@ from ftrack_common import (
     CUST_ATTR_KEY_SYNC_FAIL,
 
     CUST_ATTR_AUTO_SYNC,
-    CUST_ATTR_TOOLS,
-    FPS_KEYS,
 
+    MappedAYONAttribute,
+    CustomAttributesMapping,
     is_ftrack_enabled_in_settings,
-    get_ayon_attr_configs,
+    get_custom_attributes_mapping,
     query_custom_attribute_values,
 
     convert_to_fps,
@@ -96,6 +96,7 @@ class SyncProcess:
         self._ft_project_id = UNKNOWN_VALUE
         self._ft_project = UNKNOWN_VALUE
         self._project_name = UNKNOWN_VALUE
+        self._project_settings = None
 
         self._is_event_valid = UNKNOWN_VALUE
         self._ft_project_removed = UNKNOWN_VALUE
@@ -113,10 +114,9 @@ class SyncProcess:
         self._has_valid_entity_types = None
 
         # Caches from ftrack
+        self._cust_attr_mapping = None
         self._ft_cust_attr_types_by_id = None
         self._ft_cust_attrs = None
-        self._ft_hier_cust_attrs = None
-        self._ft_std_cust_attrs = None
         self._ft_object_type_name_by_id = None
         self._ft_task_type_name_by_id = None
         self._ft_status_names_by_id = None
@@ -193,6 +193,16 @@ class SyncProcess:
                 project_name = self.ft_project["full_name"]
             self._project_name = project_name
         return self._project_name
+
+    @property
+    def project_settings(self):
+        if self._project_settings is None:
+            self._project_settings = (
+                self.event_handler.get_project_settings_from_event(
+                    self.event, self.project_name
+                )
+            )
+        return self._project_settings
 
     @property
     def ft_project_id(self):
@@ -359,35 +369,23 @@ class SyncProcess:
         return self._ft_cust_attr_types_by_id
 
     @property
+    def cust_attr_mapping(self) -> CustomAttributesMapping:
+        if self._cust_attr_mapping is None:
+            self._cust_attr_mapping = get_custom_attributes_mapping(
+                self.session,
+                self.project_settings["ftrack"],
+                self.ft_cust_attrs,
+            )
+        return self._cust_attr_mapping
+
+    @property
     def ft_cust_attrs(self):
         if self._ft_cust_attrs is None:
-            self._ft_cust_attrs = get_ayon_attr_configs(
-                self.session, query_keys=self.cust_attr_query_keys
-            )
+            fields = ", ".join(self.cust_attr_query_keys)
+            self._ft_cust_attrs = self.session.query(
+                    f"select {fields} from CustomAttributeConfiguration"
+            ).all()
         return self._ft_cust_attrs
-
-    @property
-    def ft_hier_cust_attrs(self):
-        if self._ft_hier_cust_attrs is None:
-            hier_attrs = self.ft_cust_attrs[1]
-            self._ft_hier_cust_attrs = {
-                attr["key"]: attr
-                for attr in hier_attrs
-            }
-        return self._ft_hier_cust_attrs
-
-    @property
-    def ft_std_cust_attrs(self):
-        if self._ft_std_cust_attrs is None:
-            ft_std_cust_attrs = collections.defaultdict(dict)
-            attrs = self.ft_cust_attrs[0]
-            for attr in attrs:
-                object_type_id = attr["object_type_id"]
-                key = attr["key"]
-                ft_std_cust_attrs[object_type_id][key] = attr
-            self._ft_std_cust_attrs = ft_std_cust_attrs
-
-        return self._ft_std_cust_attrs
 
     @property
     def ft_object_type_name_by_id(self):
@@ -567,13 +565,9 @@ class SyncProcess:
             ))
             return False
 
-        project_name = ft_project["full_name"]
-        project_settings = self.event_handler.get_project_settings_from_event(
-            self.event, project_name
-        )
-        if not is_ftrack_enabled_in_settings(project_settings["ftrack"]):
+        if not is_ftrack_enabled_in_settings(self.project_settings["ftrack"]):
             self.log.debug(
-                f"ftrack is disabled for project \"{project_name}\""
+                f"ftrack is disabled for project \"{self.project_name}\""
             )
             return False
         return True
@@ -734,18 +728,14 @@ class SyncProcess:
             if item["type"] != "Project"
         ])
 
-        hier_attrs_by_id = {
-            attr["id"]: attr
-            for attr in self.ft_hier_cust_attrs.values()
-        }
-        obj_type_id = ft_entity["object_type_id"]
-        std_attrs_by_id = {
-            attr["id"]: attr
-            for attr in self.ft_std_cust_attrs[obj_type_id].values()
-        }
-        attr_ids = set(hier_attrs_by_id.keys()) | set(std_attrs_by_id.keys())
+        mapping_items_by_id = {}
+        for mapping_item in self.cust_attr_mapping.values():
+            attr_conf = mapping_item.get_attr_conf_for_entity(ft_entity)
+            if attr_conf is not None:
+                mapping_items_by_id[attr_conf["id"]] = mapping_item
+
         value_items = query_custom_attribute_values(
-            self.session, attr_ids, [ftrack_id]
+            self.session, mapping_items_by_id.keys(), [ftrack_id]
         )
         attr_values_by_key = {}
         for item in value_items:
@@ -753,14 +743,9 @@ class SyncProcess:
             if value is None:
                 continue
             attr_id = item["configuration_id"]
-            attr = hier_attrs_by_id.get(attr_id)
-            is_hier = True
-            if attr is None:
-                is_hier = False
-                attr = std_attrs_by_id.get(attr_id)
-
-            key = attr["key"]
-            if key not in attr_values_by_key or is_hier:
+            mapping_item: MappedAYONAttribute = mapping_items_by_id[attr_id]
+            key = mapping_item.ayon_attribute_name
+            if key not in attr_values_by_key or mapping_item.is_hierarchical:
                 attr_values_by_key[key] = value
 
         if matching_entity is not None:
@@ -1499,9 +1484,6 @@ class SyncProcess:
                 f"Changed status {prev_status_name} -> {new_status_name}")
 
     def _propagate_attrib_changes(self):
-        std_cust_attr = self.ft_std_cust_attrs
-        hier_cust_attr = self.ft_hier_cust_attrs
-
         # Prepare all created ftrack ids
         # - in that case it is not needed to update attributes as they have
         #   set all attributes from ftrack
@@ -1512,12 +1494,11 @@ class SyncProcess:
             if ftrack_id in created_ftrack_ids:
                 continue
 
-            object_type_id = None
+            entity = None
             if info["entityType"] == "show":
                 entity = self.entity_hub.project_entity
 
             elif info["entityType"] == "task":
-                object_type_id = info["objectTypeId"]
                 if info["entity_type"] == "Task":
                     entity_ids = self.task_ids_by_ftrack_id[ftrack_id]
                     entity_types = ["task"]
@@ -1525,16 +1506,16 @@ class SyncProcess:
                     entity_ids = self.folder_ids_by_ftrack_id[ftrack_id]
                     entity_types = ["folder"]
 
-                if len(entity_ids) != 1:
-                    continue
+                if len(entity_ids) == 1:
+                    entity_id = entity_ids[0]
+                    entity = self.entity_hub.get_or_query_entity_by_id(
+                        entity_id, entity_types
+                    )
 
-                entity_id = entity_ids[0]
-                entity = self.entity_hub.get_or_query_entity_by_id(
-                    entity_id, entity_types)
-
-            else:
+            if entity is None:
                 continue
 
+            attrib_changes = {}
             for key, change_info in info["changes"].items():
                 value = change_info["new"]
                 if key == "typeid":
@@ -1546,19 +1527,11 @@ class SyncProcess:
                     status_changes[ftrack_id] = (entity, info)
                     continue
 
-                default_attr_key = DEFAULT_ATTRS_MAPPING.get(key)
+                if key in DEFAULT_ATTRS_MAPPING:
+                    dst_key = DEFAULT_ATTRS_MAPPING[key]
+                    if dst_key not in entity.attribs:
+                        continue
 
-                if default_attr_key is not None:
-                    dst_key = default_attr_key
-                elif key == CUST_ATTR_TOOLS:
-                    dst_key = "tools"
-                else:
-                    dst_key = key
-
-                if dst_key not in entity.attribs:
-                    continue
-
-                if default_attr_key is not None:
                     if value is not None and key in ("startdate", "enddate"):
                         date = arrow.get(value)
                         # Shift date to 00:00:00 of the day
@@ -1566,17 +1539,38 @@ class SyncProcess:
                         #  for '2024-10-30'
                         value = str(date.shift(hours=24 - date.hour))
 
-                elif value is not None:
-                    if key in FPS_KEYS:
+                    entity.attribs[dst_key] = value
+                    continue
+
+                attrib_changes[key] = value
+
+            if not attrib_changes:
+                continue
+
+            attrs_mapping: CustomAttributesMapping = self.cust_attr_mapping
+            ft_entity = self.get_ftrack_entity_by_id(ftrack_id)
+
+            for key, value in attrib_changes.items():
+                mapping_item = attrs_mapping.get_mapping_item_by_key(
+                    ft_entity, key
+                )
+                if mapping_item is None:
+                    continue
+
+                dst_key = mapping_item.ayon_attribute_name
+                if dst_key not in entity.attribs:
+                    continue
+
+                if value is not None:
+                    if dst_key == "fps":
                         value = convert_to_fps(value)
                     else:
-                        attr = hier_cust_attr.get(key)
-                        if attr is None:
-                            attr = std_cust_attr[object_type_id].get(key)
-                            if attr is None:
-                                continue
+                        attr = mapping_item.get_attr_conf_for_entity(
+                            ft_entity
+                        )
                         value = self._convert_value_by_cust_attr_conf(
-                            value, attr)
+                            value, attr
+                        )
 
                 entity.attribs[dst_key] = value
 
@@ -1692,12 +1686,21 @@ class SyncProcess:
         if not ftrack_ids:
             return
 
-        server_id_attr = self.ft_hier_cust_attrs[CUST_ATTR_KEY_SERVER_ID]
-        path_attr = self.ft_hier_cust_attrs[CUST_ATTR_KEY_SERVER_PATH]
-        fail_attr = self.ft_hier_cust_attrs[CUST_ATTR_KEY_SYNC_FAIL]
+        server_id_attr = path_attr = fail_attr = None
+        for attr in self.ft_cust_attrs:
+            if not attr["is_hierarchical"]:
+                continue
+            if attr["key"] == CUST_ATTR_KEY_SERVER_ID:
+                server_id_attr = attr
+            elif attr["key"] == CUST_ATTR_KEY_SERVER_PATH:
+                path_attr = attr
+            elif attr["key"] == CUST_ATTR_KEY_SYNC_FAIL:
+                fail_attr = attr
+
         server_id_attr_id = server_id_attr["id"]
         path_attr_id = path_attr["id"]
         fail_attr_id = fail_attr["id"]
+
         attr_key_by_id = {
             attr["id"]: attr["key"]
             for attr in (server_id_attr, path_attr, fail_attr)

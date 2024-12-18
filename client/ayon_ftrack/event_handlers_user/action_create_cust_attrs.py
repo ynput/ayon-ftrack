@@ -2,8 +2,6 @@
 This action creates/updates custom attributes.
 ## First part take care about special attributes
     - AYON attributes defined in code because they use constants
-    - `applications` based on applications usages
-    - `tools` based on tools usages
 
 ## Second part is based on json file in ftrack module.
 File location: `./common/custom_attributes.json`
@@ -114,27 +112,16 @@ import datetime
 import arrow
 
 from ayon_core.settings import get_studio_settings
-try:
-    from ayon_applications import ApplicationManager
-except ImportError:
-    ApplicationManager = None
 
 from ayon_ftrack.common import (
     LocalAction,
 
     CUST_ATTR_GROUP,
-    CUST_ATTR_KEY_SERVER_ID,
-    CUST_ATTR_KEY_SERVER_PATH,
-    CUST_ATTR_AUTO_SYNC,
-    CUST_ATTR_KEY_SYNC_FAIL,
     FPS_KEYS,
     CUST_ATTR_INTENT,
-    CUST_ATTR_APPLICATIONS,
-    CUST_ATTR_TOOLS,
 
     default_custom_attributes_definition,
-    app_definitions_from_app_manager,
-    tool_definitions_from_app_manager,
+    ensure_mandatory_custom_attributes_exists,
 )
 from ayon_ftrack.lib import get_ftrack_icon_url
 
@@ -144,10 +131,9 @@ class CustAttrException(Exception):
 
 
 class CreateUpdateContext:
-    def __init__(self, session, app_manager):
-        self.app_manager = app_manager
+    def __init__(self, session):
         self._session = session
-        self._types_per_name = None
+        self._custom_attribute_types = None
         self._security_roles = None
         self._object_types = None
         self._object_types_by_name = None
@@ -162,6 +148,10 @@ class CreateUpdateContext:
     @property
     def session(self):
         return self._session
+
+    @property
+    def ftrack_settings(self):
+        return self._get_ftrack_settings()
 
     @property
     def attrs_settings(self):
@@ -188,22 +178,31 @@ class CreateUpdateContext:
         self._attrs_settings = output
         return self._attrs_settings
 
-    def get_custom_attribute_type(self, type_name):
-        if self._types_per_name is None:
-            session = self._session
-            self._types_per_name = {
-                attr_type["name"].lower(): attr_type
-                for attr_type in session.query("CustomAttributeType").all()
-            }
-        return self._types_per_name.get(type_name.lower())
+    def get_custom_attribute_types(self) -> list:
+        if self._custom_attribute_types is None:
+            self._custom_attribute_types = self._session.query(
+                "select id, name from CustomAttributeType"
+            ).all()
+        return self._custom_attribute_types
 
-    def get_security_roles(self, security_roles):
+    def get_custom_attribute_type(self, type_name: str):
+        for attr_type in self.get_custom_attribute_types():
+            if attr_type["name"].lower() == type_name:
+                return attr_type
+        return None
+
+    def get_security_roles(self) -> list:
         if self._security_roles is None:
-            self._security_roles = {
-                role["name"].lower(): role
-                for role in self._session.query("SecurityRole").all()
-            }
+            self._security_roles = self._session.query(
+                "select id, name, type from SecurityRole"
+            ).all()
+        return self._security_roles
 
+    def get_security_roles_by_names(self, security_roles):
+        security_roles_by_name = {
+            role["name"].lower(): role
+            for role in self.get_security_roles()
+        }
         security_roles_lowered = [
             name.lower() for name in security_roles
         ]
@@ -211,22 +210,23 @@ class CreateUpdateContext:
             len(security_roles_lowered) == 0
             or "all" in security_roles_lowered
         ):
-            return list(self._security_roles.values())
+            return list(security_roles_by_name.values())
 
         output = []
         if security_roles_lowered[0] == "except":
             excepts = set(security_roles_lowered[1:])
-            for role_name, role in self._security_roles.items():
+            for role_name, role in security_roles_by_name.items():
                 if role_name not in excepts:
                     output.append(role)
 
         else:
             for role_name in set(security_roles_lowered):
-                if role_name not in self._security_roles:
-                    raise CustAttrException((
-                        "Securit role \"{}\" was not found in ftrack."
-                    ).format(role_name))
-                output.append(self._security_roles[role_name])
+                if role_name in security_roles_by_name:
+                    output.append(security_roles_by_name[role_name])
+                    continue
+                raise CustAttrException(
+                    f"Securit role \"{role_name}\" was not found in ftrack."
+                )
         return output
 
     def get_group(self, group_name):
@@ -357,20 +357,16 @@ class CustomAttributes(LocalAction):
         )
         session.commit()
 
-        # TODO how to get custom attributes from different addons?
-        app_manager = None
-        if ApplicationManager is not None:
-            app_manager = ApplicationManager()
-        else:
-            self.log.info("Applications addon is not available.")
-
-        context = CreateUpdateContext(session, app_manager)
+        context = CreateUpdateContext(session)
 
         generic_message = "Custom attributes creation failed."
         try:
-            self.create_ayon_attributes(context, event)
-            self.applications_attribute(context, event)
-            self.tools_attribute(context, event)
+            ensure_mandatory_custom_attributes_exists(
+                self.session,
+                context.ftrack_settings,
+                custom_attribute_types=context.get_custom_attribute_types(),
+                security_roles=context.get_security_roles(),
+            )
             # self.intent_attribute(event)
             self.create_default_custom_attributes(context, event)
 
@@ -378,6 +374,7 @@ class CustomAttributes(LocalAction):
             traceback_message = "".join(
                 traceback.format_exception(*sys.exc_info())
             )
+            print(traceback_message)
             context.set_generic_error(generic_message, traceback_message)
 
         finally:
@@ -438,85 +435,6 @@ class CustomAttributes(LocalAction):
                 output[entity_type][obj_type.lower()] = _preset
 
         return output
-
-    def create_ayon_attributes(self, context, event):
-        # Set security roles for attribute
-
-        for item in [
-            {
-                "key": CUST_ATTR_KEY_SERVER_ID,
-                "label": "AYON ID",
-                "type": "text",
-                "default": "",
-                "group": CUST_ATTR_GROUP,
-                "is_hierarchical": True,
-                "config": {"markdown": False}
-            },
-            {
-                "key": CUST_ATTR_KEY_SERVER_PATH,
-                "label": "AYON path",
-                "type": "text",
-                "default": "",
-                "group": CUST_ATTR_GROUP,
-                "is_hierarchical": True,
-                "config": {"markdown": False}
-            },
-            {
-                "key": CUST_ATTR_KEY_SYNC_FAIL,
-                "label": "AYON sync failed",
-                "type": "boolean",
-                "default": False,
-                "group": CUST_ATTR_GROUP,
-                "is_hierarchical": True
-            },
-            {
-                "key": CUST_ATTR_AUTO_SYNC,
-                "label": "AYON auto-sync",
-                "group": CUST_ATTR_GROUP,
-                "type": "boolean",
-                "default": False,
-                "entity_type": "show"
-            }
-        ]:
-            self.process_attr_data(context, item, event)
-
-    def applications_attribute(self, context, event):
-        if context.app_manager is None:
-            return
-
-        apps_data = app_definitions_from_app_manager(context.app_manager)
-
-        applications_custom_attr_data = {
-            "label": "Applications",
-            "key": CUST_ATTR_APPLICATIONS,
-            "type": "enumerator",
-            "entity_type": "show",
-            "group": CUST_ATTR_GROUP,
-            "config": {
-                "multiselect": True,
-                "data": apps_data
-            }
-        }
-        self.process_attr_data(context, applications_custom_attr_data, event)
-
-    def tools_attribute(self, context, event):
-        if context.app_manager is None:
-            return
-
-        tools_data = tool_definitions_from_app_manager(context.app_manager)
-
-        tools_custom_attr_data = {
-            "label": "Tools",
-            "key": CUST_ATTR_TOOLS,
-            "type": "enumerator",
-            "is_hierarchical": True,
-            "group": CUST_ATTR_GROUP,
-            "config": {
-                "multiselect": True,
-                "data": tools_data
-            }
-        }
-        self.process_attr_data(context, tools_custom_attr_data, event)
 
     def intent_attribute(self, context, event):
         intent_key_values = context.ftrack_settings["intent"]["items"]
@@ -579,8 +497,6 @@ class CustomAttributes(LocalAction):
 
         # Process prepared data
         for cust_attr_data in attrs_data:
-            # Add group
-            cust_attr_data["group"] = CUST_ATTR_GROUP
             self.process_attr_data(context, cust_attr_data, event)
 
     def presets_for_attr_data(self, context, attr_data):
@@ -839,10 +755,10 @@ class CustomAttributes(LocalAction):
         if "default" in attr:
             output["default"] = self.get_default(attr)
 
-        output["read_security_roles"] = context.get_security_roles(
+        output["read_security_roles"] = context.get_security_roles_by_names(
             attr.get("read_security_roles") or []
         )
-        output["write_security_roles"] = context.get_security_roles(
+        output["write_security_roles"] = context.get_security_roles_by_names(
             attr.get("write_security_roles") or []
         )
         return output

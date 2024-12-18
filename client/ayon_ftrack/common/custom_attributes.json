@@ -1,10 +1,4 @@
 {
-    "show": {
-        "library_project": {
-            "label": "Library Project",
-            "type": "boolean"
-        }
-    },
     "is_hierarchical": {
         "fps": {
             "label": "FPS",
