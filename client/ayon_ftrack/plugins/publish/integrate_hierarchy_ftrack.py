@@ -8,7 +8,15 @@ import ayon_api
 
 from ayon_core.lib import filter_profiles
 from ayon_core.pipeline import KnownPublishError
-from ayon_ftrack.common import get_ayon_attr_configs
+from ayon_ftrack.common import (
+    CUST_ATTR_KEY_SERVER_ID,
+    CUST_ATTR_KEY_SERVER_PATH,
+    CUST_ATTR_KEY_SYNC_FAIL,
+
+    get_all_attr_configs,
+    get_custom_attributes_mapping,
+    query_custom_attribute_values,
+)
 from ayon_ftrack.pipeline import plugin
 
 
@@ -150,11 +158,7 @@ class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
                 )
         return matching_ftrack_entities
 
-    def query_custom_attribute_values(self, session, entities, hier_attrs):
-        attr_ids = {
-            attr["id"]
-            for attr in hier_attrs
-        }
+    def query_custom_attribute_values(self, session, entities, attr_ids):
         entity_ids = {
             entity["id"]
             for entity in entities
@@ -163,40 +167,13 @@ class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
             entity_id: {}
             for entity_id in entity_ids
         }
-        if not attr_ids or not entity_ids:
-            return {}
 
-        joined_attr_ids = ",".join(
-            ['"{}"'.format(attr_id) for attr_id in attr_ids]
-        )
-
-        # Query values in chunks
-        chunk_size = int(5000 / len(attr_ids))
-        # Make sure entity_ids is `list` for chunk selection
-        entity_ids = list(entity_ids)
-        results = []
-        for idx in range(0, len(entity_ids), chunk_size):
-            joined_entity_ids = ",".join([
-                '"{}"'.format(entity_id)
-                for entity_id in entity_ids[idx:idx + chunk_size]
-            ])
-            results.extend(
-                session.query(
-                    (
-                        "select value, entity_id, configuration_id"
-                        " from CustomAttributeValue"
-                        " where entity_id in ({}) and configuration_id in ({})"
-                    ).format(
-                        joined_entity_ids,
-                        joined_attr_ids
-                    )
-                ).all()
-            )
-
-        for result in results:
-            attr_id = result["configuration_id"]
-            entity_id = result["entity_id"]
-            output[entity_id][attr_id] = result["value"]
+        for value_item in query_custom_attribute_values(
+            session, attr_ids, entity_ids
+        ):
+            attr_id = value_item["configuration_id"]
+            entity_id = value_item["entity_id"]
+            output[entity_id][attr_id] = value_item["value"]
 
         return output
 
@@ -205,16 +182,28 @@ class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
     ):
         ft_task_types = self.get_all_task_types(ft_project)
         ft_task_statuses = self.get_task_statuses(ft_project)
+        project_settings = context.data["project_settings"]
+        attr_confs = get_all_attr_configs()
+        attrs_mapping = get_custom_attributes_mapping(
+            session, project_settings["ftrack"], attr_confs
+        )
 
-        # Prequery hiearchical custom attributes
-        hier_attrs = get_ayon_attr_configs(session)[1]
-        hier_attr_by_key = {
-            attr["key"]: attr
-            for attr in hier_attrs
-        }
+        mapped_confs_by_id = {}
+        for attr_conf in attr_confs:
+            if attr_conf["key"] in {
+                CUST_ATTR_KEY_SERVER_ID,
+                CUST_ATTR_KEY_SERVER_PATH,
+                CUST_ATTR_KEY_SYNC_FAIL,
+            }:
+                mapped_confs_by_id[attr_conf["id"]] = attr_conf
+
+        for mapping_item in attrs_mapping.values():
+            for mapped_conf in mapping_item.attr_confs:
+                mapped_confs_by_id[mapped_conf["id"]] = mapped_conf
+
         # Query user entity (for comments)
         user = session.query(
-            "User where username is \"{}\"".format(session.api_user)
+            f"User where username is \"{session.api_user}\""
         ).first()
         if not user:
             self.log.warning(
@@ -233,7 +222,7 @@ class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
             hierarchy_context, ftrack_hierarchy)
         # Query custom attribute values of each entity
         custom_attr_values_by_id = self.query_custom_attribute_values(
-            session, matching_entities, hier_attrs)
+            session, matching_entities, set(mapped_confs_by_id.keys()))
 
         # Get ftrack api module (as they are different per python version)
         ftrack_api = context.data["ftrackPythonModule"]
@@ -289,10 +278,9 @@ class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
                 })
                 entity_data["ft_entity"] = entity
 
-            if entity_type.lower() == "project":
-                entity_path = ""
-            else:
-                entity_path = "{}/{}".format(parent_path, entity_name)
+            entity_path = ""
+            if entity_type.lower() != "project":
+                entity_path = f"{parent_path}/{entity_name}"
 
             # CUSTOM ATTRIBUTES
             attributes = entity_data.get("attributes", {})
@@ -313,18 +301,18 @@ class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
                 if cust_attr_value is None:
                     continue
 
-                hier_attr = hier_attr_by_key.get(key)
-                # Use simple method if key is not hierarchical
-                if not hier_attr:
-                    if key not in entity["custom_attributes"]:
-                        raise KnownPublishError((
-                            "Missing custom attribute in ftrack with name '{}'"
-                        ).format(key))
+                mapping_item = attrs_mapping.get(key)
+                attr_conf = None
+                if mapping_item is not None:
+                    attr_conf = mapping_item.get_attr_conf_for_entity(entity)
 
-                    entity["custom_attributes"][key] = cust_attr_value
+                if attr_conf is not None:
+                    self.log.warning(
+                        f"Missing ftrack custom attribute with name '{key}'"
+                    )
                     continue
 
-                attr_id = hier_attr["id"]
+                attr_id = attr_conf["id"]
                 entity_values = custom_attr_values_by_id.get(entity["id"], {})
                 # New value is defined by having id in values
                 # - it can be set to 'None' (ftrack allows that using API)
@@ -336,7 +324,7 @@ class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
                 # - this is because there may be non hiearchical custom
                 #   attributes with different properties
                 entity_key = collections.OrderedDict((
-                    ("configuration_id", hier_attr["id"]),
+                    ("configuration_id", attr_conf["id"]),
                     ("entity_id", entity["id"])
                 ))
                 op = None

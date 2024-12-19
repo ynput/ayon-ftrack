@@ -21,10 +21,3 @@ FPS_KEYS = {
 
 # Intent custom attribute name
 CUST_ATTR_INTENT = "intent"
-
-# TODO these are applications addon specific
-# - maybe should be handled by applications?
-# Applications custom attribute name
-CUST_ATTR_APPLICATIONS = "applications"
-# Environment tools custom attribute
-CUST_ATTR_TOOLS = "tools_env"
