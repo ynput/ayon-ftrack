@@ -431,6 +431,25 @@ DEFAULT_PUBLISH_SETTINGS = {
             },
             {
                 "host_names": [
+                    "blender",
+                    "houdini",
+                    "max"
+                ],
+                "product_types": [],
+                "task_types": [],
+                "task_names": [],
+                "add_ftrack_family": False,
+                "advanced_filtering": [
+                    {
+                        "families": [
+                            "review"
+                        ],
+                        "add_ftrack_family": True
+                    }
+                ]
+            },
+            {
+                "host_names": [
                     "tvpaint"
                 ],
                 "product_types": [
@@ -492,18 +511,6 @@ DEFAULT_PUBLISH_SETTINGS = {
                 "product_types": [
                     "plate",
                     "take"
-                ],
-                "task_types": [],
-                "task_names": [],
-                "add_ftrack_family": True,
-                "advanced_filtering": []
-            },
-            {
-                "host_names": [
-                    "houdini"
-                ],
-                "product_types": [
-                    "usd"
                 ],
                 "task_types": [],
                 "task_names": [],
