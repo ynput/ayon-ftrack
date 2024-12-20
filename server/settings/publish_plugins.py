@@ -28,7 +28,7 @@ class CollectFamilyProfile(BaseSettingsModel):
     )
     product_types: list[str] = SettingsField(
         default_factory=list,
-        title="Families",
+        title="Product types",
     )
     task_types: list[str] = SettingsField(
         default_factory=list,
