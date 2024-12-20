@@ -421,7 +421,8 @@ DEFAULT_PUBLISH_SETTINGS = {
                     "animation",
                     "look",
                     "rig",
-                    "camera"
+                    "camera",
+                    "review"
                 ],
                 "task_types": [],
                 "task_names": [],
