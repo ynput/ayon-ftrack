@@ -62,7 +62,7 @@ class FtrackAddon(BaseServerAddon):
         )
         self.add_endpoint(
             "/ftrackProjects",
-            self.get_ftrack_project_names,
+            self.get_ftrack_projects_info,
             method="GET",
         )
 
@@ -116,35 +116,34 @@ class FtrackAddon(BaseServerAddon):
 
         return output
 
-    async def get_ftrack_project_names(
+    async def get_ftrack_projects_info(
         self,
         user: CurrentUser,
         variant: str = Query("production"),
     ) -> {}:
         # TODO validate user permissions
         # - What permissions user must have to allow this endpoint?
-        settings = await self.get_studio_overrides(variant)
-        ftrack_server_url = settings.ftrack_server_url
+        settings = await self.get_studio_settings(variant)
+        ftrack_server_url = settings.ftrack_server
         service_settings = settings.service_settings
         api_key_secret = service_settings.api_key
         username_secret = service_settings.username
+
+        projects = []
+        output = {
+            "success": False,
+            "error": None,
+            "projects": projects,
+        }
+
         if not ftrack_server_url or not api_key_secret or not username_secret:
             # TODO return some status code result?
-            return {
-                "success": False,
-                "reason": "Required settings are not set",
-                "project_name": [],
-            }
+            output["error"] = "Required settings are not set."
+            return output
 
         ftrack_api_key = await Secrets.get(api_key_secret)
         ftrack_username = await Secrets.get(username_secret)
 
-        project_names = []
-        output = {
-            "success": False,
-            "error": None,
-            "project_name": project_names,
-        }
         if not ftrack_api_key or not ftrack_username:
             # TODO return some status code result?
             output["error"] = "Invalid service settings, secrets are not set."
@@ -163,10 +162,13 @@ class FtrackAddon(BaseServerAddon):
 
         if error is None:
             output["success"] = True
-            project_names.extend([
-                project["full_name"]
-                async for project in await session.get_projects()
-            ])
+            async for project in await session.get_projects():
+                projects.append({
+                    "id": project["id"],
+                    "name": project["full_name"],
+                    "code": project["name"],
+                    "active": project["status"] == "active",
+                })
 
         output["error"] = error
         return output
