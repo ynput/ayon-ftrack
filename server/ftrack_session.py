@@ -125,6 +125,6 @@ class FtrackSession:
         self, fields: Optional[set[str]] = None
     ):
         if not fields:
-            fields = {"id", "full_name", "name"}
+            fields = {"id", "full_name", "name", "status"}
         fields_str = ", ".join(fields)
         return await self.query(f"select {fields_str} from Project")
