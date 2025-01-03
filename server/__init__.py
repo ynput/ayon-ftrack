@@ -123,9 +123,9 @@ class FtrackAddon(BaseServerAddon):
     ) -> {}:
         # TODO validate user permissions
         # - What permissions user must have to allow this endpoint?
-        settings = await self.get_studio_settings(variant)
-        ftrack_server_url = settings.ftrack_server
-        service_settings = settings.service_settings
+        settings_model = await self.get_studio_settings(variant)
+        ftrack_server_url = settings_model.ftrack_server
+        service_settings = settings_model.service_settings
         api_key_secret = service_settings.api_key
         username_secret = service_settings.username
 

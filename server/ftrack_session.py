@@ -1,7 +1,11 @@
-from typing import Optional
+import datetime
+from typing import Optional, Any, Iterable, Union
 
 import httpx
-from nxtools import logging
+
+# Maybe add FtrackEntity class with 'entity_type' property
+#     to match the ftrack_api.entity.base.Entity class
+FtrackEntityType = dict[str, Any]
 
 
 class ServerError(Exception):
@@ -43,6 +47,7 @@ class QueryResult:
         self._offset = 0
         self._done = False
         self._fetched_data = None
+        self._first = None
 
     def __aiter__(self):
         return self
@@ -55,7 +60,26 @@ class QueryResult:
                 self._done = True
                 raise StopAsyncIteration()
 
-        return self._fetched_data.pop(0)
+        output = self._fetched_data.pop(0)
+        if self._first is None:
+            self._first = output
+        return output
+
+    async def first(self):
+        if self._first is not None:
+            return self._first
+
+        if self._fetched_data is not None:
+            raise ValueError("Query already started, cannot return first.")
+        self._limit = 1
+        async for item in self:
+            self._done = True
+            return item
+        return None
+
+    async def all(self) -> list[FtrackEntityType]:
+        item: FtrackEntityType
+        return [item async for item in self]
 
     async def _fetch_more(self):
         if self._done:
@@ -118,7 +142,7 @@ class FtrackSession:
     async def get_server_information(self):
         return await self.call({"action": "query_server_information"})
 
-    async def query(self, query: str, limit=500):
+    def query(self, query: str, limit=500):
         return QueryResult(self, query, limit)
 
     async def get_projects(
@@ -127,4 +151,48 @@ class FtrackSession:
         if not fields:
             fields = {"id", "full_name", "name", "status"}
         fields_str = ", ".join(fields)
-        return await self.query(f"select {fields_str} from Project")
+        return self.query(f"select {fields_str} from Project")
+
+
+def join_filter_values(values: Iterable[str]) -> str:
+    return ",".join(f'"{value}"' for value in values)
+
+
+def create_chunks(
+    iterable: set[str],
+    chunk_size: int = 200,
+):
+    if not iterable:
+        return
+
+    if chunk_size < 1:
+        chunk_size = 1
+
+    iterable_size = len(iterable)
+    tupled_iterable = tuple(iterable)
+    for idx in range(0, iterable_size, chunk_size):
+        yield tupled_iterable[idx:idx + chunk_size]
+
+
+def convert_ftrack_date(
+    date: Union[dict[str, Any], str, None]
+) -> Optional[str]:
+    """Convert ftrack date to "standard" date.
+
+    Dates in ftrack are stored with slight offset. This function
+        adds 24 hours to the date to get the next day 00:00:00.
+
+    Args:
+        date (Union[dict[str, Any], str, None]): ftrack date.
+
+    Returns:
+        Optional[str]: Standard date.
+
+    """
+    if date is None:
+        return None
+    if isinstance(date, dict):
+        date = date["value"]
+    date_obj = datetime.datetime.fromisoformat(date)
+    date_obj += datetime.timedelta(hours=24 - date_obj.hour)
+    return date_obj.isoformat()
