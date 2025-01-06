@@ -4,6 +4,7 @@ import semver
 from fastapi import Query
 from nxtools import logging
 
+from ayon_server.exceptions import InvalidSettingsException, AyonException
 from ayon_server.addons import BaseServerAddon, AddonLibrary
 from ayon_server.secrets import Secrets
 from ayon_server.lib.postgres import Postgres
@@ -116,6 +117,45 @@ class FtrackAddon(BaseServerAddon):
 
         return output
 
+    async def _prepare_ftrack_session(
+        self, variant: str, settings_model: FtrackSettings | None
+    ) -> FtrackSession:
+        # TODO validate user permissions
+        # - What permissions user must have to allow this endpoint?
+        if settings_model is None:
+            settings_model = await self.get_studio_settings(variant)
+        ftrack_server_url = settings_model.ftrack_server
+        service_settings = settings_model.service_settings
+        api_key_secret = service_settings.api_key
+        username_secret = service_settings.username
+
+        if not ftrack_server_url or not api_key_secret or not username_secret:
+            raise InvalidSettingsException("Required settings are not set.")
+
+        ftrack_api_key = await Secrets.get(api_key_secret)
+        ftrack_username = await Secrets.get(username_secret)
+
+        if not ftrack_api_key or not ftrack_username:
+            raise InvalidSettingsException(
+                "Invalid service settings, secrets are not set."
+            )
+
+        session = FtrackSession(
+            ftrack_server_url, ftrack_api_key, ftrack_username
+        )
+        try:
+            await session.validate()
+        except InvalidCredentials:
+            raise InvalidSettingsException(
+                "Service settings contain invalid credentials."
+            )
+        except ServerError as exc:
+            raise AyonException(
+                "Unknown error occurred while connecting to ftrack server."
+                f" {exc}"
+            )
+        return session
+
     async def get_ftrack_projects_info(
         self,
         user: CurrentUser,
@@ -123,55 +163,20 @@ class FtrackAddon(BaseServerAddon):
     ) -> {}:
         # TODO validate user permissions
         # - What permissions user must have to allow this endpoint?
-        settings = await self.get_studio_settings(variant)
-        ftrack_server_url = settings.ftrack_server
-        service_settings = settings.service_settings
-        api_key_secret = service_settings.api_key
-        username_secret = service_settings.username
+        session = await self._prepare_ftrack_session(variant)
+        projects = [
+            {
+                "id": project["id"],
+                "name": project["full_name"],
+                "code": project["name"],
+                "active": project["status"] == "active",
+            }
+            async for project in await session.get_projects()
+        ]
 
-        projects = []
-        output = {
-            "success": False,
-            "error": None,
+        return {
             "projects": projects,
         }
-
-        if not ftrack_server_url or not api_key_secret or not username_secret:
-            # TODO return some status code result?
-            output["error"] = "Required settings are not set."
-            return output
-
-        ftrack_api_key = await Secrets.get(api_key_secret)
-        ftrack_username = await Secrets.get(username_secret)
-
-        if not ftrack_api_key or not ftrack_username:
-            # TODO return some status code result?
-            output["error"] = "Invalid service settings, secrets are not set."
-            return output
-
-        session = FtrackSession(
-            ftrack_server_url, ftrack_api_key, ftrack_username
-        )
-        error = None
-        try:
-            await session.validate()
-        except InvalidCredentials:
-            error = "Service settings contain invalid credentials."
-        except ServerError as exc:
-            error = str(exc)
-
-        if error is None:
-            output["success"] = True
-            async for project in await session.get_projects():
-                projects.append({
-                    "id": project["id"],
-                    "name": project["full_name"],
-                    "code": project["name"],
-                    "active": project["status"] == "active",
-                })
-
-        output["error"] = error
-        return output
 
     async def _empty_create_ftrack_attributes(self):
         return False
