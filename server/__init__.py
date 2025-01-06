@@ -1,3 +1,4 @@
+import json
 from typing import Type, Any
 
 import semver
@@ -20,6 +21,7 @@ from .constants import (
     FTRACK_PATH_ATTRIB,
 )
 from .ftrack_session import FtrackSession, InvalidCredentials, ServerError
+from .ftrack_import import import_project
 
 
 class FtrackAddon(BaseServerAddon):
@@ -65,6 +67,11 @@ class FtrackAddon(BaseServerAddon):
             "/ftrackProjects",
             self.get_ftrack_projects_info,
             method="GET",
+        )
+        self.add_endpoint(
+            "/import/{project_name}",
+            self.import_ftrack_project,
+            method="POST",
         )
 
     async def get_custom_processor_handlers(
@@ -177,6 +184,24 @@ class FtrackAddon(BaseServerAddon):
         return {
             "projects": projects,
         }
+
+    async def import_ftrack_project(
+        self,
+        user: CurrentUser,
+        project_name: str,
+        variant: str = Query("production"),
+    ) -> {}:
+
+        # TODO validate user permissions
+        # - What permissions user must have to allow this endpoint?
+        settings_model = await self.get_studio_settings(variant)
+        session = await self._prepare_ftrack_session(variant, settings_model)
+        studio_settings = json.loads(settings_model.json())
+        await import_project(
+            project_name, session, studio_settings
+        )
+
+        return {}
 
     async def _empty_create_ftrack_attributes(self):
         return False
