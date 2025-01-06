@@ -25,6 +25,7 @@ from ayon_server.lib.postgres import Postgres
 from ayon_server.settings.anatomy import Anatomy
 from ayon_server.entities.core import attribute_library
 from ayon_server.helpers.deploy_project import create_project_from_anatomy
+from ayon_server.operations import ProjectLevelOperations
 
 from .constants import (
     FTRACK_ID_ATTRIB,
@@ -129,8 +130,8 @@ class CustomAttributesMapping:
 
 
 def get_custom_attributes_mapping(
-    addon_settings: dict[str, Any],
     attr_confs: list[FtrackEntityType],
+    addon_settings: dict[str, Any],
 ) -> CustomAttributesMapping:
     """Query custom attribute configurations from ftrack server.
 
@@ -245,7 +246,7 @@ async def _get_anatomy_preset() -> dict:
             primary = row
 
     anatomy = Anatomy(**primary)
-    return json.loads(anatomy.model_dump_json())
+    return json.loads(anatomy.json())
 
 
 async def _prepare_project_entity(
@@ -544,7 +545,7 @@ async def _prepare_folder_entities(
                     attribs[dst_key] = value
 
             folder_entities.append({
-                "id": ayon_id,
+                "entity_id": ayon_id,
                 "name": folder_name,
                 "label": label,
                 "parentId": parent_id,
@@ -623,10 +624,10 @@ async def _prepare_task_entities(
                 attribs[dst_key] = value
 
         task_entities.append({
-            "id": uuid.uuid4().hex,
+            "entity_id": uuid.uuid4().hex,
             "name": task_name,
             "label": task_label,
-            "folderId": ayon_parent["id"],
+            "folderId": ayon_parent["entity_id"],
             "taskType": task_type,
             "status": status,
             "attrib": attribs,
@@ -665,7 +666,7 @@ async def _collect_project_data(
         for attr_conf in attr_confs
     }
     attrs_mapping: CustomAttributesMapping = get_custom_attributes_mapping(
-        studio_settings, attr_confs
+        attr_confs, studio_settings
     )
     statuses: list[FtrackEntityType] = await session.query(
         "select id, name, color, sort, state from Status"
@@ -764,28 +765,19 @@ async def _collect_project_data(
     }
 
 
-async def sync_project(
+async def import_project(
     project_name: str,
-    ftrack_server_url: str,
-    ftrack_api_key: str,
-    ftrack_username: str,
+    session: FtrackSession,
     studio_settings: dict[str, Any],
 ):
     """Sync ftrack project data to AYON.
 
     Args:
         project_name (str): Name of the project.
-        ftrack_server_url (str): ftrack server URL.
-        ftrack_api_key (str): ftrack API key.
-        ftrack_username (str): ftrack username.
+        session (FtrackSession): Ftrack session.
         studio_settings (dict[str, Any]): Studio settings.
 
     """
-    session = FtrackSession(
-        ftrack_server_url,
-        ftrack_api_key,
-        ftrack_username,
-    )
     data = await _collect_project_data(
         session, project_name, studio_settings,
     )
@@ -796,4 +788,11 @@ async def sync_project(
         project_code,
         Anatomy(**data["project"]),
     )
-    # TODO: Sync data rest of entities to AYON
+    operations = ProjectLevelOperations(project_name)
+    for folder_entity in data["folders"]:
+        operations.create("folder", **folder_entity)
+
+    for folder_entity in data["tasks"]:
+        operations.create("task", **folder_entity)
+
+    await operations.process()
