@@ -1,7 +1,6 @@
 from typing import Optional
 
 import httpx
-from nxtools import logging
 
 
 class ServerError(Exception):
