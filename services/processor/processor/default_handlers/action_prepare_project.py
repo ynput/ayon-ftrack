@@ -12,7 +12,8 @@ from ftrack_common import (
     FTRACK_PATH_ATTRIB,
     ServerAction,
     get_service_ftrack_icon_url,
-    get_ayon_attr_configs,
+    get_all_attr_configs,
+    get_custom_attributes_mapping,
     query_custom_attribute_values,
     map_ftrack_users_to_ayon_users,
 )
@@ -35,21 +36,6 @@ class PrepareProjectServer(ServerAction):
     settings_key = "prepare_project"
 
     item_splitter = {"type": "label", "value": "---"}
-    _keys_order = (
-        "fps",
-        "frameStart",
-        "frameEnd",
-        "handleStart",
-        "handleEnd",
-        "clipIn",
-        "clipOut",
-        "resolutionHeight",
-        "resolutionWidth",
-        "pixelAspect",
-        "applications",
-        "tools_env",
-        "library_project",
-    )
 
     def discover(self, session, entities, event):
         """Show only on project."""
@@ -93,16 +79,11 @@ class PrepareProjectServer(ServerAction):
         return output
 
     def _get_autosync_value(self, session, project_entity):
-        custom_attrs, _ = get_ayon_attr_configs(session)
-        auto_sync_attr = None
-        for attr in custom_attrs:
-            if (
-                attr["entity_type"] == "show"
-                and attr["key"] == CUST_ATTR_AUTO_SYNC
-            ):
-                auto_sync_attr = attr
-                break
-
+        auto_sync_attr = session.query(
+            "select id"
+            " from CustomAttributeConfiguration"
+            f" where key is '{CUST_ATTR_AUTO_SYNC}'"
+        ).first()
         if auto_sync_attr is None:
             return None
 
@@ -589,27 +570,25 @@ class PrepareProjectServer(ServerAction):
             )
         return new_value
 
-    def _set_ftrack_attributes(self, session, project_entity, values):
-        custom_attrs, hier_custom_attrs = get_ayon_attr_configs(session)
-        project_attrs = [
-            attr
-            for attr in custom_attrs
-            if attr["entity_type"] == "show"
-        ]
-        hier_attrs_by_name = {
-            attr["key"]: attr for attr in hier_custom_attrs
-        }
-        attrs_by_name = {
-            attr["key"]: attr for attr in project_attrs
-        }
+    def _set_ftrack_attributes(
+        self, session, project_entity, values
+    ):
+        attr_confs = get_all_attr_configs(session)
+        ftrack_settings = ayon_api.get_addons_settings()["ftrack"]
+        attrs_mapping = get_custom_attributes_mapping(
+            session,
+            ftrack_settings,
+            attr_confs,
+        )
+        project_attrs = []
+        hier_custom_attrs = []
+        for attr_conf in attr_confs:
+            if attr_conf["is_hierarchical"]:
+                hier_custom_attrs.append(attr_conf)
+            elif attr_conf["entity_type"] == "show":
+                project_attrs.append(attr_conf)
 
-        attr_ids = {
-            attr["id"]
-            for attr in project_attrs
-        } | {
-            attr["id"]
-            for attr in hier_custom_attrs
-        }
+        attr_ids = {attr["id"] for attr in attr_confs}
         value_items = query_custom_attribute_values(
             session, attr_ids, [project_entity["id"]]
         )
@@ -626,46 +605,45 @@ class PrepareProjectServer(ServerAction):
             ).all()
         }
         for attr_name, attr_value in values.items():
-            attrs = [
-                attrs_by_name.get(attr_name),
-                hier_attrs_by_name.get(attr_name)
-            ]
-            for attr in attrs:
-                if attr is None:
-                    continue
-                attr_value = self._convert_value_for_attr_conf(
-                    attr_value, attr, attr_type_names_by_id
+            mapping_item = attrs_mapping.get(attr_name)
+            if mapping_item is None:
+                continue
+            attr = mapping_item.get_attr_conf_for_entity(project_entity)
+            if attr is None:
+                continue
+            attr_value = self._convert_value_for_attr_conf(
+                attr_value, attr, attr_type_names_by_id
+            )
+            if attr_value is None:
+                continue
+
+            attr_id = attr["id"]
+            is_new = attr_id not in values_by_attr_id
+            current_value = values_by_attr_id.get(attr_id)
+
+            entity_key = collections.OrderedDict((
+                ("configuration_id", attr_id),
+                ("entity_id", project_entity["id"])
+            ))
+            op = None
+            if is_new:
+                op = ftrack_api.operation.CreateEntityOperation(
+                    "CustomAttributeValue",
+                    entity_key,
+                    {"value": attr_value}
                 )
-                if attr_value is None:
-                    continue
 
-                attr_id = attr["id"]
-                is_new = attr_id not in values_by_attr_id
-                current_value = values_by_attr_id.get(attr_id)
+            elif current_value != attr_value:
+                op = ftrack_api.operation.UpdateEntityOperation(
+                    "CustomAttributeValue",
+                    entity_key,
+                    "value",
+                    current_value,
+                    attr_value
+                )
 
-                entity_key = collections.OrderedDict((
-                    ("configuration_id", attr_id),
-                    ("entity_id", project_entity["id"])
-                ))
-                op = None
-                if is_new:
-                    op = ftrack_api.operation.CreateEntityOperation(
-                        "CustomAttributeValue",
-                        entity_key,
-                        {"value": attr_value}
-                    )
-
-                elif current_value != attr_value:
-                    op = ftrack_api.operation.UpdateEntityOperation(
-                        "CustomAttributeValue",
-                        entity_key,
-                        "value",
-                        current_value,
-                        attr_value
-                    )
-
-                if op is not None:
-                    session.recorded_operations.push(op)
+            if op is not None:
+                session.recorded_operations.push(op)
 
         if session.recorded_operations:
             session.commit()
@@ -683,6 +661,24 @@ class PrepareProjectServer(ServerAction):
             return {
                 "message": "Project already exists in AYON.",
                 "success": True
+            }
+
+        if not syncer.ensure_mandatory_custom_attributes_exists(session):
+            report_items = syncer.report_items
+            if report_items:
+                self.show_interface(
+                    report_items,
+                    title="Prepare Project report",
+                    event=event
+                )
+            msg = (
+                "Failed to create AYON mandatory custom attributes"
+                " in ftrack."
+            )
+            self.log.info(msg)
+            return {
+                "success": False,
+                "message": msg,
             }
 
         attributes = {}
@@ -724,7 +720,9 @@ class PrepareProjectServer(ServerAction):
         values = copy.deepcopy(ayon_project["attrib"])
         auto_sync_project = event_values["auto_sync_project"]
         values[CUST_ATTR_AUTO_SYNC] = auto_sync_project
-        self._set_ftrack_attributes(session, project_entity, values)
+        self._set_ftrack_attributes(
+            session, project_entity, values
+        )
 
         if not auto_sync_project:
             event_data = {

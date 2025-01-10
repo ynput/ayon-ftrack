@@ -268,7 +268,7 @@ class FtrackAddon(BaseServerAddon):
         source_version: str,
         overrides: dict[str, Any],
     ) -> dict[str, Any]:
-        convert_settings_overrides(source_version, overrides)
+        await convert_settings_overrides(source_version, overrides)
         return await super().convert_settings_overrides(
             source_version, overrides
         )
