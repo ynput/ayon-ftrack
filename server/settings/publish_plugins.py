@@ -28,7 +28,7 @@ class CollectFamilyProfile(BaseSettingsModel):
     )
     product_types: list[str] = SettingsField(
         default_factory=list,
-        title="Families",
+        title="Product types",
     )
     task_types: list[str] = SettingsField(
         default_factory=list,
@@ -421,12 +421,32 @@ DEFAULT_PUBLISH_SETTINGS = {
                     "animation",
                     "look",
                     "rig",
-                    "camera"
+                    "camera",
+                    "review"
                 ],
                 "task_types": [],
                 "task_names": [],
                 "add_ftrack_family": True,
                 "advanced_filtering": []
+            },
+            {
+                "host_names": [
+                    "blender",
+                    "houdini",
+                    "max"
+                ],
+                "product_types": [],
+                "task_types": [],
+                "task_names": [],
+                "add_ftrack_family": False,
+                "advanced_filtering": [
+                    {
+                        "families": [
+                            "review"
+                        ],
+                        "add_ftrack_family": True
+                    }
+                ]
             },
             {
                 "host_names": [
@@ -491,18 +511,6 @@ DEFAULT_PUBLISH_SETTINGS = {
                 "product_types": [
                     "plate",
                     "take"
-                ],
-                "task_types": [],
-                "task_names": [],
-                "add_ftrack_family": True,
-                "advanced_filtering": []
-            },
-            {
-                "host_names": [
-                    "houdini"
-                ],
-                "product_types": [
-                    "usd"
                 ],
                 "task_types": [],
                 "task_names": [],
