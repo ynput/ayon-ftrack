@@ -850,7 +850,11 @@ async def _prepare_components(
             components_info.add_resource_id_mapping(
                 cl["component_id"], cl["resource_identifier"]
             )
-    return components_info.to_data()
+
+    components_data = components_info.to_data()
+    for resource_id, resource_data in components_data.items():
+        resource_data["url"] = session.get_url(resource_id)
+    return components_data
 
 
 async def _collect_project_data(
