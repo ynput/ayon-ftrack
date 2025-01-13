@@ -728,6 +728,131 @@ async def _prepare_version_entities(
     return version_entities
 
 
+class ComponentsInfo:
+    def __init__(self):
+        self._components_by_id = {}
+        self._component_id_by_resource_id = collections.defaultdict(set)
+        self._entity_ids_by_review_component = collections.defaultdict(set)
+        self._entity_ids_by_thumbnail_component = collections.defaultdict(set)
+
+    def get_component_ids(self) -> set[str]:
+        return set(self._components_by_id)
+
+    def get_resource_ids(self) -> set[str]:
+        return set(self._component_id_by_resource_id)
+
+    def get_component_by_id(
+        self, component_id: str
+    ) -> Optional[dict[str, Any]]:
+        return self._components_by_id.get(component_id)
+
+    def add_review_component(
+        self,
+        component: dict[str, Any],
+        entity_ids: set[str],
+    ):
+        component_id = component["id"]
+        self._components_by_id[component_id] = component
+        self._entity_ids_by_review_component[component_id] |= entity_ids
+
+    def add_thumbnail_component(
+        self,
+        component: dict[str, Any],
+        entity_ids: set[str],
+    ):
+        component_id = component["id"]
+        self._components_by_id[component_id] = component
+        self._entity_ids_by_thumbnail_component[component_id] |= entity_ids
+
+    def add_resource_id_mapping(self, component_id: str, resource_id: str):
+        self._component_id_by_resource_id[resource_id].add(component_id)
+
+    def to_data(self) -> dict[str, Any]:
+        output = {}
+        for resource_id in self.get_resource_ids():
+            component_ids = self._component_id_by_resource_id[resource_id]
+            component = next(
+                (
+                    self._components_by_id[component_id]
+                    for component_id in component_ids
+                ),
+                None
+            )
+            if component is None:
+                continue
+
+            component_id = component["id"]
+            output[resource_id] = {
+                "ext": component["file_type"],
+                "size": component["size"],
+                "name": component["name"],
+                "review_entities": (
+                    self._entity_ids_by_review_component[component_id]
+                ),
+                "thumbnail_entities": (
+                    self._entity_ids_by_thumbnail_component[component_id]
+                ),
+            }
+
+        return output
+
+
+async def _prepare_components(
+    session: FtrackSession,
+    version_ids: set[str],
+    thumbnails_mapping: dict[str, str],
+) -> dict[str, dict[str, Any]]:
+    components_info = ComponentsInfo()
+    review_names = join_filter_values(FTRACK_REVIEW_NAMES)
+    for version_chunk_ids in create_chunks(version_ids):
+        joined_version_chunk_ids = join_filter_values(version_chunk_ids)
+        for component in await session.query(
+            "select id, file_type, name, size, version_id from Component"
+            f" where name in ({review_names})"
+            f" and version_id in ({joined_version_chunk_ids})"
+        ).all():
+            components_info.add_review_component(
+                component, {component["version_id"]}
+            )
+
+    thumbnail_ids = set(thumbnails_mapping.values())
+    entity_ids_by_thumbnail_id = {
+        thumbnail_id: set()
+        for thumbnail_id in thumbnail_ids
+    }
+    for ayon_id, thumbnail_id in thumbnails_mapping.items():
+        entity_ids_by_thumbnail_id[thumbnail_id].add(ayon_id)
+
+    for thumbnail_chunk_ids in create_chunks(thumbnail_ids):
+        joined_thumbnail_chunk_ids = join_filter_values(thumbnail_chunk_ids)
+        thumbnail_components = await session.query(
+            "select id, file_type, name, size from Component"
+            f" where id in ({joined_thumbnail_chunk_ids})"
+        ).all()
+        for component in thumbnail_components:
+            entity_ids = entity_ids_by_thumbnail_id[component["id"]]
+            components_info.add_thumbnail_component(component, entity_ids)
+
+    server_location = await session.query(
+        "select id from Location where name is \"ftrack.server\""
+    ).first()
+    server_location_id = server_location["id"]
+
+    for chunk_ids in create_chunks(components_info.get_component_ids()):
+        joined_chunk_ids = join_filter_values(chunk_ids)
+        component_locations = await session.query(
+            "select component_id, resource_identifier"
+            " from ComponentLocation"
+            f" where location_id is {server_location_id}"
+            f" and component_id in ({joined_chunk_ids})"
+        ).all()
+        for cl in component_locations:
+            components_info.add_resource_id_mapping(
+                cl["component_id"], cl["resource_identifier"]
+            )
+    return components_info.to_data()
+
+
 async def _collect_project_data(
     session: FtrackSession,
     project_name: str,
@@ -889,6 +1014,11 @@ async def _collect_project_data(
             thumbnails_mapping,
         )
     )
+
+    components: dict[str, dict[str, Any]] = await _prepare_components(
+        session,
+        set(version_entities_by_ftrack_id),
+        thumbnails_mapping,
     )
 
     return {
@@ -898,6 +1028,7 @@ async def _collect_project_data(
         "tasks": list(task_entities_by_ftrack_id.values()),
         "products": list(product_entities_by_ftrack_id.values()),
         "versions": list(version_entities_by_ftrack_id.values()),
+        "components": components,
     }
 
 
