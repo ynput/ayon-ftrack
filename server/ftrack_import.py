@@ -1063,7 +1063,13 @@ async def import_project(
     for folder_entity in data["folders"]:
         operations.create("folder", **folder_entity)
 
-    for folder_entity in data["tasks"]:
-        operations.create("task", **folder_entity)
+    for task_entity in data["tasks"]:
+        operations.create("task", **task_entity)
+
+    for product_entity in data["products"]:
+        operations.create("product", **product_entity)
+
+    for version_entity in data["versions"]:
+        operations.create("version", **version_entity)
 
     await operations.process()
