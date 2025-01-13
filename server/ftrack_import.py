@@ -40,6 +40,12 @@ from .ftrack_session import (
     convert_ftrack_date,
 )
 
+FTRACK_REVIEW_NAMES = [
+    "ftrackreview-mp4",
+    "ftrackreview-webm",
+    "ftrackreview-image",
+]
+
 
 class MappedAYONAttribute:
     def __init__(
@@ -226,12 +232,10 @@ async def _query_custom_attribute_values(
     for chunk_ids in create_chunks(entity_ids):
         joined_ids = join_filter_values(chunk_ids)
         for item in await session.query(
-            (
-                "select value, entity_id, configuration_id"
-                " from CustomAttributeValue"
-                f" where entity_id in ({joined_ids})"
-                f" and configuration_id in ({joined_attr_ids})"
-            )
+            "select value, entity_id, configuration_id"
+            " from CustomAttributeValue"
+            f" where entity_id in ({joined_ids})"
+            f" and configuration_id in ({joined_attr_ids})"
         ).all():
             values_by_id[item["entity_id"]].append(item)
     return values_by_id
@@ -257,7 +261,12 @@ async def _prepare_project_entity(
     types: list[dict[str, str]],
     attrs_mapping: CustomAttributesMapping,
     attr_values: list[dict[str, Any]],
+    thumbnails_mapping: dict[str, str],
 ):
+    project_name = project["full_name"]
+    if project["thumbnail_id"]:
+        thumbnails_mapping[project_name] = project["thumbnail_id"]
+
     ayon_project = await _get_anatomy_preset()
 
     attr_values_by_attr_id = {
@@ -480,8 +489,9 @@ async def _prepare_folder_entities(
     object_types: list[dict[str, Any]],
     attrs_mapping: CustomAttributesMapping,
     attr_values_by_id: dict[str, list[dict[str, Any]]],
-) -> list[dict[str, Any]]:
-    folder_entities: list[dict[str, Any]] = []
+    thumbnails_mapping: dict[str, str],
+) -> dict[str, dict[str, Any]]:
+    folder_entities_by_ftrack_id: dict[str, dict[str, Any]] = {}
     ftrack_entities_by_parent_id = collections.defaultdict(list)
     for entity in ftrack_entities:
         ftrack_entities_by_parent_id[entity["parent_id"]].append(entity)
@@ -540,7 +550,10 @@ async def _prepare_folder_entities(
                     dst_key = mapping_item.ayon_attribute_name
                     attribs[dst_key] = value
 
-            folder_entities.append({
+            if ft_entity["thumbnail_id"]:
+                thumbnails_mapping[ayon_id] = ft_entity["thumbnail_id"]
+
+            folder_entities_by_ftrack_id[ftrack_id] = {
                 "entity_id": ayon_id,
                 "name": folder_name,
                 "label": label,
@@ -548,9 +561,9 @@ async def _prepare_folder_entities(
                 "folderType": folder_type,
                 "status": status,
                 "attrib": attribs,
-            })
+            }
             parents_queue.append((ayon_id, ftrack_id, ftrack_path))
-    return folder_entities
+    return folder_entities_by_ftrack_id
 
 
 async def _prepare_task_entities(
@@ -560,13 +573,15 @@ async def _prepare_task_entities(
     types: list[dict[str, Any]],
     attrs_mapping: CustomAttributesMapping,
     attr_values_by_id: dict[str, list[dict[str, Any]]],
-) -> list[dict[str, Any]]:
-    task_entities: list[dict[str, Any]] = []
+    thumbnails_mapping: dict[str, str],
+) -> dict[str, dict[str, Any]]:
+    task_entities_by_ftrack_id: dict[str, dict[str, Any]] = {}
     type_names_by_id = {
         ft_type["id"]: ft_type["name"]
         for ft_type in types
     }
     for ftrack_entity in ftrack_entities:
+        ftrack_id = ftrack_entity["id"]
         ftrack_parent_id = ftrack_entity["parent_id"]
         ayon_parent = folder_by_ftrack_id.get(ftrack_parent_id)
         # When task is parented under another task
@@ -586,7 +601,7 @@ async def _prepare_task_entities(
         # TODO make sure 'FTRACK_ID_ATTRIB' and 'FTRACK_PATH_ATTRIB'
         #   do exist in AYON
         attribs = {
-            FTRACK_ID_ATTRIB: ftrack_entity["id"],
+            FTRACK_ID_ATTRIB: ftrack_id,
             FTRACK_PATH_ATTRIB: ftrack_path,
         }
         for src_key, dst_key in (
@@ -611,17 +626,21 @@ async def _prepare_task_entities(
                 dst_key = mapping_item.ayon_attribute_name
                 attribs[dst_key] = value
 
-        task_entities.append({
-            "entity_id": uuid.uuid4().hex,
+        ayon_id = uuid.uuid4().hex
+        if ftrack_entity["thumbnail_id"]:
+            thumbnails_mapping[ayon_id] = ftrack_entity["thumbnail_id"]
+
+        task_entities_by_ftrack_id[ftrack_id] = {
+            "entity_id": ayon_id,
             "name": task_name,
             "label": task_label,
             "folderId": ayon_parent["entity_id"],
             "taskType": task_type,
             "status": status,
             "attrib": attribs,
-        })
+        }
 
-    return task_entities
+    return task_entities_by_ftrack_id
 
 
 async def _prepare_product_entities(
@@ -657,18 +676,14 @@ async def _prepare_product_entities(
 
 async def _prepare_version_entities(
     product_entities_by_ftrack_id: dict[str, Any],
-    task_entities: list[dict[str, Any]],
+    tasks_by_ftrack_id: dict[str, dict[str, Any]],
     ftrack_versions: list[dict[str, Any]],
     status_names_by_id: dict[str, str],
     attrs_mapping: CustomAttributesMapping,
     attr_values_by_id: dict[str, list[dict[str, Any]]],
-) -> list[dict[str, Any]]:
-    version_entities = []
-    tasks_by_ftrack_id = {
-        task["attrib"][FTRACK_ID_ATTRIB]: task
-        for task in task_entities
-    }
-
+    thumbnails_mapping: dict[str, str],
+) -> dict[str, dict[str, Any]]:
+    version_entities = {}
     for asset_version in ftrack_versions:
         ftrack_id = asset_version["id"]
         asset_id = asset_version["asset_id"]
@@ -700,7 +715,7 @@ async def _prepare_version_entities(
                 attribs[dst_key] = value
 
         status_id = asset_version["status_id"]
-        version_entities.append({
+        version_entities[ftrack_id] = {
             "id": uuid.uuid4().hex,
             "version": asset_version["version"],
             "taskId": task_id,
@@ -708,7 +723,7 @@ async def _prepare_version_entities(
             "comment": asset_version["comment"],
             "status": status_names_by_id[status_id],
             "attrib": attribs,
-        })
+        }
 
     return version_entities
 
@@ -731,7 +746,7 @@ async def _collect_project_data(
 
     """
     ftrack_project: FtrackEntityType = await session.query(
-        "select id, full_name, name, project_schema_id"
+        "select id, full_name, name, thumbnail_id, project_schema_id"
         f" from Project where full_name is \"{project_name}\""
     ).first()
     attr_confs: list[FtrackEntityType] = await session.query(
@@ -812,10 +827,13 @@ async def _collect_project_data(
         f" from Asset where project_id is \"{project_id}\""
     ).all()
     versions = await session.query(
-        "select id, version, asset_id, task_id, comment"
+        "select id, version, asset_id, task_id, comment,"
         " status_id, thumbnail_id, user_id"
         f" from AssetVersion where project_id is \"{project_id}\""
     ).all()
+
+    # ftrack thumbnail id by AYON id
+    thumbnails_mapping: dict[str, str] = {}
 
     project_entity: dict[str, Any] = await _prepare_project_entity(
         session,
@@ -825,29 +843,31 @@ async def _collect_project_data(
         types,
         attrs_mapping,
         attr_values_by_id[ftrack_project["id"]],
+        thumbnails_mapping,
     )
 
-    folder_entities: list[dict[str, Any]] = await _prepare_folder_entities(
-        project_id,
-        folder_src_entities,
-        status_names_by_id,
-        object_types,
-        attrs_mapping,
-        attr_values_by_id,
+    folder_entities_by_ftrack_id: dict[str, Any] = (
+        await _prepare_folder_entities(
+            project_id,
+            folder_src_entities,
+            status_names_by_id,
+            object_types,
+            attrs_mapping,
+            attr_values_by_id,
+            thumbnails_mapping,
+        )
     )
 
-    folder_entities_by_ftrack_id = {
-        folder["attrib"][FTRACK_ID_ATTRIB]: folder
-        for folder in folder_entities
-    }
-
-    task_entities: list[dict[str, Any]] = await _prepare_task_entities(
-        folder_entities_by_ftrack_id,
-        task_src_entities,
-        status_names_by_id,
-        types,
-        attrs_mapping,
-        attr_values_by_id,
+    task_entities_by_ftrack_id: dict[str, dict[str, Any]] = (
+        await _prepare_task_entities(
+            folder_entities_by_ftrack_id,
+            task_src_entities,
+            status_names_by_id,
+            types,
+            attrs_mapping,
+            attr_values_by_id,
+            thumbnails_mapping,
+        )
     )
 
     product_entities_by_ftrack_id: dict[str, Any] = (
@@ -858,22 +878,26 @@ async def _collect_project_data(
         )
     )
 
-    version_entities = await _prepare_version_entities(
-        product_entities_by_ftrack_id,
-        task_entities,
-        versions,
-        status_names_by_id,
-        attrs_mapping,
-        attr_values_by_id,
+    version_entities_by_ftrack_id: dict[str, Any] =(
+        await _prepare_version_entities(
+            product_entities_by_ftrack_id,
+            task_entities_by_ftrack_id,
+            versions,
+            status_names_by_id,
+            attrs_mapping,
+            attr_values_by_id,
+            thumbnails_mapping,
+        )
+    )
     )
 
     return {
         "project_code": ftrack_project["name"],
         "project": project_entity,
-        "folders": folder_entities,
-        "tasks": task_entities,
-        "product": list(product_entities_by_ftrack_id.values()),
-        "versions": version_entities
+        "folders": list(folder_entities_by_ftrack_id.values()),
+        "tasks": list(task_entities_by_ftrack_id.values()),
+        "products": list(product_entities_by_ftrack_id.values()),
+        "versions": list(version_entities_by_ftrack_id.values()),
     }
 
 

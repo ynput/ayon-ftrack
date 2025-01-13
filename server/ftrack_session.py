@@ -1,4 +1,5 @@
 import datetime
+import urllib.parse
 from typing import Optional, Any, Iterable, Union
 
 import httpx
@@ -103,6 +104,8 @@ class FtrackSession:
     def __init__(self, server_url: str, api_key: str, username: str):
         server_url = server_url.rstrip("/")
         self._server_url = server_url
+        self._api_key = api_key
+        self._username = username
         self._api_url = server_url + "/api"
         self._client = httpx.AsyncClient(
             headers={
@@ -152,6 +155,14 @@ class FtrackSession:
             fields = {"id", "full_name", "name", "status"}
         fields_str = ", ".join(fields)
         return self.query(f"select {fields_str} from Project")
+
+    def get_url(self, resource_identifier: str) -> str:
+        query = urllib.parse.urlencode((
+            ("id", resource_identifier),
+            ("username", self._username),
+            ("apiKey", self._api_key),
+        ))
+        return f"{self._server_url}/component/get?{query}"
 
 
 def join_filter_values(values: Iterable[str]) -> str:
