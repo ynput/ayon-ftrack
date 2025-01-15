@@ -21,7 +21,7 @@ from .constants import (
     FTRACK_PATH_ATTRIB,
 )
 from .ftrack_session import FtrackSession, InvalidCredentials, ServerError
-from .ftrack_import import import_project
+from .ftrack_import import import_users, import_project
 
 
 class FtrackAddon(BaseServerAddon):
@@ -69,7 +69,12 @@ class FtrackAddon(BaseServerAddon):
             method="GET",
         )
         self.add_endpoint(
-            "/import/{project_name}",
+            "/import/users",
+            self.import_ftrack_users,
+            method="POST",
+        )
+        self.add_endpoint(
+            "/import/projects/{project_name}",
             self.import_ftrack_project,
             method="POST",
         )
@@ -184,6 +189,19 @@ class FtrackAddon(BaseServerAddon):
         return {
             "projects": projects,
         }
+
+    async def import_ftrack_users(
+        self,
+        user: CurrentUser,
+        variant: str = Query("production"),
+    ):
+        # TODO validate user permissions
+        # - What permissions user must have to allow this endpoint?
+        settings_model = await self.get_studio_settings(variant)
+        session = await self._prepare_ftrack_session(variant, settings_model)
+        await import_users(session)
+
+        return {}
 
     async def import_ftrack_project(
         self,
