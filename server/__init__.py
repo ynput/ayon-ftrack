@@ -69,7 +69,7 @@ class FtrackAddon(BaseServerAddon):
             method="GET",
         )
         self.add_endpoint(
-            "/import/{project_name}",
+            "/import/projects/{project_name}",
             self.import_ftrack_project,
             method="POST",
         )
