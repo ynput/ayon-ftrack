@@ -17,13 +17,15 @@ import re
 import uuid
 import json
 import collections
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
-from nxtools import slugify
+from nxtools import slugify, logging
 
 from ayon_server.lib.postgres import Postgres
 from ayon_server.settings.anatomy import Anatomy
 from ayon_server.entities.core import attribute_library
+from ayon_server.entities import UserEntity
+from ayon_server.access.access_groups import AccessGroups
 from ayon_server.helpers.deploy_project import create_project_from_anatomy
 from ayon_server.operations import ProjectLevelOperations
 
@@ -644,7 +646,7 @@ async def _collect_project_data(
     """Collect data from ftrack and convert them to AYON data.
 
     Args:
-        session (FtrackSession): Ftrack session.
+        session (FtrackSession): ftrack session.
         project_name (str): Name of the project.
         studio_settings (dict[str, Any]): Studio settings.
 
@@ -774,7 +776,7 @@ async def import_project(
 
     Args:
         project_name (str): Name of the project.
-        session (FtrackSession): Ftrack session.
+        session (FtrackSession): ftrack session.
         studio_settings (dict[str, Any]): Studio settings.
 
     """
@@ -796,3 +798,353 @@ async def import_project(
         operations.create("task", **folder_entity)
 
     await operations.process()
+
+
+def _map_ftrack_users_to_ayon_users(
+    ftrack_users: list[dict[str, Any]],
+    ayon_users: list[dict[str, Any]],
+) -> dict[str, Union[str, None]]:
+    """Map ftrack users to AYON users.
+
+    Mapping is based on 2 possible keys, email and username where email has
+    higher priority. Once AYON user is mapped it cannot be mapped again to
+    different user.
+
+    Fields used from ftrack users: 'id', 'username', 'email'.
+
+    Args:
+        ftrack_users (List[ftrack_api.entity.user.User]): List of ftrack users.
+        ayon_users (List[Dict[str, Any]]): List of AYON users.
+
+    Returns:
+        Dict[str, Union[str, None]]: Mapping of ftrack user id
+            to AYON username.
+
+    """
+    mapping: dict[str, Union[str, None]] = {
+        user["id"]: None
+        for user in ftrack_users
+    }
+    ayon_users_by_email: dict[str, str] = {}
+    ayon_users_by_name: dict[str, str] = {}
+    for ayon_user in ayon_users:
+        ayon_name = ayon_user["name"]
+        ayon_email = ayon_user["attrib"]["email"]
+        ayon_users_by_name[ayon_name.lower()] = ayon_name
+        if ayon_email:
+            ayon_users_by_email[ayon_email.lower()] = ayon_name
+
+    mapped_ayon_users: set[str] = set()
+    for ftrack_user in ftrack_users:
+        ftrack_id: str = ftrack_user["id"]
+        # Make sure username does not contain '@' character
+        ftrack_name: str = ftrack_user["username"].split("@", 1)[0]
+        ftrack_email: str = ftrack_user["email"]
+
+        if ftrack_email and ftrack_email.lower() in ayon_users_by_email:
+            ayon_name: str = ayon_users_by_email[ftrack_email.lower()]
+            if ayon_name not in mapped_ayon_users:
+                mapping[ftrack_id] = ayon_name
+                mapped_ayon_users.add(ayon_name)
+            continue
+
+        if ftrack_name in ayon_users_by_name:
+            ayon_name: str = ayon_users_by_name[ftrack_name]
+            if ayon_name not in mapped_ayon_users:
+                mapped_ayon_users.add(ayon_name)
+                mapping[ftrack_id] = ayon_name
+
+    return mapping
+
+
+def _calculate_default_access_groups(
+    ftrack_projects: list[dict[str, Any]],
+    project_names: set[str],
+    user_security_roles: list[dict[str, Any]],
+    project_roles_by_id: dict[str, list[dict[str, Any]]],
+    access_groups: set[str],
+):
+    available_project_names = []
+
+    allow_public_projects = any(
+        user_security_role["is_all_projects"]
+        for user_security_role in user_security_roles
+    )
+    project_ids = set()
+    for user_security_role in user_security_roles:
+        # QUESTION: Maybe we should check what role it is?
+        role_id = user_security_role["id"]
+        project_roles = project_roles_by_id.get(role_id, [])
+        for project_role in project_roles:
+            project_ids.add(project_role["project_id"])
+
+    for ftrack_project in ftrack_projects:
+        project_name = ftrack_project["full_name"]
+        # Skip projects that are not in AYON
+        if project_name not in project_names:
+            continue
+
+        # Public project
+        if not ftrack_project["is_private"]:
+            # Add access if user has access to all public projects
+            if allow_public_projects:
+                available_project_names.append(project_name)
+            continue
+
+        if ftrack_project["id"] in project_ids:
+            available_project_names.append(project_name)
+
+    return {
+        project_name: list(access_groups)
+        for project_name in available_project_names
+    }
+
+
+async def import_users(session):
+    valid_ftrack_user_type_ids = {
+        user_type["id"]
+        for user_type in await session.query(
+            "select id, name from UserType"
+        ).all()
+        # Ignore services and demo users
+        if user_type["name"] not in ("service", "demo")
+    }
+
+    fields = {
+        "id",
+        "username",
+        "is_active",
+        "email",
+        "first_name",
+        "last_name",
+        "user_type_id",
+        # "resource_type",
+        # "thumbnail_id",
+        # "thumbnail_url",
+    }
+    joined_fields = ", ".join(fields)
+    ftrack_users = [
+        user
+        for user in await session.query(
+            f"select {joined_fields} from User"
+        ).all()
+        if user["user_type_id"] in valid_ftrack_user_type_ids
+    ]
+    ftrack_users_by_id = {
+        ftrack_user["id"]: ftrack_user
+        for ftrack_user in ftrack_users
+    }
+    security_roles_by_id: dict[str, dict[str, Any]] = {
+        role["id"]: role
+        for role in await session.query(
+            "select id, name, type from SecurityRole"
+        ).all()
+    }
+    ayon_role_by_user_id: dict[str, str] = {
+        ftrack_id: "artist"
+        for ftrack_id in ftrack_users_by_id
+    }
+    user_roles_by_user_id: dict[str, list[dict[str, Any]]] = {
+        ftrack_id: []
+        for ftrack_id in ftrack_users_by_id
+    }
+    project_role_ids: set[str] = set()
+    for user_security_role in await session.query(
+        "select is_all_projects, is_all_open_projects"
+        ", security_role_id, user_id"
+        " from UserSecurityRole"
+    ).all():
+        role: dict[str, Any] = (
+            security_roles_by_id[user_security_role["security_role_id"]]
+        )
+        user_id: str = user_security_role["user_id"]
+        # Ignore users that are not 'ftrack' users
+        if user_id not in ftrack_users_by_id:
+            continue
+
+        user_roles_by_user_id.setdefault(user_id, []).append(
+            user_security_role
+        )
+        if not user_security_role["is_all_projects"]:
+            project_role_ids.add(user_security_role["id"])
+            continue
+
+        # Mark user as admin
+        if role["name"] == "Administrator":
+            ayon_role_by_user_id[user_id] = "admin"
+            continue
+
+        # Make sure that user which was already marked with previous role
+        #   as admin is not downgraded
+        current_role = ayon_role_by_user_id[user_id]
+        if role["name"] == "Project Manager" and current_role != "admin":
+            ayon_role_by_user_id[user_id] = "manager"
+
+    project_roles_by_id = {}
+    for chunk in create_chunks(project_role_ids):
+        project_role_ids = join_filter_values(chunk)
+        for project_role in await session.query(
+            "select id, project_id, user_security_role_id"
+            " from UserSecurityRoleProject"
+            f" where user_security_role_id in ({project_role_ids})"
+        ).all():
+            role_id = project_role["user_security_role_id"]
+            project_roles_by_id.setdefault(role_id, []).append(
+                project_role
+            )
+
+    ayon_users_by_name = {
+        row["name"]: UserEntity.from_record(row)
+        async for row in Postgres.iterate("SELECT * FROM users")
+    }
+    access_groups = set()
+    for ag_key, _ in AccessGroups.access_groups.items():
+        access_group_name, pname = ag_key
+        if pname == "_":
+            access_groups.add(access_group_name)
+
+    project_names = {
+        row["name"]
+        async for row in Postgres.iterate("SELECT name FROM projects")
+    }
+
+    ftrack_projects: list[dict[str, Any]] = await session.query(
+        "select id, full_name, is_private from Project"
+    ).all()
+    users_mapping: dict[str, Union[str, None]] = (
+        _map_ftrack_users_to_ayon_users(
+            ftrack_users,
+            [user.dict() for user in ayon_users_by_name.values()]
+        )
+    )
+    for ftrack_id, ayon_user_name in users_mapping.items():
+        ftrack_user = ftrack_users_by_id[ftrack_id]
+        ftrack_username = ftrack_user["username"].split("@", 1)[0]
+        logging.debug(f"Processing ftrack user {ftrack_username}")
+
+        ayon_user_data = {
+            "ftrack": {
+                "id": ftrack_id,
+                "username": ftrack_user["username"],
+            }
+        }
+
+        ayon_role = ayon_role_by_user_id[ftrack_id]
+
+        attrib = {}
+        if ftrack_user["email"]:
+            attrib["email"] = ftrack_user["email"]
+
+        full_name_items = []
+        for key in "first_name", "last_name":
+            value = ftrack_user[key]
+            if value:
+                full_name_items.append(value)
+
+        if full_name_items:
+            attrib["fullName"] = " ".join(full_name_items)
+
+        is_admin = ayon_role == "admin"
+        is_manager = ayon_role == "manager"
+        if not ayon_user_name:
+            logging.debug("User does not exist in AYON yet, creating...")
+            ayon_user_data["isAdmin"] = is_admin
+            ayon_user_data["isManger"] = is_manager
+            # Create new user
+            if not is_admin and not is_manager:
+                # TODO use predefined endpoints (are not available
+                #   at the moment of this PR)
+                ayon_user_data["defaultAccessGroups"] = list(
+                    access_groups
+                )
+                ayon_user_data["accessGroups"] = (
+                    _calculate_default_access_groups(
+                        ftrack_projects,
+                        project_names,
+                        user_roles_by_user_id[ftrack_id],
+                        project_roles_by_id,
+                        access_groups,
+                    )
+                )
+
+            new_ayon_user = {
+                "name": ftrack_username,
+                "active": ftrack_user["is_active"],
+                "data": ayon_user_data,
+            }
+            if attrib:
+                new_ayon_user["attrib"] = attrib
+            ayon_user = UserEntity(new_ayon_user)
+            await ayon_user.save()
+            ayon_users_by_name[ayon_user.name] = ayon_user
+            continue
+
+        logging.debug(
+            f"Mapped ftrack user {ftrack_username}"
+            f" to AYON user {ayon_user_name}, updating..."
+        )
+        # Fetch user with REST to get 'data'
+        ayon_user = ayon_users_by_name[ayon_user_name]
+        user_diffs = {}
+        if ftrack_user["is_active"] != ayon_user.active:
+            ayon_user.active = ftrack_user["is_active"]
+
+        # Comapre 'data' field
+        current_user_data = ayon_user.data
+        if "ftrack" in current_user_data:
+            ayon_user_ftrack_data = current_user_data["ftrack"]
+            for key, value in ayon_user_data["ftrack"].items():
+                if (
+                    key not in ayon_user_ftrack_data
+                    or ayon_user_ftrack_data[key] != value
+                ):
+                    ayon_user_ftrack_data.update(ayon_user_data["ftrack"])
+                    current_user_data["ftrack"] = ayon_user_ftrack_data
+                    break
+
+        if ayon_role == "admin":
+            if not current_user_data.get("isAdmin"):
+                current_user_data["isAdmin"] = True
+                if current_user_data.get("isManger"):
+                    current_user_data["isManger"] = False
+
+        elif ayon_role == "manager":
+            if not current_user_data.get("isManger"):
+                current_user_data["isManger"] = True
+                if current_user_data.get("isAdmin"):
+                    current_user_data["isAdmin"] = False
+
+        elif ayon_role == "artist":
+            became_artist = False
+            if current_user_data.get("isAdmin"):
+                became_artist = True
+                current_user_data["isAdmin"] = False
+
+            if current_user_data.get("isManger"):
+                became_artist = True
+                current_user_data["isManger"] = False
+
+            # User will become artist and we need to update access groups
+            if became_artist:
+                current_user_data["defaultAccessGroups"] = list(
+                    access_groups
+                )
+                current_user_data["accessGroups"] = (
+                    _calculate_default_access_groups(
+                        ftrack_projects,
+                        project_names,
+                        user_roles_by_user_id[ftrack_id],
+                        project_roles_by_id,
+                        access_groups,
+                    )
+                )
+
+        # Compare 'attrib' fields
+        for key, value in attrib.items():
+            if not hasattr(ayon_user.attrib, key):
+                continue
+
+            if getattr(ayon_user.attrib, key) != value:
+                setattr(ayon_user.attrib, key, value)
+
+        ayon_user.save()
