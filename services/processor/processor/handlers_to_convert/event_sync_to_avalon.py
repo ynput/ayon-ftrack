@@ -1966,21 +1966,6 @@ class SyncToAvalonEvent(BaseEventHandler):
                     value, ent_cust_attrs[key]
                 )
 
-                if entType == "show" and key == "applications":
-                    # Store apps to project't config
-                    proj_apps, warnings = (
-                        avalon_sync.get_project_apps(new_value)
-                    )
-                    if "config" not in self.updates[mongo_id]:
-                        self.updates[mongo_id]["config"] = {}
-                    self.updates[mongo_id]["config"]["apps"] = proj_apps
-
-                    for msg, items in warnings.items():
-                        if not msg or not items:
-                            continue
-                        self.report_items["warning"][msg] = items
-                    continue
-
                 if "data" not in self.updates[mongo_id]:
                     self.updates[mongo_id]["data"] = {}
                 self.updates[mongo_id]["data"][key] = new_value

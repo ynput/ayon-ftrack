@@ -102,7 +102,8 @@ class FtrackSettings(BaseSettingsModel):
     )
     custom_attributes: CustomAttributesModel = SettingsField(
         title="Custom Attributes",
-        default_factory=CustomAttributesModel
+        default_factory=CustomAttributesModel,
+        scope=["studio"],
     )
 
 
