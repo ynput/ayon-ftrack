@@ -1177,7 +1177,13 @@ def _calculate_default_access_groups(
     }
 
 
-async def import_users(session):
+async def _prepare_users_mapping(
+    session: FtrackSession
+) -> tuple[
+    dict[str, dict[str, Any]],
+    dict[str, UserEntity],
+    dict[str, Union[str, None]]
+]:
     valid_ftrack_user_type_ids = {
         user_type["id"]
         for user_type in await session.query(
@@ -1186,7 +1192,6 @@ async def import_users(session):
         # Ignore services and demo users
         if user_type["name"] not in ("service", "demo")
     }
-
     fields = {
         "id",
         "username",
@@ -1211,6 +1216,26 @@ async def import_users(session):
         ftrack_user["id"]: ftrack_user
         for ftrack_user in ftrack_users
     }
+
+    ayon_users_by_name = {
+        row["name"]: UserEntity.from_record(row)
+        async for row in Postgres.iterate("SELECT * FROM users")
+    }
+    users_mapping: dict[str, Union[str, None]] = (
+        _map_ftrack_users_to_ayon_users(
+            ftrack_users,
+            [user.dict() for user in ayon_users_by_name.values()]
+        )
+    )
+    return ftrack_users_by_id, ayon_users_by_name, users_mapping
+
+
+async def import_users(session):
+    (
+        ftrack_users_by_id,
+        ayon_users_by_name,
+        users_mapping
+    ) = _prepare_users_mapping(session)
     security_roles_by_id: dict[str, dict[str, Any]] = {
         role["id"]: role
         for role in await session.query(
@@ -1270,10 +1295,6 @@ async def import_users(session):
                 project_role
             )
 
-    ayon_users_by_name = {
-        row["name"]: UserEntity.from_record(row)
-        async for row in Postgres.iterate("SELECT * FROM users")
-    }
     access_groups = set()
     for ag_key, _ in AccessGroups.access_groups.items():
         access_group_name, pname = ag_key
@@ -1288,12 +1309,6 @@ async def import_users(session):
     ftrack_projects: list[dict[str, Any]] = await session.query(
         "select id, full_name, is_private from Project"
     ).all()
-    users_mapping: dict[str, Union[str, None]] = (
-        _map_ftrack_users_to_ayon_users(
-            ftrack_users,
-            [user.dict() for user in ayon_users_by_name.values()]
-        )
-    )
     for ftrack_id, ayon_user_name in users_mapping.items():
         ftrack_user = ftrack_users_by_id[ftrack_id]
         ftrack_username = ftrack_user["username"].split("@", 1)[0]
