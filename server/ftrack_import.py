@@ -695,7 +695,6 @@ async def _prepare_version_entities(
     status_names_by_id: dict[str, str],
     attrs_mapping: CustomAttributesMapping,
     attr_values_by_id: dict[str, list[dict[str, Any]]],
-    thumbnails_mapping: dict[str, str],
 ) -> dict[str, dict[str, Any]]:
     version_entities = {}
     for asset_version in ftrack_versions:
@@ -1056,7 +1055,6 @@ async def _collect_project_data(
             status_names_by_id,
             attrs_mapping,
             attr_values_by_id,
-            thumbnails_mapping,
         )
     )
 
@@ -1114,6 +1112,17 @@ async def import_project(
         operations.create("version", **version_entity)
 
     await operations.process()
+
+    # components: dict[str, dict[str, Any]] = data["components"]
+    # for resource_id, component in components.items():
+    #     THIS IS EXAMPLE CONTENT
+    #     component = {
+    #         "ext": component["file_type"],
+    #         "size": component["size"],
+    #         "name": component["name"],
+    #         "review_entities": set[str],  # ayon ids
+    #         "thumbnail_entities": set[str],  # ayon ids
+    #     }
 
 
 def _map_ftrack_users_to_ayon_users(
