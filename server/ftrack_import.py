@@ -575,6 +575,8 @@ async def _prepare_task_entities(
     types: list[dict[str, Any]],
     attrs_mapping: CustomAttributesMapping,
     attr_values_by_id: dict[str, list[dict[str, Any]]],
+    assignment_by_task_id: dict[str, set[str]],
+    users_mapping: dict[str, Union[str, None]],
     thumbnails_mapping: dict[str, str],
 ) -> dict[str, dict[str, Any]]:
     task_entities_by_ftrack_id: dict[str, dict[str, Any]] = {}
@@ -628,11 +630,17 @@ async def _prepare_task_entities(
                 dst_key = mapping_item.ayon_attribute_name
                 attribs[dst_key] = value
 
+        assignees = []
+        for user_id in assignment_by_task_id.get(ftrack_id, []):
+            user_name = users_mapping.get(user_id)
+            if user_name is not None:
+                assignees.append(user_name)
+
         ayon_id = uuid.uuid4().hex
         if ftrack_entity["thumbnail_id"]:
             thumbnails_mapping[ayon_id] = ftrack_entity["thumbnail_id"]
 
-        task_entities_by_ftrack_id[ftrack_id] = {
+        task_entity = {
             "entity_id": ayon_id,
             "name": task_name,
             "label": task_label,
@@ -641,6 +649,9 @@ async def _prepare_task_entities(
             "status": status,
             "attrib": attribs,
         }
+        if assignees:
+            task_entity["assignees"] = assignees
+        task_entities_by_ftrack_id[ftrack_id] = task_entity
 
     return task_entities_by_ftrack_id
 
@@ -963,6 +974,25 @@ async def _collect_project_data(
         f" from AssetVersion where project_id is \"{project_id}\""
     ).all()
 
+    assignment_by_task_id = collections.defaultdict(set)
+    task_ids = {
+        task_entity["id"] for task_entity in task_src_entities
+    }
+    for task_ids_chunk in create_chunks(task_ids, 50):
+        joined_ids = ",".join([
+            f'"{task_id}"'
+            for task_id in task_ids_chunk
+        ])
+        appointments = await session.query(
+            f"select resource_id, context_id from Appointment"
+            f" where context_id in ({joined_ids})"
+            f" and type is 'assignment'"
+        ).all()
+        for appointment in appointments:
+            task_id = appointment["context_id"]
+            user_id = appointment["resource_id"]
+            assignment_by_task_id[task_id].add(user_id)
+
     # ftrack thumbnail id by AYON id
     thumbnails_mapping: dict[str, str] = {}
 
@@ -976,6 +1006,12 @@ async def _collect_project_data(
         attr_values_by_id[ftrack_project["id"]],
         thumbnails_mapping,
     )
+
+    (
+        ftrack_users_by_id,
+        ayon_users_by_name,
+        users_mapping
+    ) = _prepare_users_mapping(session)
 
     folder_entities_by_ftrack_id: dict[str, Any] = (
         await _prepare_folder_entities(
@@ -997,6 +1033,8 @@ async def _collect_project_data(
             types,
             attrs_mapping,
             attr_values_by_id,
+            assignment_by_task_id,
+            users_mapping,
             thumbnails_mapping,
         )
     )
