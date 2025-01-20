@@ -674,7 +674,8 @@ async def _prepare_product_entities(
         if product_name == product_label:
             product_label = None
 
-        product_type = asset_types_by_id[asset_entity["type_id"]]["name"]
+        asset_type = asset_types_by_id[asset_entity["type_id"]]
+        product_type = asset_type["short"]
 
         product_entities_by_ftrack_id[ftrack_id] = {
             "entity_id": uuid.uuid4().hex,
