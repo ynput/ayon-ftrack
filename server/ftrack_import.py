@@ -1011,7 +1011,7 @@ async def _collect_project_data(
         ftrack_users_by_id,
         ayon_users_by_name,
         users_mapping
-    ) = _prepare_users_mapping(session)
+    ) = await _prepare_users_mapping(session)
 
     folder_entities_by_ftrack_id: dict[str, Any] = (
         await _prepare_folder_entities(
@@ -1273,7 +1273,7 @@ async def import_users(session):
         ftrack_users_by_id,
         ayon_users_by_name,
         users_mapping
-    ) = _prepare_users_mapping(session)
+    ) = await _prepare_users_mapping(session)
     security_roles_by_id: dict[str, dict[str, Any]] = {
         role["id"]: role
         for role in await session.query(
