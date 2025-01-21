@@ -1,8 +1,11 @@
 # TODO what to do if project already exists in AYON?
-# TODO sync users first to keep assignments
-# TODO sync assignments
+# TODO handle invalid project name -> we don't care if the sync won't
+#    work afterwards
 # TODO better handling of invalid characters in names
 #    Project, folder and task name, maybe even type names?
+# TODO sync users first to keep assignments
+# TODO define default username for not mapped users for entity creation
+#    and comments
 # TODO figure out how to do custom attributes mapping
 #    Right now a sync mapping was copied here, but that is code duplication
 #    and is based on addon settings.
@@ -11,8 +14,6 @@
 #   do exist in AYON
 # TODO make sure ftrack custom attributes contains mandatory ftrack
 #   attributes
-# TODO actually sync data to AYON
-# TODO sync products and versions
 import re
 import uuid
 import json
@@ -604,7 +605,6 @@ async def _prepare_task_entities(
         task_type = type_names_by_id[ftrack_entity["type_id"]]
 
         status = status_names_by_id[ftrack_entity["status_id"]]
-        # TODO fill attributes
         # TODO make sure 'FTRACK_ID_ATTRIB' and 'FTRACK_PATH_ATTRIB'
         #   do exist in AYON
         attribs = {
@@ -777,7 +777,6 @@ async def _prepare_activities(
     users_mapping
 ) -> ActivitiesWrap:
     activities = ActivitiesWrap()
-    # TODO fill default username for not mapped users
     default_username = None
     for note in notes:
         user_id = note["user_id"]
@@ -1037,7 +1036,6 @@ async def _collect_project_data(
         )
     )
 
-    # TODO: Implement assets and versions (AYON products and versions)
     asset_types_by_id = {
         asset_type["id"] : asset_type
         for asset_type in await session.query(
