@@ -170,7 +170,7 @@ def join_filter_values(values: Iterable[str]) -> str:
 
 
 def create_chunks(
-    iterable: set[str],
+    iterable: Union[set, list, tuple],
     chunk_size: int = 200,
 ):
     if not iterable:
