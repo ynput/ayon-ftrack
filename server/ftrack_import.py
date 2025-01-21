@@ -729,7 +729,7 @@ async def _prepare_version_entities(
 
         status_id = asset_version["status_id"]
         version_entities[ftrack_id] = {
-            "id": uuid.uuid4().hex,
+            "entity_id": uuid.uuid4().hex,
             "version": asset_version["version"],
             "taskId": task_id,
             "productId": product_entity["entity_id"],
