@@ -39,6 +39,7 @@ from .ftrack_session import (
     FtrackEntityType,
     join_filter_values,
     create_chunks,
+    convert_ftrack_date_obj,
     convert_ftrack_date,
 )
 

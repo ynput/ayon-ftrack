@@ -185,6 +185,18 @@ def create_chunks(
         yield tupled_iterable[idx:idx + chunk_size]
 
 
+def convert_ftrack_date_obj(
+    date: Union[dict[str, Any], str, None]
+) -> Optional[datetime.datetime]:
+    if date is None:
+        return None
+    if isinstance(date, dict):
+        date = date["value"]
+    date_obj = datetime.datetime.fromisoformat(date)
+    date_obj += datetime.timedelta(hours=24 - date_obj.hour)
+    return date_obj
+
+
 def convert_ftrack_date(
     date: Union[dict[str, Any], str, None]
 ) -> Optional[str]:
@@ -200,10 +212,7 @@ def convert_ftrack_date(
         Optional[str]: Standard date.
 
     """
-    if date is None:
-        return None
-    if isinstance(date, dict):
-        date = date["value"]
-    date_obj = datetime.datetime.fromisoformat(date)
-    date_obj += datetime.timedelta(hours=24 - date_obj.hour)
-    return date_obj.isoformat()
+    date_obj = convert_ftrack_date_obj(date)
+    if date_obj is not None:
+        return date_obj.isoformat()
+    return None
