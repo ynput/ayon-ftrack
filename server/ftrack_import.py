@@ -15,11 +15,14 @@
 # TODO make sure ftrack custom attributes contains mandatory ftrack
 #   attributes
 import re
+import io
 import uuid
 import json
 import collections
+import asyncio
 from typing import Any, Optional, Union
 
+import httpx
 from nxtools import slugify, logging
 
 from ayon_server.access.access_groups import AccessGroups
@@ -28,6 +31,7 @@ from ayon_server.lib.postgres import Postgres
 from ayon_server.settings.anatomy import Anatomy
 from ayon_server.entities import UserEntity
 from ayon_server.entities.core import attribute_library
+from ayon_server.helpers.thumbnails import store_thumbnail
 from ayon_server.helpers.deploy_project import create_project_from_anatomy
 from ayon_server.helpers.get_entity_class import get_entity_class
 from ayon_server.operations import ProjectLevelOperations
@@ -1234,6 +1238,53 @@ async def _import_comments(
         await session.call(operations_chunk)
 
 
+async def _import_thumbnails(
+    project_name: str,
+    components: dict[str, dict[str, Any]],
+):
+    output = {}
+    chunk_size = 512
+    client = httpx.AsyncClient()
+    for resource_id, component in components.items():
+        thumbnail_entities = component["thumbnail_entities"]
+        if not thumbnail_entities:
+            continue
+        resource_url = component["url"]
+        response = await client.get(resource_url)
+        download_url = response.headers["location"]
+        stream = io.BytesIO()
+        async with client.stream("GET", download_url) as response:
+            async for chunk in response.aiter_bytes(chunk_size):
+                stream.write(chunk)
+
+        ext = component["ext"].lower()
+        mime_type = None
+        if ext in (".jpg", ".jpeg"):
+            mime_type = "image/jpeg"
+        elif ext == ".png":
+            mime_type = "image/png"
+
+        if not mime_type:
+            logging.info(
+                f"Skipping thumbnail component with extension: {ext}"
+            )
+            continue
+
+        thumbnail_id = uuid.uuid4().hex
+        # TODO get username somehow?
+        # username = None
+        await store_thumbnail(
+            project_name,
+            thumbnail_id,
+            stream.getvalue(),
+            mime=mime_type,
+        )
+        component["ayon_id"] = thumbnail_id
+        for entity_id in thumbnail_entities:
+            output[entity_id] = thumbnail_id
+    return output
+
+
 async def import_project(
     project_name: str,
     session: FtrackSession,
@@ -1257,17 +1308,30 @@ async def import_project(
         project_code,
         Anatomy(**data["project"]),
     )
+
+    thumbnail_ids_by_entity_id: dict[str, str] = (
+        await _import_thumbnails(project_name, data["components"])
+    )
+
+    def _add_thumbnail(entity_data):
+        entity_id = entity_data["entity_id"]
+        thumbnail_id = thumbnail_ids_by_entity_id.get(entity_id)
+        entity_data["thumbnailId"] = thumbnail_id
+
     operations = ProjectLevelOperations(project_name)
     for folder_entity in data["folders"]:
+        _add_thumbnail(folder_entity)
         operations.create("folder", **folder_entity)
 
     for task_entity in data["tasks"]:
+        _add_thumbnail(task_entity)
         operations.create("task", **task_entity)
 
     for product_entity in data["products"]:
         operations.create("product", **product_entity)
 
     for version_entity in data["versions"]:
+        _add_thumbnail(version_entity)
         operations.create("version", **version_entity)
 
     await operations.process()
