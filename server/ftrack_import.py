@@ -702,6 +702,7 @@ async def _prepare_version_entities(
     status_names_by_id: dict[str, str],
     attrs_mapping: CustomAttributesMapping,
     attr_values_by_id: dict[str, list[dict[str, Any]]],
+    thumbnails_mapping: dict[str, str],
 ) -> dict[str, dict[str, Any]]:
     version_entities = {}
     for asset_version in ftrack_versions:
@@ -735,8 +736,11 @@ async def _prepare_version_entities(
                 attribs[dst_key] = value
 
         status_id = asset_version["status_id"]
+        ayon_id = uuid.uuid4().hex
+        if asset_version["thumbnail_id"]:
+            thumbnails_mapping[ayon_id] = asset_version["thumbnail_id"]
         version_entities[ftrack_id] = {
-            "entity_id": uuid.uuid4().hex,
+            "entity_id": ayon_id,
             "version": asset_version["version"],
             "taskId": task_id,
             "productId": product_entity["entity_id"],
@@ -1157,6 +1161,7 @@ async def _collect_project_data(
             status_names_by_id,
             attrs_mapping,
             attr_values_by_id,
+            thumbnails_mapping,
         )
     )
     activities = await _prepare_activities(
