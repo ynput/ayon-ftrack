@@ -21,12 +21,14 @@ from typing import Any, Optional, Union
 
 from nxtools import slugify, logging
 
+from ayon_server.access.access_groups import AccessGroups
+from ayon_server.activities import create_activity
 from ayon_server.lib.postgres import Postgres
 from ayon_server.settings.anatomy import Anatomy
-from ayon_server.entities.core import attribute_library
 from ayon_server.entities import UserEntity
-from ayon_server.access.access_groups import AccessGroups
+from ayon_server.entities.core import attribute_library
 from ayon_server.helpers.deploy_project import create_project_from_anatomy
+from ayon_server.helpers.get_entity_class import get_entity_class
 from ayon_server.operations import ProjectLevelOperations
 
 from .constants import (
@@ -742,6 +744,83 @@ async def _prepare_version_entities(
     return version_entities
 
 
+class ActivitiesWrap:
+    def __init__(self):
+        self._activities = []
+        self._activity_ids_mapping = {}
+        self._metadata_by_id = {}
+
+    def iter(self):
+        for activity in self._activities:
+            activity_id = activity["activity_id"]
+            ftrack_id = self._activity_ids_mapping[activity_id]
+            metadata = self._metadata_by_id.get(activity_id)
+            yield activity, ftrack_id, metadata
+
+    def add_activity(
+        self,
+        activity: dict[str, Any],
+        ftrack_id: str,
+        metadata: Optional[dict[str, Any]] = None,
+    ):
+        activity_id = activity["activity_id"]
+        self._activities.append(activity)
+        self._activity_ids_mapping[activity_id] = ftrack_id
+        self._metadata_by_id[activity_id] = metadata
+
+
+async def _prepare_activities(
+    notes: list[dict[str, Any]],
+    notes_metadata: dict[str, dict[str, Any]],
+    task_entities_by_ftrack_id: dict[str, dict[str, Any]],
+    version_entities_by_ftrack_id: dict[str, dict[str, Any]],
+    users_mapping
+) -> ActivitiesWrap:
+    activities = ActivitiesWrap()
+    # TODO fill default username for not mapped users
+    default_username = None
+    for note in notes:
+        user_id = note["user_id"]
+        ayon_username = users_mapping.get(user_id)
+        if ayon_username is None:
+            ayon_username = default_username
+
+        if ayon_username is None:
+            continue
+
+        parent_ftrack_id = note["parent_id"]
+        parent_entity = task_entities_by_ftrack_id.get(parent_ftrack_id)
+        parent_entity_type = "task"
+        if not parent_entity:
+            parent_entity = version_entities_by_ftrack_id.get(
+                parent_ftrack_id
+            )
+            parent_entity_type = "version"
+
+        if not parent_entity:
+            continue
+
+        parent_ayon_id = parent_entity["entity_id"]
+
+        activity_id = uuid.uuid4().hex
+        note_id = note["id"]
+        activities.add_activity(
+            {
+                "activity_id": activity_id,
+                "activity_type": "comment",
+                "parent_id": parent_ayon_id,
+                "parent_type": parent_entity_type,
+                "user_name": ayon_username,
+                "body": note["content"],
+                "timestamp": convert_ftrack_date_obj(note["date"]),
+                "data": {"ftrack": {"id": note_id}},
+            },
+            note_id,
+            notes_metadata.get(note_id)
+        )
+    return activities
+
+
 class ComponentsInfo:
     def __init__(self):
         self._components_by_id = {}
@@ -991,6 +1070,29 @@ async def _collect_project_data(
             user_id = appointment["resource_id"]
             assignment_by_task_id[task_id].add(user_id)
 
+    notes = []
+    note_parent_ids = set(task_ids) | {version["id"] for version in versions}
+    for entity_ids_chunk in create_chunks(note_parent_ids, 50):
+        joined_parent_ids = join_filter_values(entity_ids_chunk)
+        notes.extend(await session.query(
+            "select id, content, date, parent_id, user_id, in_reply_to_id"
+            " from Note"
+            f" where parent_id in ({joined_parent_ids})"
+        ).all())
+
+    notes_metadata = {}
+    note_ids = {note["id"] for note in notes}
+    for note_ids_chunk in create_chunks(note_ids, 50):
+        joined_note_ids = join_filter_values(note_ids_chunk)
+        notes_metadata.update({
+            metadata_item["parent_id"]: metadata_item
+            for metadata_item in await session.query(
+                "select key, parent_id, value from Metadata"
+                " where key is 'ayon_activity_id'"
+                f" and parent_id in ({joined_note_ids})"
+            ).all()
+        })
+
     # ftrack thumbnail id by AYON id
     thumbnails_mapping: dict[str, str] = {}
 
@@ -1055,6 +1157,13 @@ async def _collect_project_data(
             attr_values_by_id,
         )
     )
+    activities = await _prepare_activities(
+        notes,
+        notes_metadata,
+        task_entities_by_ftrack_id,
+        version_entities_by_ftrack_id,
+        users_mapping
+    )
 
     components: dict[str, dict[str, Any]] = await _prepare_components(
         session,
@@ -1070,7 +1179,61 @@ async def _collect_project_data(
         "products": list(product_entities_by_ftrack_id.values()),
         "versions": list(version_entities_by_ftrack_id.values()),
         "components": components,
+        "activities": activities,
     }
+
+
+async def _import_comments(
+    project_name: str,
+    session: FtrackSession,
+    activities: ActivitiesWrap,
+):
+    entity_by_id = {}
+    async def _get_entity_obj(e_id, e_type):
+        obj = entity_by_id.get(e_id)
+        if obj is None:
+            entity_class = get_entity_class(e_type)
+            obj = await entity_class.load(project_name, e_id)
+            entity_by_id[e_id] = obj
+        return obj
+
+    ftrack_batch_operations = []
+    for activity, ftrack_id, metadata_item in activities.iter():
+        entity_id = activity.pop("parent_id")
+        entity_type = activity.pop("parent_type")
+        activity_id = activity["activity_id"]
+        entity = await _get_entity_obj(entity_id, entity_type)
+        await create_activity(
+            entity,
+            **activity
+        )
+        if metadata_item:
+            ftrack_batch_operations.append({
+                "action": "update",
+                "entity_data": {
+                    "__entity_type__": "Metadata",
+                    "value": activity_id,
+                },
+                "entity_key": [ftrack_id, "ayon_activity_id"],
+                "entity_type": "Metadata",
+            })
+            continue
+
+        ftrack_batch_operations.append({
+            "action": "create",
+            "entity_data": {
+                "__entity_type__": "Metadata",
+                "key": "ayon_activity_id",
+                "parent_id": ftrack_id,
+                "parent_type": "Note",
+                "value": activity_id,
+            },
+            "entity_key": [ftrack_id, "ayon_activity_id"],
+            "entity_type": "Metadata",
+        })
+
+    for operations_chunk in create_chunks(ftrack_batch_operations, 50):
+        await session.call(operations_chunk)
 
 
 async def import_project(
@@ -1110,6 +1273,8 @@ async def import_project(
         operations.create("version", **version_entity)
 
     await operations.process()
+
+    await _import_comments(project_name, session, data["activities"])
 
     # components: dict[str, dict[str, Any]] = data["components"]
     # for resource_id, component in components.items():
