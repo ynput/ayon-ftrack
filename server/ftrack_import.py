@@ -980,14 +980,11 @@ async def _collect_project_data(
         task_entity["id"] for task_entity in task_src_entities
     }
     for task_ids_chunk in create_chunks(task_ids, 50):
-        joined_ids = ",".join([
-            f'"{task_id}"'
-            for task_id in task_ids_chunk
-        ])
+        joined_task_ids = join_filter_values(task_ids_chunk)
         appointments = await session.query(
-            f"select resource_id, context_id from Appointment"
-            f" where context_id in ({joined_ids})"
-            f" and type is 'assignment'"
+            "select resource_id, context_id from Appointment"
+            f" where context_id in ({joined_task_ids})"
+            " and type is 'assignment'"
         ).all()
         for appointment in appointments:
             task_id = appointment["context_id"]
