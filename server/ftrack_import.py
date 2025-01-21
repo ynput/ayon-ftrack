@@ -4,6 +4,7 @@
 # TODO better handling of invalid characters in names
 #    Project, folder and task name, maybe even type names?
 # TODO sync users first to keep assignments
+# TODO create entities as users who created them
 # TODO define default username for not mapped users for entity creation
 #    and comments
 # TODO figure out how to do custom attributes mapping
@@ -19,7 +20,6 @@ import io
 import uuid
 import json
 import collections
-import asyncio
 from typing import Any, Optional, Union
 
 import httpx
