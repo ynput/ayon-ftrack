@@ -1183,6 +1183,59 @@ async def _collect_project_data(
     }
 
 
+async def _import_comments(
+    project_name: str,
+    session: FtrackSession,
+    activities: ActivitiesWrap,
+):
+    entity_by_id = {}
+    async def _get_entity_obj(e_id, e_type):
+        obj = entity_by_id.get(e_id)
+        if obj is None:
+            entity_class = get_entity_class(e_type)
+            obj = await entity_class.load(project_name, e_id)
+            entity_by_id[e_id] = obj
+        return obj
+
+    ftrack_batch_operations = []
+    for activity, ftrack_id, metadata_item in activities.iter():
+        entity_id = activity.pop("parent_id")
+        entity_type = activity.pop("parent_type")
+        activity_id = activity["activity_id"]
+        entity = await _get_entity_obj(entity_id, entity_type)
+        await create_activity(
+            entity,
+            **activity
+        )
+        if metadata_item:
+            ftrack_batch_operations.append({
+                "action": "update",
+                "entity_data": {
+                    "__entity_type__": "Metadata",
+                    "value": activity_id,
+                },
+                "entity_key": [ftrack_id, "ayon_activity_id"],
+                "entity_type": "Metadata",
+            })
+            continue
+
+        ftrack_batch_operations.append({
+            "action": "create",
+            "entity_data": {
+                "__entity_type__": "Metadata",
+                "key": "ayon_activity_id",
+                "parent_id": ftrack_id,
+                "parent_type": "Note",
+                "value": activity_id,
+            },
+            "entity_key": [ftrack_id, "ayon_activity_id"],
+            "entity_type": "Metadata",
+        })
+
+    for operations_chunk in create_chunks(ftrack_batch_operations, 50):
+        await session.call(operations_chunk)
+
+
 async def import_project(
     project_name: str,
     session: FtrackSession,
@@ -1221,54 +1274,7 @@ async def import_project(
 
     await operations.process()
 
-    entity_by_id = {}
-    async def _get_entity_obj(e_id, e_type):
-        obj = entity_by_id.get(e_id)
-        if obj is None:
-            entity_class = get_entity_class(e_type)
-            obj = await entity_class.load(project_name, e_id)
-            entity_by_id[e_id] = obj
-        return obj
-
-    ftrack_batch_operations = []
-    activities: ActivitiesWrap = data["activities"]
-
-    for activity, ftrack_id, metadata_item in activities.iter():
-        entity_id = activity.pop("parent_id")
-        entity_type = activity.pop("parent_type")
-        activity_id = activity["activity_id"]
-        entity = await _get_entity_obj(entity_id, entity_type)
-        await create_activity(
-            entity,
-            **activity
-        )
-        if metadata_item:
-            ftrack_batch_operations.append({
-                "action": "update",
-                "entity_data": {
-                    "__entity_type__": "Metadata",
-                    "value": activity_id,
-                },
-                "entity_key": [ftrack_id, "ayon_activity_id"],
-                "entity_type": "Metadata",
-            })
-            continue
-
-        ftrack_batch_operations.append({
-            "action": "create",
-            "entity_data": {
-                "__entity_type__": "Metadata",
-                "key": "ayon_activity_id",
-                "parent_id": ftrack_id,
-                "parent_type": "Note",
-                "value": activity_id,
-            },
-            "entity_key": [ftrack_id, "ayon_activity_id"],
-            "entity_type": "Metadata",
-        })
-
-    for operations_chunk in create_chunks(ftrack_batch_operations, 50):
-        await session.call(operations_chunk)
+    await _import_comments(project_name, session, data["activities"])
 
     # components: dict[str, dict[str, Any]] = data["components"]
     # for resource_id, component in components.items():
