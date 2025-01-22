@@ -1,6 +1,4 @@
 # TODO what to do if project already exists in AYON?
-# TODO handle invalid project name -> we don't care if the sync won't
-#    work afterwards
 # TODO better handling of invalid characters in names
 #    Project, folder and task name, maybe even type names?
 # TODO sync users first to keep assignments
@@ -959,14 +957,14 @@ async def _prepare_components(
 
 async def _collect_project_data(
     session: FtrackSession,
-    project_name: str,
+    ftrack_project_name: str,
     studio_settings: dict[str, Any],
 ):
     """Collect data from ftrack and convert them to AYON data.
 
     Args:
         session (FtrackSession): ftrack session.
-        project_name (str): Name of the project.
+        ftrack_project_name (str): Name of the project.
         studio_settings (dict[str, Any]): Studio settings.
 
     Returns:
@@ -976,7 +974,7 @@ async def _collect_project_data(
     """
     ftrack_project: FtrackEntityType = await session.query(
         "select id, full_name, name, thumbnail_id, project_schema_id"
-        f" from Project where full_name is \"{project_name}\""
+        f" from Project where full_name is \"{ftrack_project_name}\""
     ).first()
     attr_confs: list[FtrackEntityType] = await session.query(
         "select id, key, entity_type, object_type_id, is_hierarchical,"
@@ -1191,7 +1189,7 @@ async def _collect_project_data(
 
 
 async def _import_comments(
-    project_name: str,
+    ayon_project_name: str,
     session: FtrackSession,
     activities: ActivitiesWrap,
 ):
@@ -1200,7 +1198,7 @@ async def _import_comments(
         obj = entity_by_id.get(e_id)
         if obj is None:
             entity_class = get_entity_class(e_type)
-            obj = await entity_class.load(project_name, e_id)
+            obj = await entity_class.load(ayon_project_name, e_id)
             entity_by_id[e_id] = obj
         return obj
 
@@ -1244,7 +1242,7 @@ async def _import_comments(
 
 
 async def _import_thumbnails(
-    project_name: str,
+    ayon_project_name: str,
     components: dict[str, dict[str, Any]],
 ):
     output = {}
@@ -1279,7 +1277,7 @@ async def _import_thumbnails(
         # TODO get username somehow?
         # username = None
         await store_thumbnail(
-            project_name,
+            ayon_project_name,
             thumbnail_id,
             stream.getvalue(),
             mime=mime_type,
@@ -1291,31 +1289,32 @@ async def _import_thumbnails(
 
 
 async def import_project(
-    project_name: str,
+    ftrack_project_name: str,
     session: FtrackSession,
     studio_settings: dict[str, Any],
 ):
     """Sync ftrack project data to AYON.
 
     Args:
-        project_name (str): Name of the project.
+        ftrack_project_name (str): ftrack project name.
         session (FtrackSession): ftrack session.
         studio_settings (dict[str, Any]): Studio settings.
 
     """
+    ayon_project_name = slugify(ftrack_project_name, "_")
     data = await _collect_project_data(
-        session, project_name, studio_settings,
+        session, ftrack_project_name, studio_settings,
     )
     project_code = data["project_code"]
 
     await create_project_from_anatomy(
-        project_name,
+        ayon_project_name,
         project_code,
         Anatomy(**data["project"]),
     )
 
     thumbnail_ids_by_entity_id: dict[str, str] = (
-        await _import_thumbnails(project_name, data["components"])
+        await _import_thumbnails(ayon_project_name, data["components"])
     )
 
     def _add_thumbnail(entity_data):
@@ -1323,7 +1322,7 @@ async def import_project(
         thumbnail_id = thumbnail_ids_by_entity_id.get(entity_id)
         entity_data["thumbnailId"] = thumbnail_id
 
-    operations = ProjectLevelOperations(project_name)
+    operations = ProjectLevelOperations(ayon_project_name)
     for folder_entity in data["folders"]:
         _add_thumbnail(folder_entity)
         operations.create("folder", **folder_entity)
@@ -1341,7 +1340,7 @@ async def import_project(
 
     await operations.process()
 
-    await _import_comments(project_name, session, data["activities"])
+    await _import_comments(ayon_project_name, session, data["activities"])
 
     # components: dict[str, dict[str, Any]] = data["components"]
     # for resource_id, component in components.items():
