@@ -2,6 +2,7 @@
 # - Probably delete it? But there is missing api function for that.
 # TODO Better handling of invalid characters in names
 #    Folder and task name, maybe even type names?
+# TODO How to find out how many users can be created (license limitations).
 # TODO Define default username for not mapped users for entity creation
 #    and comments.
 # TODO Create entities as users who created them in ftrack.
@@ -12,6 +13,7 @@
 #   do exist in AYON, or do not set them.
 # TODO Make sure ftrack custom attributes contains mandatory ftrack
 #   attributes, or do not set them.
+# TODO Sync reviewables.
 import re
 import io
 import uuid
