@@ -28,8 +28,9 @@ from ayon_server.access.access_groups import AccessGroups
 from ayon_server.activities import create_activity
 from ayon_server.lib.postgres import Postgres
 from ayon_server.settings.anatomy import Anatomy
-from ayon_server.entities import UserEntity
+from ayon_server.entities import UserEntity, ProjectEntity
 from ayon_server.entities.core import attribute_library
+from ayon_server.exceptions import NotFoundException, BadRequestException
 from ayon_server.helpers.thumbnails import store_thumbnail
 from ayon_server.helpers.deploy_project import create_project_from_anatomy
 from ayon_server.helpers.get_entity_class import get_entity_class
@@ -1307,17 +1308,15 @@ async def import_project(
     if not re.match(PROJECT_NAME_REGEX, ayon_project_name):
         ayon_project_name = slugify(ayon_project_name, "_")
 
-    # Missing delete project api function
-    # - this implementation does not handle storage files, user permissions
-    #   etc.
-    # try:
-    #     project_entity = ProjectEntity.load(ayon_project_name)
-    #     logging.warning(
-    #         f"Project '{ayon_project_name}' already exists, replacing it."
-    #     )
-    #     await project_entity.delete()
-    # except NotFoundException:
-    #     pass
+    try:
+        # Project already exists -> skip
+        _ = ProjectEntity.load(ayon_project_name)
+        raise BadRequestException(
+            f"Project '{ayon_project_name}' already exists"
+        )
+
+    except NotFoundException:
+        pass
     data = await _collect_project_data(
         session, ftrack_project_name, studio_settings,
     )
