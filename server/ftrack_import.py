@@ -1732,4 +1732,4 @@ async def import_users(session):
             if getattr(ayon_user.attrib, key) != value:
                 setattr(ayon_user.attrib, key, value)
 
-        ayon_user.save()
+        await ayon_user.save()
