@@ -33,6 +33,7 @@ from ayon_server.helpers.thumbnails import store_thumbnail
 from ayon_server.helpers.deploy_project import create_project_from_anatomy
 from ayon_server.helpers.get_entity_class import get_entity_class
 from ayon_server.operations import ProjectLevelOperations
+from ayon_server.types import PROJECT_NAME_REGEX
 
 from .constants import (
     FTRACK_ID_ATTRIB,
@@ -1301,7 +1302,10 @@ async def import_project(
         studio_settings (dict[str, Any]): Studio settings.
 
     """
-    ayon_project_name = slugify(ftrack_project_name, "_")
+    ayon_project_name = ftrack_project_name
+    if not re.match(PROJECT_NAME_REGEX, ayon_project_name):
+        ayon_project_name = slugify(ayon_project_name, "_")
+
     data = await _collect_project_data(
         session, ftrack_project_name, studio_settings,
     )
