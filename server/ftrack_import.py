@@ -1,18 +1,17 @@
 # TODO what to do if project already exists in AYON?
-# TODO better handling of invalid characters in names
-#    Project, folder and task name, maybe even type names?
-# TODO sync users first to keep assignments
-# TODO create entities as users who created them
-# TODO define default username for not mapped users for entity creation
-#    and comments
-# TODO figure out how to do custom attributes mapping
+# - Probably delete it? But there is missing api function for that.
+# TODO Better handling of invalid characters in names
+#    Folder and task name, maybe even type names?
+# TODO Define default username for not mapped users for entity creation
+#    and comments.
+# TODO Create entities as users who created them in ftrack.
+# TODO Figure out how to do custom attributes mapping
 #    Right now a sync mapping was copied here, but that is code duplication
-#    and is based on addon settings.
-# TODO custom attributes mapping could be shared from common?
-# TODO make sure 'FTRACK_ID_ATTRIB' and 'FTRACK_PATH_ATTRIB'
-#   do exist in AYON
-# TODO make sure ftrack custom attributes contains mandatory ftrack
-#   attributes
+#    and is based on addon settings -> we might need to ask in dialog?
+# TODO Make sure 'FTRACK_ID_ATTRIB' and 'FTRACK_PATH_ATTRIB'
+#   do exist in AYON, or do not set them.
+# TODO Make sure ftrack custom attributes contains mandatory ftrack
+#   attributes, or do not set them.
 import re
 import io
 import uuid
@@ -1306,6 +1305,17 @@ async def import_project(
     if not re.match(PROJECT_NAME_REGEX, ayon_project_name):
         ayon_project_name = slugify(ayon_project_name, "_")
 
+    # Missing delete project api function
+    # - this implementation does not handle storage files, user permissions
+    #   etc.
+    # try:
+    #     project_entity = ProjectEntity.load(ayon_project_name)
+    #     logging.warning(
+    #         f"Project '{ayon_project_name}' already exists, replacing it."
+    #     )
+    #     await project_entity.delete()
+    # except NotFoundException:
+    #     pass
     data = await _collect_project_data(
         session, ftrack_project_name, studio_settings,
     )
