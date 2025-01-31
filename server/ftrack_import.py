@@ -58,6 +58,274 @@ FTRACK_REVIEW_NAMES = [
 ]
 
 
+async def _make_sure_ayon_custom_attribute_exists(
+    session: FtrackSession,
+    existing_custom_attributes: list[dict[str, Any]],
+):
+    security_roles = await session.query(
+        "select id, name, type from SecurityRole"
+    ).all()
+    attr_security_roles = [
+        {
+            "__entity_type__": "SecurityRole",
+            "id": security_role["id"],
+        }
+        for security_role in security_roles
+    ]
+    existing_keys = {
+        attr_conf["key"]
+        for attr_conf in existing_custom_attributes
+    }
+    batch = []
+    for item in [
+        {
+            "key": CUST_ATTR_KEY_SERVER_ID,
+            "type": "text",
+            "label": "AYON ID",
+            "default": "",
+            "is_hierarchical": True,
+            "config": json.dumps({"markdown": False}),
+        },
+        {
+            "key": CUST_ATTR_KEY_SERVER_PATH,
+            "type": "text",
+            "label": "AYON path",
+            "default": "",
+            "is_hierarchical": True,
+            "config": json.dumps({"markdown": False}),
+        },
+    ]:
+        if item["key"] in existing_keys:
+            continue
+        item_id = str(uuid.uuid4())
+        item.update({
+            "__entity_type__": "CustomAttributeConfiguration",
+            "core": False,
+            "sort": 0,
+            "id": item_id,
+            "read_security_roles": attr_security_roles,
+            "write_security_roles": attr_security_roles,
+        })
+        item.setdefault("entity_type", "show")
+        batch.append({
+            "action": "create",
+            "entity_data": item,
+            "entity_key": [item_id],
+            "entity_type": "CustomAttributeConfiguration",
+        })
+
+    if not batch:
+        return
+
+    try:
+        await session.call(batch)
+    except ServerError:
+        raise BadRequestException(
+            "Failed to create custom attributes in ftrack."
+            " Please make sure API key you filled has admin permissions."
+        )
+
+
+async def _get_supported_attribute_types(
+    session: FtrackSession
+) -> dict[str, str]:
+    supported_types = {
+        "text",
+        "enumerator",
+        "date",
+        "enumerator",
+        "number",
+        "boolean",
+        # "dynamic",
+        # "notificationtype",
+        # "expression",
+        # "url",
+    }
+    return {
+        conf_type["id"]: conf_type["name"]
+        for conf_type in await session.query(
+            "select id, name from CustomAttributeType"
+        ).all()
+        if conf_type["name"] in supported_types
+    }
+
+
+async def _find_possible_ayon_attributes(
+    attr_conf: dict[str, Any],
+    attr_type_name_by_id: dict[str, str],
+    ayon_attributes: dict[str, Any],
+):
+    _ = {
+        "text": {"string"},
+        "date": {"datetime", "string"},
+        "number": {"integer", "float", "string"},
+        "boolean": {"boolean"},
+        "enumerator": {"string", "list_of_strings", "list_of_integers"},
+    }
+    # NOTE Maybe also filter those that are built-in and don't have correct
+    #   scope
+    output = []
+    attr_type_name = attr_type_name_by_id[attr_conf["type_id"]]
+    for ayon_attribute in ayon_attributes.values():
+        is_builtin = ayon_attribute["builtin"]
+        ayon_attr_data = ayon_attribute["data"]
+        if attr_type_name == "boolean":
+            if ayon_attr_data["type"] == "boolean":
+                output.append(ayon_attribute)
+
+        elif attr_type_name == "text":
+            if ayon_attr_data["type"] == "string":
+                output.append(ayon_attribute)
+
+        elif attr_type_name == "date":
+            if ayon_attr_data["type"] in {"string", "datetime"}:
+                output.append(ayon_attribute)
+
+        elif attr_type_name == "enumerator":
+            config = json.loads(attr_conf["config"])
+            # Mapping to AYON builtin enumerator might be potential danger
+            if is_builtin:
+                pass
+            elif config["multiSelect"]:
+                if ayon_attr_data["type"] == "list_of_strings":
+                    output.append(ayon_attribute)
+            elif ayon_attr_data["type"] == "string":
+                output.append(ayon_attribute)
+
+        elif attr_type_name == "number":
+            if ayon_attr_data["type"] in {"integer", "float", "string"}:
+                output.append(ayon_attribute)
+
+    return output
+
+
+async def prepare_custom_attributes(session: FtrackSession):
+    supported_type_ids = await _get_supported_attribute_types(session)
+    attr_confs = await session.query(
+        "select id, key, label, type_id, is_hierarchical,"
+        " entity_type, config, object_type_id, default"
+        " from CustomAttributeConfiguration"
+    ).all()
+
+    # NOTE make it optional?
+    # Make sure ftrack has minimum required custom attributes we need for
+    #   import
+    await _make_sure_ayon_custom_attribute_exists(session, attr_confs)
+
+    filtered_attr_confs = [
+        attr_conf
+        for attr_conf in attr_confs
+        if (
+            attr_conf["type_id"] in supported_type_ids
+            and attr_conf["key"] not in {
+                # TODO skip also keys that are not create with import script
+                #   - can be found in constants.py
+                CUST_ATTR_KEY_SERVER_PATH,
+                CUST_ATTR_KEY_SERVER_ID,
+            }
+        )
+    ]
+
+    # TODO probably collect their scope and validate if ftrack attribute
+    #   can be used for mapping in AYON?
+    ayon_attributes = {
+        row["name"]: row
+        async for row in Postgres.iterate(
+            "SELECT name, data, builtin FROM public.attributes"
+        )
+    }
+    ayon_attribute_names = {
+        name.lower()
+        for name in ayon_attributes
+    }
+    # Remove ftrack attributes
+    for attr_name in {FTRACK_ID_ATTRIB, FTRACK_PATH_ATTRIB}:
+        ayon_attributes.pop(attr_name, None)
+
+    CREATE_ITEM = "__create__"
+    SKIP_ITEM = "__skip__"
+    # Group ftrack attributes by key
+    attr_confs_by_key = collections.defaultdict(list)
+    for attr_conf in filtered_attr_confs:
+        key = attr_conf["key"]
+        attr_confs_by_key[key].append(attr_conf)
+
+    items = []
+    for key, attr_confs in attr_confs_by_key.items():
+        # Choose which attribute will be used for mapping
+        # - only one is used, hierarchical has always priority, then the most
+        #   counted by attribute type (2 bools and 1 text -> bool is used)
+        attr_conf = None
+        confs_by_type = collections.defaultdict(list)
+        if len(attr_confs) == 1:
+            attr_conf = attr_confs[0]
+        else:
+            for _attr_conf in attr_confs:
+                if _attr_conf["is_hierarchical"]:
+                    attr_conf = _attr_conf
+                    break
+                confs_by_type[_attr_conf["type_id"]].append(_attr_conf)
+
+        if attr_conf is None:
+            max_type_count = 0
+            for type_id, _attr_confs in confs_by_type.items():
+                if len(_attr_confs) > max_type_count:
+                    max_type_count = len(_attr_confs)
+                    attr_conf = _attr_confs[0]
+
+        if attr_conf is None:
+            continue
+
+        enum_items = [{
+            "value": SKIP_ITEM,
+            "label": "< Skip >",
+        }]
+        # Do not allow to create attribute if already exists in AYON
+        mapped_key = None
+        possible_attributes = await _find_possible_ayon_attributes(
+            attr_conf, supported_type_ids, ayon_attributes
+        )
+        possible_attributes.sort(key=lambda i: i["name"])
+        for ayon_attribute in possible_attributes:
+            enum_items.append({
+                "value": ayon_attribute["name"],
+                "label": ayon_attribute["name"],
+            })
+            if key.lower() == ayon_attribute["name"].lower():
+                mapped_key = ayon_attribute["name"]
+            elif key == "fstart":
+                mapped_key = "frameStart"
+            elif key == "fend":
+                mapped_key = "frameEnd"
+
+        if key.lower() not in ayon_attribute_names:
+            enum_items.insert(
+                0,
+                {
+                    "value": CREATE_ITEM,
+                    "label": "< Create >"
+                }
+            )
+            if not mapped_key:
+                mapped_key = CREATE_ITEM
+
+        # There is only 'SKIP_ITEM'
+        if len(enum_items) == 1:
+            continue
+
+        if not mapped_key:
+            mapped_key = SKIP_ITEM
+        items.append({
+            "key": key,
+            "value": mapped_key,
+            "enum_items": enum_items,
+        })
+
+    return {
+        "items": items,
+    }
+
+
 class MappedAYONAttribute:
     def __init__(
         self,
@@ -116,11 +384,16 @@ class MappedAYONAttribute:
 
 
 class CustomAttributesMapping:
-    def __init__(self):
+    def __init__(self, attr_confs):
         self._items: dict[str, MappedAYONAttribute] = {}
+        self._attr_confs = attr_confs
 
     def __contains__(self, item):
         return item in self._items
+
+    @property
+    def attr_confs(self) -> list[FtrackEntityType]:
+        return self._attr_confs
 
     def items(self):
         return self._items.items()
@@ -148,7 +421,7 @@ class CustomAttributesMapping:
 
 def get_custom_attributes_mapping(
     attr_confs: list[FtrackEntityType],
-    addon_settings: dict[str, Any],
+    attributes_mapping: dict[str, str],
 ) -> CustomAttributesMapping:
     """Query custom attribute configurations from ftrack server.
 
@@ -157,7 +430,6 @@ def get_custom_attributes_mapping(
 
     """
     # TODO this is not available yet in develop
-    attributes_mapping = addon_settings.get("custom_attributes", {}).get("attributes_mapping", {})
     ayon_attribute_names = set()
     builtin_attributes_names = set()
     for attr in attribute_library.info_data:
@@ -173,7 +445,7 @@ def get_custom_attributes_mapping(
         else:
             nonhier_attrs.append(attr_conf)
 
-    output = CustomAttributesMapping()
+    output = CustomAttributesMapping(attr_confs)
     if not attributes_mapping.get("enabled"):
         for attr_conf in hier_attrs:
             attr_name = attr_conf["key"]
@@ -783,18 +1055,15 @@ async def _prepare_activities(
     notes_metadata: dict[str, dict[str, Any]],
     task_entities_by_ftrack_id: dict[str, dict[str, Any]],
     version_entities_by_ftrack_id: dict[str, dict[str, Any]],
-    users_mapping
+    default_username: str,
+    users_mapping: dict[str, Union[str, None]],
 ) -> ActivitiesWrap:
     activities = ActivitiesWrap()
-    default_username = None
     for note in notes:
         user_id = note["user_id"]
         ayon_username = users_mapping.get(user_id)
         if ayon_username is None:
             ayon_username = default_username
-
-        if ayon_username is None:
-            continue
 
         parent_ftrack_id = note["parent_id"]
         parent_entity = task_entities_by_ftrack_id.get(parent_ftrack_id)
@@ -961,14 +1230,19 @@ async def _prepare_components(
 async def _collect_project_data(
     session: FtrackSession,
     ftrack_project_name: str,
-    studio_settings: dict[str, Any],
+    default_username: str,
+    users_mapping: dict[str, Union[str, None]],
+    attrs_mapping: CustomAttributesMapping,
 ):
     """Collect data from ftrack and convert them to AYON data.
 
     Args:
         session (FtrackSession): ftrack session.
         ftrack_project_name (str): Name of the project.
-        studio_settings (dict[str, Any]): Studio settings.
+        default_username (str): Default username used if user was not mapped.
+        users_mapping (dict[str, Union[str, None]]): Mapping of user ids to
+            AYON usernames.
+        attrs_mapping (CustomAttributesMapping): Mapping of custom attributes.
 
     Returns:
         dict[str, Any]: Output contains project entity, folder entities
@@ -979,17 +1253,10 @@ async def _collect_project_data(
         "select id, full_name, name, thumbnail_id, project_schema_id"
         f" from Project where full_name is \"{ftrack_project_name}\""
     ).first()
-    attr_confs: list[FtrackEntityType] = await session.query(
-        "select id, key, entity_type, object_type_id, is_hierarchical,"
-        " default, type_id from CustomAttributeConfiguration"
-    ).all()
     attr_confs_by_id: dict[str, FtrackEntityType] = {
         attr_conf["id"]: attr_conf
-        for attr_conf in attr_confs
+        for attr_conf in attrs_mapping.attr_confs
     }
-    attrs_mapping: CustomAttributesMapping = get_custom_attributes_mapping(
-        attr_confs, studio_settings
-    )
     statuses: list[FtrackEntityType] = await session.query(
         "select id, name, color, sort, state from Status"
     ).all()
@@ -1114,12 +1381,6 @@ async def _collect_project_data(
         thumbnails_mapping,
     )
 
-    (
-        ftrack_users_by_id,
-        ayon_users_by_name,
-        users_mapping
-    ) = await _prepare_users_mapping(session)
-
     folder_entities_by_ftrack_id: dict[str, Any] = (
         await _prepare_folder_entities(
             project_id,
@@ -1170,7 +1431,8 @@ async def _collect_project_data(
         notes_metadata,
         task_entities_by_ftrack_id,
         version_entities_by_ftrack_id,
-        users_mapping
+        default_username,
+        users_mapping,
     )
 
     components: dict[str, dict[str, Any]] = await _prepare_components(
@@ -1291,17 +1553,22 @@ async def _import_thumbnails(
     return output
 
 
-async def import_project(
-    ftrack_project_name: str,
+async def _import_project(
     session: FtrackSession,
-    studio_settings: dict[str, Any],
+    ftrack_project_name: str,
+    default_username: str,
+    users_mapping: dict[str, Union[str, None]],
+    attrs_mapping: CustomAttributesMapping,
 ):
     """Sync ftrack project data to AYON.
 
     Args:
         ftrack_project_name (str): ftrack project name.
         session (FtrackSession): ftrack session.
-        studio_settings (dict[str, Any]): Studio settings.
+        users_mapping (dict[str, Union[str, None]]): Mapping of ftrack user id
+            to AYON username.
+        attrs_mapping (CustomAttributesMapping): Mapping of ftrack attributes to
+            AYON attributes.
 
     """
     ayon_project_name = ftrack_project_name
@@ -1318,7 +1585,11 @@ async def import_project(
     except NotFoundException:
         pass
     data = await _collect_project_data(
-        session, ftrack_project_name, studio_settings,
+        session,
+        ftrack_project_name,
+        default_username,
+        users_mapping,
+        attrs_mapping,
     )
     project_code = data["project_code"]
 
@@ -1522,7 +1793,17 @@ async def _prepare_users_mapping(
     return ftrack_users_by_id, ayon_users_by_name, users_mapping
 
 
-async def import_users(session):
+async def _create_attributes(
+    session: FtrackSession,
+    attributes_mapping: dict[str, str],
+    attr_confs: list[FtrackEntityType],
+    ftrack_object_types: list[FtrackEntityType],
+) -> dict[str, str]:
+    output = {}
+    return output
+
+
+async def _import_users(session) -> dict[str, Union[str, None]]:
     (
         ftrack_users_by_id,
         ayon_users_by_name,
@@ -1669,7 +1950,6 @@ async def import_users(session):
         )
         # Fetch user with REST to get 'data'
         ayon_user = ayon_users_by_name[ayon_user_name]
-        user_diffs = {}
         if ftrack_user["is_active"] != ayon_user.active:
             ayon_user.active = ftrack_user["is_active"]
 
@@ -1732,3 +2012,45 @@ async def import_users(session):
                 setattr(ayon_user.attrib, key, value)
 
         await ayon_user.save()
+
+    return users_mapping
+
+
+async def import_projects(
+    session: FtrackSession,
+    default_username: str,
+    attributes_mapping: dict[str, str],
+    project_names: list[str],
+):
+    """Import ftrack projects to AYON.
+
+    Args:
+        session (FtrackSession): ftrack session.
+        default_username (str): Default username used for unmapped users.
+        attributes_mapping (dict[str, str]): Mapping of ftrack attributes to
+            AYON attributes.
+        project_names (List[str]): List of ftrack project names.
+
+    """
+    attr_confs: list[FtrackEntityType] = await session.query(
+        "select id, key, entity_type, object_type_id, is_hierarchical,"
+        " default, type_id from CustomAttributeConfiguration"
+    ).all()
+    object_types: list[FtrackEntityType] = await session.query(
+        "select id, name, sort from ObjectType"
+    ).all()
+    attributes_mapping = await _create_attributes(
+        session, attributes_mapping, attr_confs, object_types
+    )
+    users_mapping = await _import_users(session)
+    attrs_mapping: CustomAttributesMapping = get_custom_attributes_mapping(
+        attr_confs, attributes_mapping
+    )
+    for project_name in project_names:
+        await _import_project(
+            session,
+            project_name,
+            default_username,
+            users_mapping,
+            attrs_mapping,
+        )
