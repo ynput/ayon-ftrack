@@ -21,7 +21,11 @@ from .constants import (
     FTRACK_PATH_ATTRIB,
 )
 from .ftrack_session import FtrackSession, InvalidCredentials, ServerError
-from .ftrack_import import prepare_custom_attributes, import_projects
+from .ftrack_import import (
+    prepare_attributes_mapping,
+    create_update_attributes,
+    import_projects,
+)
 
 
 class FtrackCredentialsPayload(OPModel):
@@ -30,10 +34,13 @@ class FtrackCredentialsPayload(OPModel):
     username: str = Field(..., title="ftrack username")
 
 
-class ProjectsSyncPayload(FtrackCredentialsPayload):
+class AttributesCreateUpdatePayload(FtrackCredentialsPayload):
     attributes_mapping: dict[str, str] = Field(
         ..., title="Mapping of ftrack attributes to ayon attributes"
     )
+
+
+class ProjectsSyncPayload(AttributesCreateUpdatePayload):
     project_names: list[str] = Field(
         ..., title="List of ftrack project names to sync"
     )
@@ -89,8 +96,13 @@ class FtrackAddon(BaseServerAddon):
             method="POST",
         )
         self.add_endpoint(
+            "/import/ftrackAttributes",
+            self._prepare_attr_mapping,
+            method="POST",
+        )
+        self.add_endpoint(
             "/import/attributes",
-            self._prepare_attributes,
+            self._create_update_attributes,
             method="POST",
         )
         self.add_endpoint(
@@ -256,7 +268,7 @@ class FtrackAddon(BaseServerAddon):
             "is_admin": "administrator" in role_names,
         }
 
-    async def _prepare_attributes(
+    async def _prepare_attr_mapping(
         self,
         user: CurrentUser,
         payload: FtrackCredentialsPayload,
@@ -266,7 +278,22 @@ class FtrackAddon(BaseServerAddon):
             payload.api_key,
             payload.username,
         )
-        return await prepare_custom_attributes(session)
+        return await prepare_attributes_mapping(session)
+
+    async def _create_update_attributes(
+        self,
+        user: CurrentUser,
+        payload: AttributesCreateUpdatePayload,
+    ):
+        session = await self._prepare_ftrack_session(
+            payload.server_url,
+            payload.api_key,
+            payload.username,
+        )
+        return await create_update_attributes(
+            session,
+            payload.attributes_mapping,
+        )
 
     async def _import_ftrack_projects(
         self,
