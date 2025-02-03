@@ -1,4 +1,5 @@
 import datetime
+import urllib.parse
 from typing import Optional, Any, Iterable, Union
 
 import httpx
@@ -103,6 +104,8 @@ class FtrackSession:
     def __init__(self, server_url: str, api_key: str, username: str):
         server_url = server_url.rstrip("/")
         self._server_url = server_url
+        self._api_key = api_key
+        self._username = username
         self._api_url = server_url + "/api"
         self._client = httpx.AsyncClient(
             headers={
@@ -153,13 +156,21 @@ class FtrackSession:
         fields_str = ", ".join(fields)
         return self.query(f"select {fields_str} from Project")
 
+    def get_url(self, resource_identifier: str) -> str:
+        query = urllib.parse.urlencode((
+            ("id", resource_identifier),
+            ("username", self._username),
+            ("apiKey", self._api_key),
+        ))
+        return f"{self._server_url}/component/get?{query}"
+
 
 def join_filter_values(values: Iterable[str]) -> str:
     return ",".join(f'"{value}"' for value in values)
 
 
 def create_chunks(
-    iterable: set[str],
+    iterable: Union[set, list, tuple],
     chunk_size: int = 200,
 ):
     if not iterable:
@@ -172,6 +183,18 @@ def create_chunks(
     tupled_iterable = tuple(iterable)
     for idx in range(0, iterable_size, chunk_size):
         yield tupled_iterable[idx:idx + chunk_size]
+
+
+def convert_ftrack_date_obj(
+    date: Union[dict[str, Any], str, None]
+) -> Optional[datetime.datetime]:
+    if date is None:
+        return None
+    if isinstance(date, dict):
+        date = date["value"]
+    date_obj = datetime.datetime.fromisoformat(date)
+    date_obj += datetime.timedelta(hours=24 - date_obj.hour)
+    return date_obj
 
 
 def convert_ftrack_date(
@@ -189,10 +212,7 @@ def convert_ftrack_date(
         Optional[str]: Standard date.
 
     """
-    if date is None:
-        return None
-    if isinstance(date, dict):
-        date = date["value"]
-    date_obj = datetime.datetime.fromisoformat(date)
-    date_obj += datetime.timedelta(hours=24 - date_obj.hour)
-    return date_obj.isoformat()
+    date_obj = convert_ftrack_date_obj(date)
+    if date_obj is not None:
+        return date_obj.isoformat()
+    return None
