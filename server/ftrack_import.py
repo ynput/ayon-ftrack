@@ -1680,7 +1680,7 @@ async def _import_project(
 
     try:
         # Project already exists -> skip
-        _ = ProjectEntity.load(ayon_project_name)
+        _ = await ProjectEntity.load(ayon_project_name)
         raise BadRequestException(
             f"Project '{ayon_project_name}' already exists"
         )
@@ -2032,7 +2032,7 @@ async def _create_attribute(
         for object_type in ftrack_object_types
     }
     ftrack_confs = _find_best_attr_conf(ftrack_attr_confs)
-    scope, inherit = _get_scope_n_inherit(
+    scope, inherit = await _get_scope_n_inherit(
         ftrack_confs, object_type_by_id
     )
     first_attr = ftrack_confs[0]
@@ -2121,7 +2121,7 @@ async def _udpdate_attribute(
         for object_type in ftrack_object_types
     }
     ftrack_confs = _find_best_attr_conf(ftrack_attrs)
-    extracted_scope, inherit = _get_scope_n_inherit(
+    extracted_scope, inherit = await _get_scope_n_inherit(
         ftrack_confs, object_type_by_id
     )
 
