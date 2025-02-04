@@ -2085,12 +2085,6 @@ async def _create_attribute(
 
     ayon_attr_data["type"] = ayon_attr_type
 
-    ayon_attr = {
-        "name": ftrack_key,
-        "position": position,
-        "scope": list(scope),
-        "data": ayon_attr_data,
-    }
     await Postgres.execute(
         """
         INSERT INTO public.attributes
@@ -2107,7 +2101,7 @@ async def _create_attribute(
         ftrack_key,
         position,
         list(scope),
-        ayon_attr,
+        ayon_attr_data,
     )
     return True
 
@@ -2270,6 +2264,13 @@ async def create_update_attributes(
             continue
 
         if ayon_key == CREATE_ITEM:
+            if ftrack_key in ayon_attr_by_name:
+                logging.warning(
+                    f"Failed to create attribute '{ftrack_key}'"
+                    " because already exists, skipping"
+                )
+                continue
+
             if await _create_attribute(
                 ftrack_key,
                 ftrack_attr_confs,
