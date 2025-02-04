@@ -449,8 +449,9 @@ async def _get_custom_attributes_mapping(
 
     """
     attr_confs: list[FtrackEntityType] = await session.query(
-        "select id, key, entity_type, object_type_id, is_hierarchical,"
-        " default, type_id from CustomAttributeConfiguration"
+        "select id, key, label, type_id, is_hierarchical,"
+        " entity_type, config, object_type_id, default"
+        " from CustomAttributeConfiguration"
     ).all()
 
     ayon_attribute_names = set()
@@ -2230,8 +2231,9 @@ async def create_update_attributes(
     attributes_mapping: dict[str, str],
 ) -> dict[str, Any]:
     attr_confs: list[FtrackEntityType] = await session.query(
-        "select id, key, entity_type, object_type_id, is_hierarchical,"
-        " default, type_id from CustomAttributeConfiguration"
+        "select id, key, label, type_id, is_hierarchical,"
+        " entity_type, config, object_type_id, default"
+        " from CustomAttributeConfiguration"
     ).all()
     ftrack_object_types: list[FtrackEntityType] = await session.query(
         "select id, name, sort from ObjectType"
