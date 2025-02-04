@@ -1895,54 +1895,6 @@ async def _prepare_users_mapping(
     return ftrack_users_by_id, ayon_users_by_name, users_mapping
 
 
-async def _attribute_needs_update(ftrack_attrs, ayon_attr) -> bool:
-    for ftrack_attr in ftrack_attrs:
-        if ftrack_attr["type"] != ayon_attr["type"]:
-            return True
-
-        if ftrack_attr["type"] == "string":
-            if ftrack_attr["default"] != ayon_attr["default"]:
-                return True
-            continue
-
-        if ftrack_attr["type"] == "number":
-            if ftrack_attr["min"] != ayon_attr["min"]:
-                return True
-            if ftrack_attr["max"] != ayon_attr["max"]:
-                return True
-            continue
-
-        if ftrack_attr["type"] == "boolean":
-            if ftrack_attr["default"] != ayon_attr["default"]:
-                return True
-            continue
-
-        if ftrack_attr["type"] == "enum":
-            if ftrack_attr["values"] != ayon_attr["values"]:
-                return True
-            continue
-
-        if ftrack_attr["type"] == "date":
-            if ftrack_attr["default"] != ayon_attr["default"]:
-                return True
-            continue
-
-        if ftrack_attr["type"] == "json":
-            if ftrack_attr["default"] != ayon_attr["default"]:
-                return True
-            continue
-    return False
-
-
-_ATTR_TYPE_MAPPING = {
-    "text": {"string"},
-    "date": {"datetime"},
-    "number": {"integer", "float"},
-    "boolean": {"boolean"},
-    "enumerator": {"string", "list_of_strings", "list_of_integers"},
-}
-
-
 async def _get_scope_n_inherit(
     attr_confs: list[dict[str, Any]],
     object_type_by_id: dict[str, str],
