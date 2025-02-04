@@ -527,7 +527,7 @@ async def _convert_attrib_value(
     if value is None:
         return value
 
-    ayon_type_name = ayon_attr["type"]
+    ayon_type_name = ayon_attr["data"]["type"]
     ftrack_type_name = ftrack_attr["type_name"]
 
     if ayon_type_name == "boolean":
@@ -2151,7 +2151,8 @@ async def _udpdate_attribute(
         type_name == "enumerator"
         and ayon_type in {"list_of_strings", "string"}
     ):
-        enum_items = json.loads(first_attr["confis"]["data"])
+        config = json.loads(first_attr["config"])
+        enum_items = json.loads(config["data"])
         # Mapping to AYON builtin enumerator might be potential danger
         new_enum = [
             {
