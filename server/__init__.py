@@ -247,7 +247,7 @@ class FtrackAddon(BaseServerAddon):
         )
         user = await session.query(
             f"select id from User where username is '{payload.username}'"
-        ).one()
+        ).first()
         user_id = user["id"]
         role_types_by_id = {
             role_type["id"]: role_type
