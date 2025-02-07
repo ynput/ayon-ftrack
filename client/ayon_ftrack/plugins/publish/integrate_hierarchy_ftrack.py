@@ -1,8 +1,6 @@
-import sys
 import collections
 from copy import deepcopy
 
-import six
 import pyblish.api
 import ayon_api
 
@@ -350,11 +348,10 @@ class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
             if session.recorded_operations:
                 try:
                     session.commit()
-                except Exception:
-                    tp, value, tb = sys.exc_info()
+                except Exception as exc:
                     session.rollback()
                     session._configure_locations()
-                    six.reraise(tp, value, tb)
+                    raise exc
 
             # TASKS
             instances_by_task_name = collections.defaultdict(list)
@@ -399,11 +396,10 @@ class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
             self.create_links(session, project_name, entity_data, entity)
             try:
                 session.commit()
-            except Exception:
-                tp, value, tb = sys.exc_info()
+            except Exception as exc:
                 session.rollback()
                 session._configure_locations()
-                six.reraise(tp, value, tb)
+                raise exc
 
             # Create notes.
             entity_comments = entity_data.get("comments")
@@ -413,11 +409,10 @@ class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
 
                 try:
                     session.commit()
-                except Exception:
-                    tp, value, tb = sys.exc_info()
+                except Exception as exc:
                     session.rollback()
                     session._configure_locations()
-                    six.reraise(tp, value, tb)
+                    raise exc
 
             # Import children.
             children = entity_data.get("children")
@@ -439,11 +434,10 @@ class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
             session.delete(link)
             try:
                 session.commit()
-            except Exception:
-                tp, value, tb = sys.exc_info()
+            except Exception as exc:
                 session.rollback()
                 session._configure_locations()
-                six.reraise(tp, value, tb)
+                raise exc
 
         # Create new links.
         input_folder_ids = {
@@ -541,11 +535,10 @@ class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
 
         try:
             session.commit()
-        except Exception:
-            tp, value, tb = sys.exc_info()
+        except Exception as exc:
             session.rollback()
             session._configure_locations()
-            six.reraise(tp, value, tb)
+            raise exc
 
         if status_id is not None:
             ftrack_status_by_task_id[task["id"]] = None
