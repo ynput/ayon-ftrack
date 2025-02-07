@@ -133,7 +133,7 @@ def convert_to_fps(source_value):
         InvalidFpsValue: When value can't be converted to float.
     """
 
-    if not isinstance(source_value, six.string_types):
+    if not isinstance(source_value, str):
         if isinstance(source_value, numbers.Number):
             return float(source_value)
         return source_value
