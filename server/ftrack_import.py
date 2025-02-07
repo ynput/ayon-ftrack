@@ -308,7 +308,11 @@ async def prepare_attributes_mapping(session: FtrackSession):
             elif key == "fend":
                 mapped_key = "frameEnd"
 
-        if key.lower() not in ayon_attribute_names:
+        converted_name = _convert_attribute_name(key)
+        if (
+            converted_name
+            and converted_name.lower() not in ayon_attribute_names
+        ):
             enum_items.insert(
                 0,
                 {
