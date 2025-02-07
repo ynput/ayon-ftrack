@@ -2,7 +2,6 @@ import re
 import numbers
 import socket
 
-import six
 from ayon_api import (
     get_base_url,
     get_service_addon_name,
@@ -81,13 +80,11 @@ def create_chunks(iterable, chunk_size=None):
     return chunks
 
 
-def is_string_number(value):
+def is_string_number(value: str) -> bool:
     """Can string value be converted to number (float)."""
 
-    if not isinstance(value, six.string_types):
-        raise TypeError("Expected {} got {}".format(
-            ", ".join(str(t) for t in six.string_types), str(type(value))
-        ))
+    if not isinstance(value, str):
+        raise TypeError(f"Expected str got {str(type(value))}")
     if value == ".":
         return False
 
@@ -136,7 +133,7 @@ def convert_to_fps(source_value):
         InvalidFpsValue: When value can't be converted to float.
     """
 
-    if not isinstance(source_value, six.string_types):
+    if not isinstance(source_value, str):
         if isinstance(source_value, numbers.Number):
             return float(source_value)
         return source_value
