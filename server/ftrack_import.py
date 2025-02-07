@@ -472,17 +472,17 @@ async def _get_custom_attributes_mapping(
             ftrack_attrs_by_name[key].append(attr_conf)
 
     output = CustomAttributesMapping(attr_confs)
-    for ftrack_key, ayon_attr_name in attributes_mapping.items():
-        if ayon_attr_name == SKIP_ITEM:
+    for ftrack_key, mapped_value in attributes_mapping.items():
+        if mapped_value == SKIP_ITEM:
             continue
 
-        if ayon_attr_name == CREATE_ITEM:
-            ayon_attr_name = ftrack_key
+        if mapped_value == CREATE_ITEM:
+            mapped_value = _convert_attribute_name(ftrack_key)
 
-        if ayon_attr_name not in ayon_attribute_names:
+        if not mapped_value or mapped_value not in ayon_attribute_names:
             continue
 
-        mapped_item = MappedAYONAttribute(ayon_attr_name)
+        mapped_item = MappedAYONAttribute(mapped_value)
         for attr_conf in ftrack_attrs_by_name[ftrack_key]:
             mapped_item.add_attr_conf(attr_conf)
 
@@ -1937,6 +1937,23 @@ async def _get_scope_n_inherit(
     return scope, inherit
 
 
+def _convert_attribute_name(attribute_name: str) -> Optional[str]:
+    attr_name_reverse_regex = re.compile(r"[^a-zA-Z0-9]")
+    parts = re.split(r"[\ \._\-]", attribute_name)
+    new_value = ""
+    for part in parts:
+        new_part = attr_name_reverse_regex.sub("", part)
+        if not new_part:
+            continue
+        if new_value:
+            new_part = new_part[0].upper() + new_part[1:]
+        new_value += new_part
+
+    if len(new_value) < 3:
+        return None
+    return new_value
+
+
 async def _create_ftrack_addon_attributes(
     ayon_attr_by_name: dict[str, Any],
     position: int,
@@ -2038,6 +2055,10 @@ async def _create_attribute(
     first_attr = ftrack_confs[0]
     attr_type_name = type_names_by_id[first_attr["type_id"]]
 
+    ayon_name = _convert_attribute_name(ftrack_key)
+    if not ayon_name:
+        return False
+
     ayon_attr_data = {
         "title": ftrack_key,
         "description": None,
@@ -2099,7 +2120,7 @@ async def _create_attribute(
             builtin = EXCLUDED.builtin,
             data = EXCLUDED.data
         """,
-        ftrack_key,
+        ayon_name,
         position,
         list(scope),
         ayon_attr_data,
@@ -2282,7 +2303,7 @@ async def create_update_attributes(
                 position,
             ):
                 restart_required = True
-            position += 1
+                position += 1
             continue
 
         ayon_attr = ayon_attr_by_name.get(ftrack_key)
