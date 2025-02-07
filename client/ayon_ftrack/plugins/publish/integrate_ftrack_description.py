@@ -5,7 +5,6 @@ Requires:
     instance > ftrackIntegratedAssetVersionsData
 """
 
-import sys
 import json
 
 import pyblish.api
