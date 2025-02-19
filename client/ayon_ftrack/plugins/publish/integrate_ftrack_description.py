@@ -5,10 +5,8 @@ Requires:
     instance > ftrackIntegratedAssetVersionsData
 """
 
-import sys
 import json
 
-import six
 import pyblish.api
 from ayon_core.lib import StringTemplate
 
@@ -108,8 +106,7 @@ class IntegrateFtrackDescription(plugin.FtrackPublishInstancePlugin):
                 self.log.debug("Comment added to AssetVersion \"{}\"".format(
                     str(asset_version)
                 ))
-            except Exception:
-                tp, value, tb = sys.exc_info()
+            except Exception as exc:
                 session.rollback()
                 session._configure_locations()
-                six.reraise(tp, value, tb)
+                raise exc
