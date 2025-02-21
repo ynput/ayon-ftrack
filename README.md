@@ -23,7 +23,7 @@ Primarily for client code downloadable file.
 Contains ftrack integration used in ayon launcher application. Contains publish plugins with logic to integrate content to ftrack like reviewables. Also contains ftrack server for user with actions that are executed inside ayon launcher application, like delivery creation, applications launch etc.
 
 ## Services
-Currently, there is `leecher` which stores ftrack events and `processor` which is processing them. Separation of these two tasks allow to restart `processor` without loosing any events that happened meanwhile. There can be multiple services running at the same time. The `processer` has nothing to process without runnin `leecher`.
+Currently, there is `leecher` which stores ftrack events, `processor` which is processing them and `transmitter` which propagates changes from AYON to ftrack. Separation of `leecher` and `processor` allows to restart `processor` without loosing any events that happened meanwhile. The `processer` has nothing to process without running `leecher`. There can be multiple services running at the same time, but they all should be using same version and settings variant.
 
 ## Create package
 To create a "server-ready" package of the `server` folder, on a terminal, run `python create_package.py`. That will create `./package/ftrack {version}.zip` file that can be uploaded to the server.
