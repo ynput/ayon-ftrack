@@ -641,7 +641,7 @@ class SyncProcess:
 
         # Just return entity if already exists
         if entity_ids:
-            entity = self.entity_hub.get_or_query_entity_by_id(
+            entity = self.entity_hub.get_or_fetch_entity_by_id(
                 entity_ids[0], [entity_type]
             )
             if entity is not None:
@@ -663,7 +663,7 @@ class SyncProcess:
             # TODO missing check if there are multiple mathching entity ids
             parent_ids = self.folder_ids_by_ftrack_id[ft_parent_id]
             if len(parent_ids) == 1:
-                parent = self.entity_hub.get_or_query_entity_by_id(
+                parent = self.entity_hub.get_or_fetch_entity_by_id(
                     parent_ids[0], ["folder"]
                 )
 
@@ -859,7 +859,7 @@ class SyncProcess:
                 ))
                 continue
 
-            entity = self.entity_hub.get_or_query_entity_by_id(
+            entity = self.entity_hub.get_or_fetch_entity_by_id(
                 entity_ids[0], ["folder"])
 
             allow_change = not entity.immutable_for_hierarchy
@@ -977,7 +977,7 @@ class SyncProcess:
                 else:
                     entity_ids = self.folder_ids_by_ftrack_id[ft_parent_id]
                     if len(entity_ids) == 1:
-                        parent = self.entity_hub.get_or_query_entity_by_id(
+                        parent = self.entity_hub.get_or_fetch_entity_by_id(
                             entity_ids[0], ["folder"])
 
             if parent is None:
@@ -1108,7 +1108,7 @@ class SyncProcess:
             entity_ids = self.task_ids_by_ftrack_id[ftrack_id]
             if len(entity_ids) != 1:
                 continue
-            entity = self.entity_hub.get_or_query_entity_by_id(
+            entity = self.entity_hub.get_or_fetch_entity_by_id(
                 entity_ids[0], ["task"])
 
             if entity is None:
@@ -1133,7 +1133,7 @@ class SyncProcess:
 
                 entity_ids = self.folder_ids_by_ftrack_id[ft_parent_id]
                 if len(entity_ids) == 1:
-                    parent = self.entity_hub.get_or_query_entity_by_id(
+                    parent = self.entity_hub.get_or_fetch_entity_by_id(
                         entity_ids[0], ["folder"])
 
             if parent is None:
@@ -1508,7 +1508,7 @@ class SyncProcess:
 
                 if len(entity_ids) == 1:
                     entity_id = entity_ids[0]
-                    entity = self.entity_hub.get_or_query_entity_by_id(
+                    entity = self.entity_hub.get_or_fetch_entity_by_id(
                         entity_id, entity_types
                     )
 
@@ -1604,7 +1604,7 @@ class SyncProcess:
             entity_ids = self.task_ids_by_ftrack_id[task_id]
             if len(entity_ids) != 1:
                 continue
-            task_entity = self.entity_hub.get_or_query_entity_by_id(
+            task_entity = self.entity_hub.get_or_fetch_entity_by_id(
                 entity_ids[0], ["task"]
             )
             if task_entity is None:
