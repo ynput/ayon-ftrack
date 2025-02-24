@@ -690,8 +690,8 @@ class EventProcessor:
                 f" where workflow_schema_id is '{av_workflow_schema_id}'"
             ).all()
             return {
-                status["id"]
-                for status in workflow_statuses
+                workflow["status_id"]
+                for workflow in workflow_statuses
             }
 
         if is_folder:
