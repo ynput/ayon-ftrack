@@ -106,8 +106,12 @@ class EntityEventData:
         return self._ayon_project_entity
 
     def get_ayon_entity(self) -> Optional[Dict[str, Any]]:
-        if not self.get_ayon_project():
+        project = self.get_ayon_project()
+        if not project:
             return None
+
+        if self.entity_type == "project":
+            return project
 
         if self._ayon_entity is _NOT_SET:
             self._ayon_entity = _get_entity_by_id(
@@ -359,6 +363,7 @@ class EventProcessor:
         entity_data: Optional[EntityEventData] = self._convert_entity_event(
             source_event
         )
+        self._log.info(str(entity_data))
         if entity_data is None:
             return
 
@@ -404,9 +409,26 @@ class EventProcessor:
             action = "updated"
             if entity_id is None:
                 entity_id = source_event["summary"]["entityId"]
-            update_key, changes = self._prepare_update_data(
-                source_event, change_type, entity_type
-            )
+
+            # NOTE this is special behavior of project changes
+            # - At the moment of this change project changes do trigger only
+            #   'entity.project.changed' topic which does not contain
+            #   information about "what" changed.
+            # - There is an issue to trigger 'entity.project.attrib_changed'
+            #   which might make this obsolete.
+            if entity_type == "project" and change_type == "changed":
+                update_key = "attrib"
+                project_entity = _get_entity_by_id(
+                    project_name, entity_type, entity_id, logger=self._log
+                )
+                changes = {
+                    "old": {"attrib": project_entity["attrib"]},
+                    "new": {"attrib": project_entity["attrib"]},
+                }
+            else:
+                update_key, changes = self._prepare_update_data(
+                    source_event, change_type, entity_type
+                )
             if update_key is None or changes is None:
                 return None
 
@@ -468,7 +490,7 @@ class EventProcessor:
             f" in project {entity_data.project_name}"
         )
         # TODO implement all entities
-        if entity_type in ("project", "product"):
+        if entity_type == "product":
             self._log.info(
                 f"Unhandled change of entity type '{entity_type}'."
             )
@@ -493,13 +515,18 @@ class EventProcessor:
             return
 
         # TODO implement more logic
-        if entity_data.update_key == "assignees":
-            if entity_type == "task":
-                self._handle_task_assignees_change(entity_data)
+        if entity_data.update_key == "attrib":
+            self._handle_attrib_change(entity_data, project_settings)
+        elif entity_type == "project":
+            self._log.info(
+                "Unhandled change of project entity"
+                f" '{entity_data.update_key}'."
+            )
         elif entity_data.update_key == "status":
             self._handle_status_change(entity_data)
-        elif entity_data.update_key == "attrib":
-            self._handle_attrib_change(entity_data, project_settings)
+        elif entity_data.update_key == "assignees":
+            if entity_type == "task":
+                self._handle_task_assignees_change(entity_data)
         else:
             self._log.info("Unhandled entity update event")
 
@@ -512,7 +539,10 @@ class EventProcessor:
     ):
         ft_entity_type = None
         type_fields = set()
-        if entity_type == "version":
+        if entity_type == "project":
+            ft_entity_type = "Project"
+            type_fields = {"name", "full_name"}
+        elif entity_type == "version":
             ft_entity_type = "AssetVersion"
         elif entity_type in {"task", "folder"}:
             ft_entity_type = "TypedContext"
