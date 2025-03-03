@@ -363,7 +363,6 @@ class EventProcessor:
         entity_data: Optional[EntityEventData] = self._convert_entity_event(
             source_event
         )
-        self._log.info(str(entity_data))
         if entity_data is None:
             return
 
