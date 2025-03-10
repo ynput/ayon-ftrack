@@ -10,7 +10,7 @@ from ayon_server.settings import (
 from .common import DictWithStrList, ROLES_TITLE
 
 
-class SimpleAction(BaseSettingsModel):
+class SimpleServiceAction(BaseSettingsModel):
     enabled: bool = True
     role_list: list[str] = SettingsField(
         title=ROLES_TITLE,
@@ -322,17 +322,17 @@ class ComponentsSizeCalcModel(BaseSettingsModel):
 class FtrackServiceHandlers(BaseSettingsModel):
     """Settings for event handlers running in ftrack service."""
 
-    prepare_project: SimpleAction = SettingsField(
+    prepare_project: SimpleServiceAction = SettingsField(
         title="Prepare Project",
-        default_factory=SimpleAction,
+        default_factory=SimpleServiceAction,
     )
-    sync_from_ftrack: SimpleAction = SettingsField(
+    sync_from_ftrack: SimpleServiceAction = SettingsField(
         title="Sync to AYON",
-        default_factory=SimpleAction,
+        default_factory=SimpleServiceAction,
     )
-    sync_users_from_ftrack: SimpleAction = SettingsField(
+    sync_users_from_ftrack: SimpleServiceAction = SettingsField(
         title="Sync Users to AYON",
-        default_factory=SimpleAction,
+        default_factory=SimpleServiceAction,
     )
     sync_hier_entity_attributes: SyncHierarchicalAttributes = SettingsField(
         title="Sync Hierarchical and Entity Attributes",
@@ -342,9 +342,9 @@ class FtrackServiceHandlers(BaseSettingsModel):
         title="Clone Review Session",
         default_factory=CloneReviewAction,
     )
-    delete_ayon_entities: SimpleAction = SettingsField(
+    delete_ayon_entities: SimpleServiceAction = SettingsField(
         title="Delete Folders/Products",
-        default_factory=SimpleAction,
+        default_factory=SimpleServiceAction,
     )
     thumbnail_updates: ThumbnailHierarchyUpdates = SettingsField(
         title="Update Hierarchy thumbnails",

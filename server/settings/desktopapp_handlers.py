@@ -9,7 +9,7 @@ from ayon_server.settings import (
 from .common import DictWithStrList, ROLES_TITLE
 
 
-class SimpleAction(BaseSettingsModel):
+class SimpleLocalAction(BaseSettingsModel):
     enabled: bool = True
     role_list: list[str] = SettingsField(
         title=ROLES_TITLE,
@@ -47,7 +47,7 @@ class CreateUpdateCustomAttributesAction(BaseSettingsModel):
     )
 
 
-class PrepareProjectAction(SimpleAction):
+class PrepareProjectAction(SimpleLocalAction):
     create_project_structure_checked: bool = SettingsField(
         True,
         description="Check \"Create project structure\" by default",
@@ -84,21 +84,21 @@ class FtrackDesktopAppHandlers(BaseSettingsModel):
         title="Prepare Project",
         default_factory=PrepareProjectAction,
     )
-    clean_hierarchical_attr: SimpleAction = SettingsField(
+    clean_hierarchical_attr: SimpleLocalAction = SettingsField(
         title="Clean hierarchical custom attributes",
-        default_factory=SimpleAction
+        default_factory=SimpleLocalAction
     )
-    delete_old_versions: SimpleAction = SettingsField(
+    delete_old_versions: SimpleLocalAction = SettingsField(
         title="Delete old versions",
-        default_factory=SimpleAction,
+        default_factory=SimpleLocalAction,
     )
-    delivery_action: SimpleAction = SettingsField(
+    delivery_action: SimpleLocalAction = SettingsField(
         title="Delivery action",
-        default_factory=SimpleAction,
+        default_factory=SimpleLocalAction,
     )
-    job_killer: SimpleAction = SettingsField(
+    job_killer: SimpleLocalAction = SettingsField(
         title="Job Killer",
-        default_factory=SimpleAction,
+        default_factory=SimpleLocalAction,
     )
     fill_workfile_attribute: FillWorkfileAttr = SettingsField(
         title="Fill workfile Custom attribute",
