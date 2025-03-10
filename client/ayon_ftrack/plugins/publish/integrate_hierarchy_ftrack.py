@@ -181,7 +181,7 @@ class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
         ft_task_types = self.get_all_task_types(ft_project)
         ft_task_statuses = self.get_task_statuses(ft_project)
         project_settings = context.data["project_settings"]
-        attr_confs = get_all_attr_configs()
+        attr_confs = get_all_attr_configs(session)
         attrs_mapping = get_custom_attributes_mapping(
             session, project_settings["ftrack"], attr_confs
         )
