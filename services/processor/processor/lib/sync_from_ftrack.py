@@ -303,7 +303,7 @@ class SyncFromFtrack:
                 "scope": scope,
                 "sort": status["sort"],
             })
-        statuses_data.sort(key=lambda i: i["sort"])
+        statuses_data.sort(key=lambda i: i["sort"], reverse=True)
 
         statuses = self._entity_hub.project_entity.statuses
         for idx, status_data in enumerate(statuses_data):
