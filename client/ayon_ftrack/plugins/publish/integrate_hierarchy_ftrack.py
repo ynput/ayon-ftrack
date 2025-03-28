@@ -304,7 +304,7 @@ class IntegrateHierarchyToFtrack(plugin.FtrackPublishContextPlugin):
                 if mapping_item is not None:
                     attr_conf = mapping_item.get_attr_conf_for_entity(entity)
 
-                if attr_conf is not None:
+                if attr_conf is None:
                     self.log.warning(
                         f"Missing ftrack custom attribute with name '{key}'"
                     )
