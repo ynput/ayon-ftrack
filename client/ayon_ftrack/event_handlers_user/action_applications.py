@@ -1,4 +1,5 @@
 import time
+from urllib.parse import urlparse, urlunparse
 
 import ayon_api
 
@@ -205,6 +206,17 @@ class AppplicationsAction(BaseAction):
             app_icon = self.applications_addon.get_app_icon_url(
                 app.icon, server=False
             )
+            if app_icon:
+                # ftrack frontend does not allow redirect to IP address, but
+                #   allows redirect to 'localhost'
+                result = urlparse(app_icon)
+                if result.hostname == "127.0.0.1":
+                    port = ""
+                    if result.port:
+                        port = f":{result.port}"
+                    app_icon = urlunparse(
+                        result._replace(netloc=f"localhost{port}")
+                    )
 
             items.append({
                 "label": app.group.label,
