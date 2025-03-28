@@ -574,6 +574,14 @@ class PrepareProjectServer(ServerAction):
         self, session, project_entity, values
     ):
         attr_confs = get_all_attr_configs(session)
+        auto_sync_attr = next(
+            (
+                attr
+                for attr in attr_confs
+                if attr["key"] == CUST_ATTR_AUTO_SYNC
+            ),
+            None
+        )
         ftrack_settings = ayon_api.get_addons_settings()["ftrack"]
         attrs_mapping = get_custom_attributes_mapping(
             session,
@@ -605,10 +613,14 @@ class PrepareProjectServer(ServerAction):
             ).all()
         }
         for attr_name, attr_value in values.items():
-            mapping_item = attrs_mapping.get(attr_name)
-            if mapping_item is None:
-                continue
-            attr = mapping_item.get_attr_conf_for_entity(project_entity)
+            if attr_name == CUST_ATTR_AUTO_SYNC:
+                attr = auto_sync_attr
+            else:
+                mapping_item = attrs_mapping.get(attr_name)
+                if mapping_item is None:
+                    continue
+                attr = mapping_item.get_attr_conf_for_entity(project_entity)
+
             if attr is None:
                 continue
             attr_value = self._convert_value_for_attr_conf(
@@ -733,7 +745,7 @@ class PrepareProjectServer(ServerAction):
                 }]
             }
             user = session.query(
-                "User where username is \"{}\"".format(session.api_user)
+                f"User where username is \"{session.api_user}\""
             ).one()
             user_data = {
                 "username": user["username"],
