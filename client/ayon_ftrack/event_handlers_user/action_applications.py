@@ -1,4 +1,6 @@
 import time
+from typing import Optional
+from urllib.parse import urlparse, urlunparse
 
 import ayon_api
 
@@ -47,6 +49,7 @@ class AppplicationsAction(BaseAction):
         self._applications_manager = None
         self._applications_addon = None
         self._expire_time = 0
+        self._icons_mapping = {}
 
     @property
     def applications_addon(self):
@@ -205,7 +208,6 @@ class AppplicationsAction(BaseAction):
             app_icon = self.applications_addon.get_app_icon_url(
                 app.icon, server=False
             )
-
             items.append({
                 "label": app.group.label,
                 "variant": app.label,
@@ -213,10 +215,35 @@ class AppplicationsAction(BaseAction):
                 "actionIdentifier": "{}.{}".format(
                     self.launch_identifier_with_id, app_name
                 ),
-                "icon": app_icon
+                "icon": self._get_icon_mapping(app_icon),
             })
 
         return items
+
+    def _get_icon_mapping(self, icon: Optional[str]):
+        """Get icon mapping.
+
+        This function does create and store mapping of icon url. Urls with
+            '127.0.0.1' IP address are replaced with 'localhost'. Otherwise
+            is icon kept as was.
+
+        """
+        if not icon:
+            return icon
+
+        if icon not in self._icons_mapping:
+            # ftrack frontend does not allow redirect to IP address, but
+            #   allows redirect to 'localhost'
+            result = urlparse(icon)
+            if result.hostname == "127.0.0.1":
+                port = ""
+                if result.port:
+                    port = f":{result.port}"
+                icon = urlunparse(
+                    result._replace(netloc=f"localhost{port}")
+                )
+            self._icons_mapping[icon] = icon
+        return self._icons_mapping[icon]
 
     def _launch(self, event):
         event_identifier = event["data"]["actionIdentifier"]
