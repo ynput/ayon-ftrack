@@ -231,7 +231,7 @@ class AppplicationsAction(BaseAction):
         if not icon:
             return icon
 
-        if icon in self._icons_mapping:
+        if icon not in self._icons_mapping:
             # ftrack frontend does not allow redirect to IP address, but
             #   allows redirect to 'localhost'
             result = urlparse(icon)
