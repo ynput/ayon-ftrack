@@ -3,7 +3,7 @@
 [project]
 name = "ayon-ftrack"
 version = "1.4.3"
-description = "Ftrack addon for Ayon.\n"
+description = "ftrack addon for AYON.\n"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
