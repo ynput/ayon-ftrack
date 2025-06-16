@@ -1,5 +1,4 @@
 import os
-import copy
 import json
 import collections
 
@@ -28,7 +27,6 @@ from ayon_core.pipeline.delivery import (
     get_format_dict,
     check_destination_path,
     deliver_single_file,
-    deliver_sequence,
     get_representations_delivery_template_data,
 )
 
