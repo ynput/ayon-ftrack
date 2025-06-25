@@ -217,7 +217,7 @@ class DailyListCustomAttributesModel(BaseSettingsModel):
         "bool_value",
         title="Attribute type",
         enum_resolver=custom_attribute_type,
-        conditionalEnum=True,
+        conditional_enum=True,
     )
     bool_value: bool = SettingsField(True, title="Expected value")
     str_value: str = SettingsField("", title="Expected value")
