@@ -14,7 +14,7 @@ class CustomAttributeMappingModel(BaseSettingsModel):
         "hierarchical",
         title="Attribute type",
         enum_resolver=_attr_types,
-        conditionalEnum=True,
+        conditional_enum=True,
     )
     hierarchical: str = SettingsField(
         "",
