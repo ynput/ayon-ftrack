@@ -1,5 +1,4 @@
 import os
-import copy
 import json
 import collections
 
@@ -20,6 +19,7 @@ from ayon_ftrack.common import (
 )
 from ayon_ftrack.lib import get_ftrack_icon_url
 
+from ayon_core.lib import collect_frames
 from ayon_core.lib.dateutils import get_datetime_data
 from ayon_core.pipeline import Anatomy
 from ayon_core.pipeline.load import get_representation_path_with_anatomy
@@ -27,7 +27,7 @@ from ayon_core.pipeline.delivery import (
     get_format_dict,
     check_destination_path,
     deliver_single_file,
-    deliver_sequence,
+    get_representations_delivery_template_data,
 )
 
 
@@ -287,7 +287,7 @@ class Delivery(LocalAction):
         values = event["data"]["values"]
 
         location_path = values.pop("__location_path__")
-        anatomy_name = values.pop("__delivery_template__")
+        template_name = values.pop("__delivery_template__")
         project_name = values.pop("__project_name__")
 
         repre_names = set()
@@ -316,76 +316,72 @@ class Delivery(LocalAction):
             representation_names=repre_names,
             version_ids=version_ids
         ))
+        repre_ids = {repre["id"] for repre in repres_to_deliver}
+        template_data_by_repre_id = (
+            get_representations_delivery_template_data(
+                project_name, repre_ids
+            )
+        )
         anatomy = Anatomy(project_name)
 
         format_dict = get_format_dict(anatomy, location_path)
 
         datetime_data = get_datetime_data()
-        for repre in repres_to_deliver:
-            source_path = repre["attrib"]["path"]
-            debug_msg = "Processing representation {}".format(repre["id"])
-            if source_path:
-                debug_msg += " with published path {}.".format(source_path)
-            self.log.debug(debug_msg)
-
-            anatomy_data = copy.deepcopy(repre["context"])
-
-            if "product" not in anatomy_data:
-                product_value = {}
-
-                product_name = anatomy_data.get("subset")
-                if product_name is not None:
-                    product_value["name"] = product_name
-
-                product_type = anatomy_data.get("family")
-                if product_type is not None:
-                    product_value["type"] = product_type
-
-                anatomy_data["product"] = product_value
-
-            if "folder" not in anatomy_data:
-                folder_value = {}
-                folder_name = anatomy_data.get("asset")
-                if folder_name is not None:
-                    folder_value["name"] = folder_name
-                anatomy_data["folder"] = folder_value
-
-            repre_report_items = check_destination_path(
-                repre["id"],
+        repres_counter = len(repres_to_deliver)
+        for idx, repre in enumerate(repres_to_deliver):
+            repre_id = repre["id"]
+            repre_path = get_representation_path_with_anatomy(
+                repre, anatomy
+            )
+            self.log.debug(
+                f"Processing representation {idx + 1}/{repres_counter}"
+                f" '{repre_id}'"
+            )
+            template_data = template_data_by_repre_id[repre_id]
+            new_report_items = check_destination_path(
+                repre_id,
                 anatomy,
-                anatomy_data,
+                template_data,
                 datetime_data,
-                anatomy_name
+                template_name
             )
 
-            if repre_report_items:
-                report_items.update(repre_report_items)
+            if new_report_items:
+                report_items.update(new_report_items)
                 continue
 
-            # Get source repre path
-            frame = repre["context"].get("frame")
-
-            if frame:
-                repre["context"]["frame"] = len(str(frame)) * "#"
-
-            repre_path = get_representation_path_with_anatomy(repre, anatomy)
-            # TODO add backup solution where root of path from component
-            # is replaced with root
-            args = (
+            args = [
                 repre_path,
                 repre,
                 anatomy,
-                anatomy_name,
-                anatomy_data,
+                template_name,
+                template_data,
                 format_dict,
                 report_items,
                 self.log
-            )
-            if not frame:
-                deliver_single_file(*args)
-            else:
-                deliver_sequence(*args)
-
+            ]
+            src_paths = []
+            for repre_file in repre["files"]:
+                src_path = anatomy.fill_root(repre_file["path"])
+                src_paths.append(src_path)
+            sources_and_frames = collect_frames(src_paths)
+            for src_path, frame in sources_and_frames.items():
+                args[0] = src_path
+                if frame is not None:
+                    if repre["context"].get("frame"):
+                        template_data["frame"] = frame
+                    elif repre["context"].get("udim"):
+                        template_data["udim"] = frame
+                    else:
+                        # Fallback
+                        self.log.warning(
+                            "Representation context has no frame or udim"
+                            " data. Supplying sequence frame to '{frame}'"
+                            " formatting data."
+                        )
+                        template_data["frame"] = frame
+                new_report_items, uploaded = deliver_single_file(*args)
+                report_items.update(new_report_items)
         return self.report(report_items)
 
     def report(self, report_items):
