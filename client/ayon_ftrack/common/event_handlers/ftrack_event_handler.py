@@ -97,5 +97,5 @@ class BaseEventHandler(BaseHandler):
         return self._get_entities(
             event,
             session,
-            ignore=["socialfeed", "socialnotification", "team"]
+            ignore={"socialfeed", "socialnotification", "team"}
         )

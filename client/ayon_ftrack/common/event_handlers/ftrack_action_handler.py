@@ -124,7 +124,11 @@ class BaseAction(BaseHandler):
         ):
             _entities = [
                 item
-                for item in self._get_entities(event, session=session)
+                for item in self._get_entities(
+                    event,
+                    session=session,
+                    ignore={"socialfeed", "socialnotification", "team"}
+                )
                 if item is not None
             ]
             event["data"]["entities_object"] = _entities
