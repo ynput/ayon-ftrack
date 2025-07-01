@@ -162,9 +162,9 @@ class BaseHandler(metaclass=ABCMeta):
             return entities
 
         if ignore is None:
-            ignore = []
+            ignore = set()
         elif isinstance(ignore, str):
-            ignore = [ignore]
+            ignore = {ignore}
 
         filtered_selection = []
         for entity in selection:

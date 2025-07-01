@@ -127,7 +127,7 @@ class BaseAction(BaseHandler):
                 for item in self._get_entities(
                     event,
                     session=session,
-                    ignore=["socialfeed", "socialnotification", "team"]
+                    ignore={"socialfeed", "socialnotification", "team"}
                 )
                 if item is not None
             ]
