@@ -1470,14 +1470,29 @@ class SyncProcess:
                 or entity.entity_type not in ayon_status.scope
             ):
                 project_need_update = True
-                continue
 
             to_change.append((entity, ayon_status.name))
 
         if project_need_update:
             self._update_project_statuses()
+            # Recalculate 'ayon_statuses_by_name' variable with new statuses
+            project_entity = self.entity_hub.project_entity
+            ayon_statuses_by_name = {
+                status.name.lower(): status
+                for status in project_entity.statuses
+            }
 
         for entity, new_status_name in to_change:
+            ayon_status = ayon_statuses_by_name.get(new_status_name.lower())
+            if (
+                ayon_status is None
+                or entity.entity_type not in ayon_status.scope
+            ):
+                self.log.debug(
+                    f"Status '{new_status_name}' not found on AYON project"
+                )
+                continue
+
             prev_status_name = entity.status
             entity.status = new_status_name
             self.log.debug(
