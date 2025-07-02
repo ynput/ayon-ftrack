@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ftrack-transmitter"
-version = "1.4.6"
+version = "1.4.6+dev"
 description = ""
 authors = ["Ynput s.r.o. <info@ynput.io>"]
 package-mode = false
