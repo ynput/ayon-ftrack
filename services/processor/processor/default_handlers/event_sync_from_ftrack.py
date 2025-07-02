@@ -3,6 +3,7 @@ import collections
 import json
 import time
 import atexit
+from typing import Optional
 
 import arrow
 import ftrack_api
@@ -883,6 +884,110 @@ class SyncProcess:
 
         return allowed_changes
 
+    def _clear_ayon_id_in_created_entities(self, ftrack_ids: set[str]):
+        ayon_id_by_ftrack_id = self._get_server_id_by_ftrack_ids(
+            ftrack_ids
+        )
+        filtered_mapping = {
+            ftrack_id: ayon_id
+            for ftrack_id, ayon_id in ayon_id_by_ftrack_id.items()
+            if ayon_id
+        }
+        ayon_ids = set(filtered_mapping.values())
+        if not ayon_ids:
+            return
+
+        ayon_id_attr_conf = next(
+            (
+                attr
+                for attr in self.ft_cust_attrs
+                if attr["key"] == CUST_ATTR_KEY_SERVER_ID
+            ),
+            None
+        )
+        if ayon_id_attr_conf is None:
+            return
+
+        ayon_id_attr_conf_id = ayon_id_attr_conf["id"]
+        current_mapping_ay = collections.defaultdict(set)
+        current_mapping_ft = {}
+        for chunk in create_chunks(ayon_ids, 100):
+            entity_ids_joined = join_filter_values(chunk)
+            for item in self.session.query(
+                "select value, entity_id"
+                " from CustomAttributeValue"
+                f" where configuration_id in ({ayon_id_attr_conf_id})"
+                f" and value in ({entity_ids_joined})"
+            ).all():
+                current_mapping_ay[item["value"]].add(item["entity_id"])
+                current_mapping_ft[item["entity_id"]] = item["value"]
+
+        operations = []
+        cleared_ftrack_ids = set()
+        for ayon_id in ayon_ids:
+            ftrack_ids = current_mapping_ay[ayon_id]
+            if len(ftrack_ids) < 2:
+                continue
+            entity = self.entity_hub.get_or_fetch_entity_by_id(
+                ayon_id, ["folder", "task"]
+            )
+            current_ftrack_id = entity.attrib.get(FTRACK_ID_ATTRIB, None)
+            if current_ftrack_id and current_ftrack_id in ftrack_ids:
+                ftrack_ids.discard(current_ftrack_id)
+            else:
+                ftrack_ids = set()
+                for ftrack_id, _ayon_id in filtered_mapping.items():
+                    if _ayon_id == ayon_id:
+                        ftrack_ids.add(ftrack_id)
+
+            cleared_ftrack_ids |= ftrack_ids
+            for ftrack_id in ftrack_ids:
+                entity_key = collections.OrderedDict((
+                    ("configuration_id", ayon_id_attr_conf_id),
+                    ("entity_id", ftrack_id)
+                ))
+                operations.append(
+                    ftrack_api.operation.DeleteEntityOperation(
+                        "CustomAttributeValue",
+                        entity_key
+                    )
+                )
+
+        ayon_path_attr_conf = next(
+            (
+                attr
+                for attr in self.ft_cust_attrs
+                if attr["key"] == CUST_ATTR_KEY_SERVER_PATH
+            ),
+            None
+        )
+        if ayon_path_attr_conf is not None:
+            ayon_path_attr_conf_id = ayon_path_attr_conf["id"]
+            for value_item in query_custom_attribute_values(
+                self.session,
+                {ayon_path_attr_conf_id},
+                ftrack_ids,
+            ):
+                if value_item["value"] is None:
+                    continue
+                entity_key = collections.OrderedDict((
+                    ("configuration_id", ayon_path_attr_conf_id),
+                    ("entity_id", value_item["entity_id"])
+                ))
+                operations.append(
+                    ftrack_api.operation.DeleteEntityOperation(
+                        "CustomAttributeValue",
+                        entity_key
+                    )
+                )
+
+        if not operations:
+            return
+
+        for op in operations:
+            self.session.recorded_operations.push(op)
+        self.session.commit()
+
     def _process_folder_hierarchy_changes(
         self,
         folder_hierarchy_changes,
@@ -1102,6 +1207,23 @@ class SyncProcess:
         for ftrack_id in filtered_ftrack_ids_to_create:
             self._try_create_entity(ftrack_id)
 
+    def _get_server_id_by_ftrack_ids(
+        self, ftrack_ids: set[str]
+    ) -> dict[str, Optional[str]]:
+        ayon_id_attr = self._get_server_id_attribute()
+        value_items = query_custom_attribute_values(
+            self.session,
+            {ayon_id_attr},
+            ftrack_ids,
+        )
+        ayon_id_by_ftrack_id = {ftrack_id: None for ftrack_id in ftrack_ids}
+        ayon_id_by_ftrack_id.update({
+            item["entity_id"]: item["value"]
+            for item in value_items
+            if item["value"]
+        })
+        return ayon_id_by_ftrack_id
+
     def _process_task_hierarchy_changes(self, task_hierarchy_changes):
         # TODO finish task name and parent changes
         for ftrack_id, info in task_hierarchy_changes.items():
@@ -1196,6 +1318,7 @@ class SyncProcess:
                     folder_hierarchy_changes[ftrack_id] = info
 
         ftrack_ids_to_create = set(self.entities_by_action["add"].keys())
+        self._clear_ayon_id_in_created_entities(ftrack_ids_to_create)
         self._process_folder_hierarchy_changes(
             folder_hierarchy_changes,
             ftrack_ids_to_create
@@ -1789,6 +1912,12 @@ class SyncProcess:
                 for operation in chunk:
                     self.session.recorded_operations.push(operation)
                 self.session.commit()
+
+    def _get_server_id_attribute(self):
+        for attr in self.ft_cust_attrs:
+            if attr["key"] == CUST_ATTR_KEY_SERVER_ID:
+                return attr
+        return None
 
     def process_event_data(self):
         # Check if auto-sync custom attribute exists
