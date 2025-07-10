@@ -1,6 +1,6 @@
 [project]
 name = "ftrack-transmitter"
-version = "1.4.5+dev"
+version = "1.4.6+dev"
 description = ""
 authors = [{name = "Ynput s.r.o.", email ="info@ynput.io"}]
 dependencies = [
