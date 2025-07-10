@@ -1,9 +1,5 @@
-FROM python:3.9-bullseye
+FROM python:3.9-alpine
 ENV PYTHONUNBUFFERED=1
-
-RUN apt-get update \
-  && apt-get install -y curl python3-pip python3-virtualenv \
-  && pip install poetry
 
 RUN mkdir /service
 COPY ./processor /service/processor
@@ -11,8 +7,6 @@ COPY ./ftrack_common /service/ftrack_common
 COPY ./pyproject.toml /service/pyproject.toml
 WORKDIR /service
 
-
-RUN poetry config virtualenvs.create false \
- && poetry install --no-interaction --no-ansi
+RUN pip install .
 
 CMD ["python", "-m", "processor"]

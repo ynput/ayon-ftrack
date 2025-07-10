@@ -1,18 +1,9 @@
-[tool.poetry]
+[project]
 name = "ftrack-leecher"
 version = "1.4.6+dev"
 description = ""
-authors = ["Ynput s.r.o. <info@ynput.io>"]
-package-mode = false
-
-[tool.poetry.dependencies]
-python = ">=3.9,<3.10"
-ayon-python-api = "1.0.11"
-ftrack-python-api = "2.3.3"
-
-[tool.poetry.dev-dependencies]
-pytest = "^5.2"
-
-[build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+authors = [{name = "Ynput s.r.o.", email ="info@ynput.io"}]
+dependencies = [
+    "ayon-python-api==1.0.11",
+    "ftrack-python-api==2.3.3"
+]
