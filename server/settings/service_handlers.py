@@ -1,10 +1,12 @@
 from pydantic import validator
 
+from ayon_server.lib.postgres import Postgres
 from ayon_server.settings import (
     BaseSettingsModel,
     SettingsField,
     ensure_unique_names,
 )
+from ayon_server.settings.enum import get_primary_anatomy_preset
 
 
 from .common import DictWithStrList, ROLES_TITLE
@@ -12,6 +14,52 @@ from .common import DictWithStrList, ROLES_TITLE
 
 class SimpleServiceAction(BaseSettingsModel):
     enabled: bool = True
+    role_list: list[str] = SettingsField(
+        title=ROLES_TITLE,
+        default_factory=list,
+    )
+
+
+async def project_link_types_enum(project_name: str | None = None):
+    if project_name is None:
+        anatomy = await get_primary_anatomy_preset()
+        link_type_names = [
+            link_type.link_type
+            for link_type in anatomy.link_types
+            if (
+                link_type.input_type == "folder"
+                and link_type.output_type == "folder"
+            )
+        ]
+
+    else:
+        link_type_names = [
+            row["link_type"]
+            async for row in Postgres.iterate(
+                f"""
+                SELECT link_type, input_type, output_type
+                FROM project_{project_name}.link_type
+                ORDER BY POSITION
+                """
+            )
+            if (
+                row["input_type"] == "folder"
+                and row["output_type"] == "folder"
+            )
+        ]
+
+    link_type_names.insert(0, "< Skip >")
+    return link_type_names
+
+
+class SyncFromFtrackModel(BaseSettingsModel):
+    enabled: bool = True
+    sync_link_type: str = SettingsField(
+        "< Skip >",
+        title="Sync Link Type",
+        enum_resolver=project_link_types_enum,
+        description="Synchronize links from ftrack as AYON link type",
+    )
     role_list: list[str] = SettingsField(
         title=ROLES_TITLE,
         default_factory=list,
@@ -326,9 +374,9 @@ class FtrackServiceHandlers(BaseSettingsModel):
         title="Prepare Project",
         default_factory=SimpleServiceAction,
     )
-    sync_from_ftrack: SimpleServiceAction = SettingsField(
+    sync_from_ftrack: SyncFromFtrackModel = SettingsField(
         title="Sync to AYON",
-        default_factory=SimpleServiceAction,
+        default_factory=SyncFromFtrackModel,
     )
     sync_users_from_ftrack: SimpleServiceAction = SettingsField(
         title="Sync Users to AYON",
