@@ -97,6 +97,7 @@ class SyncProcess:
         self._ft_project_id = UNKNOWN_VALUE
         self._ft_project = UNKNOWN_VALUE
         self._project_name = UNKNOWN_VALUE
+        self._project_entity = UNKNOWN_VALUE
         self._project_settings = None
 
         self._is_event_valid = UNKNOWN_VALUE
@@ -179,6 +180,11 @@ class SyncProcess:
         if not entity_id:
             return None
         return self.get_ftrack_entity_by_ids([entity_id])[entity_id]
+
+    def get_ayon_project(self) -> Optional[dict[str, Any]]:
+        if self._project_entity is UNKNOWN_VALUE:
+            self._project_entity = get_project(self.project_name)
+        return self._project_entity
 
     @property
     def project_name(self):
@@ -483,7 +489,8 @@ class SyncProcess:
             "remove": {},
             "update": {},
             "add": {},
-            "assignee_change": {}
+            "assignee_change": {},
+            "link_change": [],
         }
         found_actions = set()
         ft_project_removed = False
@@ -500,6 +507,16 @@ class SyncProcess:
                 ftrack_id = ent_info["entityId"]
                 found_actions.add(action)
                 entities_by_action[action][ftrack_id] = ent_info
+                continue
+
+            if base_type == "dependency":
+                # NOTE we're not handling 'update'
+                # - hopefully nobody is changing ids in existing links?
+                if ent_info["action"] not in ("remove", "add"):
+                    continue
+                action = "link_change"
+                found_actions.add(action)
+                entities_by_action[action].append(ent_info)
                 continue
 
             if base_type not in self.interest_base_types:
@@ -1771,6 +1788,117 @@ class SyncProcess:
             if assignees_changed:
                 task_entity.assignees = assignees
 
+    def _propagate_link_changes(self):
+        link_change = self.entities_by_action["link_change"]
+        if not link_change:
+            return
+
+        links_info = []
+        ftrack_ids = set()
+        for ent_info in link_change:
+            to_id_changes = ent_info["changes"]["to_id"]
+            from_id_changes = ent_info["changes"]["from_id"]
+            action = ent_info["action"]
+            if action == "add":
+                to_id = to_id_changes["new"]
+                from_id = from_id_changes["new"]
+            else:
+                to_id = to_id_changes["old"]
+                from_id = from_id_changes["old"]
+
+            ftrack_ids |= {to_id, from_id}
+            links_info.append(
+                (from_id, to_id, action)
+            )
+
+        ayon_out_ids = set()
+        added_links = []
+        removed_links = []
+        entities_by_id = self.get_ftrack_entity_by_ids(ftrack_ids)
+        for (ft_from_id, ft_to_id, action) in links_info:
+            ft_from_entity = entities_by_id[ft_to_id]
+            ft_to_entity = entities_by_id[ft_to_id]
+            if not ft_to_entity or not ft_from_entity:
+                continue
+
+            if (
+                ft_from_entity.entity_type.lower() == "task"
+                or ft_to_entity.entity_type.lower() == "task"
+            ):
+                continue
+
+            ay_in_entity_ids = self.folder_ids_by_ftrack_id[ft_from_id]
+            ay_out_entity_ids = self.folder_ids_by_ftrack_id[ft_to_id]
+            if len(ay_in_entity_ids) != 1 or len(ay_out_entity_ids) != 1:
+                continue
+            ay_in_id = ay_in_entity_ids[0]
+            ay_out_id = ay_out_entity_ids[0]
+            ayon_out_ids.add(ay_out_id)
+            if action == "add":
+                added_links.append((ay_in_id, ay_out_id))
+            else:
+                removed_links.append((ay_in_id, ay_out_id))
+
+        if not added_links and not removed_links:
+            return
+
+        ay_link_type = (
+            self.project_settings
+            ["ftrack"]
+            ["service_event_handlers"]
+            ["sync_from_ftrack"]
+            ["sync_link_type"]
+        )
+        if ay_link_type == "< Skip >":
+            self.log.info("Links sync is not set to be skipped.")
+            return
+
+        project_entity = self.get_ayon_project()
+        exists = False
+        for link_type in project_entity["linkTypes"]:
+            if (
+                link_type["linkType"] == ay_link_type
+                and link_type["inputType"] == "folder"
+                and link_type["outputType"] == "folder"
+            ):
+                exists = True
+
+        if not exists:
+            self.log.warning(
+                f"Skipping links sync because link type '{ay_link_type}'"
+                f" does not exist on project '{self.project_name}'."
+            )
+            return
+
+        folder_links_by_id = get_folders_links(
+            self.project_name,
+            folder_ids=ayon_out_ids,
+            link_types={ay_link_type},
+            link_direction="in",
+        )
+        folder_link_ids_by_id = {}
+        for ayon_id, links in folder_links_by_id.items():
+            folder_link_ids_by_id[ayon_id] = {
+                link["entityId"]: link
+                for link in links
+            }
+
+        for (ay_in_id, ay_out_id) in removed_links:
+            link = folder_link_ids_by_id[ay_out_id].get(ay_in_id)
+            if link:
+                delete_link(self.project_name, link["id"])
+
+        for (ay_in_id, ay_out_id) in added_links:
+            if ay_in_id not in folder_link_ids_by_id[ay_out_id]:
+                create_link(
+                    self.project_name,
+                    ay_link_type,
+                    ay_in_id,
+                    "folder",
+                    ay_out_id,
+                    "folder",
+                )
+
     def _create_ft_attr_operation(
         self, conf_id, entity_id, is_new, new_value, old_value=None
     ):
@@ -1927,6 +2055,7 @@ class SyncProcess:
             "remove": "Removed",
             "update": "Updated",
             "assignee_change": "Assignee changed",
+            "link_change": "Link changed",
         }
         debug_msg = "\n".join([
             f"- {debug_action_map[action]}: {len(entities_info)}"
@@ -1947,6 +2076,20 @@ class SyncProcess:
             ftrack_id = context_id_changes["new"] or context_id_changes["old"]
             ftrack_ids.add(ftrack_id)
 
+        for ent_info in entities_by_action["link_change"]:
+            to_id_changes = ent_info["changes"]["to_id"]
+            from_id_changes = ent_info["changes"]["from_id"]
+            action = ent_info["action"]
+            if action == "add":
+                to_id = to_id_changes["new"]
+                from_id = from_id_changes["new"]
+            else:
+                to_id = to_id_changes["old"]
+                from_id = from_id_changes["old"]
+            # NOTE this works until 'update' is handled
+            ftrack_ids.add(to_id)
+            ftrack_ids.add(from_id)
+
         # Precache entities that will be needed in single call
         if ftrack_ids:
             self.get_ftrack_entity_by_ids(ftrack_ids)
@@ -1964,16 +2107,19 @@ class SyncProcess:
             # 3. Propage assigneess changes
             self._propagate_assignee_changes()
             time_4 = time.time()
-            # 4. Commit changes to server
-            self.entity_hub.commit_changes()
-            # 5. Propagate entity changes to ftack
+            # 4. Propage link changes
+            self._propagate_link_changes()
             time_5 = time.time()
+            # 5. Commit changes to server
+            self.entity_hub.commit_changes()
+            # 6. Propagate entity changes to ftack
+            time_6 = time.time()
             self._propagate_ftrack_attributes()
             # TODO propagate entities to ftrack
             #  - server id, server path, sync failed
-            time_6 = time.time()
+            time_7 = time.time()
 
-            total_time = f"{time_6 - time_1:.2f}"
+            total_time = f"{time_7 - time_1:.2f}"
             mid_times = ", ".join([
                 f"{diff:.2f}"
                 for diff in (
@@ -1982,6 +2128,7 @@ class SyncProcess:
                     time_4 - time_3,
                     time_5 - time_4,
                     time_6 - time_5,
+                    time_7 - time_6,
                 )
             ])
             self.log.debug(f"Process time: {total_time} <{mid_times}>")
