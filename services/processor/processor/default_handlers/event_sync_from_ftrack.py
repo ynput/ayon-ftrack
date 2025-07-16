@@ -3,15 +3,20 @@ import collections
 import json
 import time
 import atexit
-from typing import Optional
+import typing
+from typing import Optional, Any
 
 import arrow
 import ftrack_api
 
 from ayon_api import (
+    get_project,
     get_folders,
     get_tasks,
+    get_folders_links,
     slugify_string,
+    create_link,
+    delete_link,
 )
 
 from ayon_api.entity_hub import EntityHub
@@ -41,6 +46,9 @@ from ftrack_common import (
     join_filter_values,
     map_ftrack_users_to_ayon_users,
 )
+
+if typing.TYPE_CHECKING:
+    from ftrack_api.entity.base import Entity as FtrackEntity
 
 UNKNOWN_VALUE = object()
 
