@@ -47,9 +47,6 @@ from ftrack_common import (
     map_ftrack_users_to_ayon_users,
 )
 
-if typing.TYPE_CHECKING:
-    from ftrack_api.entity.base import Entity as FtrackEntity
-
 UNKNOWN_VALUE = object()
 
 DEFAULT_ATTRS_MAPPING = {
