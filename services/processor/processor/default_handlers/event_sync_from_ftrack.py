@@ -3,7 +3,6 @@ import collections
 import json
 import time
 import atexit
-import typing
 from typing import Optional, Any
 
 import arrow
