@@ -38,7 +38,7 @@ async def project_link_types_enum(project_name: str | None = None):
             async for row in Postgres.iterate(
                 f"""
                 SELECT link_type, input_type, output_type
-                FROM project_{project_name}.link_type
+                FROM project_{project_name}.link_types
                 ORDER BY POSITION
                 """
             )
