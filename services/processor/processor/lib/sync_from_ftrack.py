@@ -4,9 +4,10 @@ import time
 import copy
 import logging
 import typing
-from typing import Any, Dict
+from typing import Any, Optional, Dict
 
 import arrow
+import ayon_api
 from ayon_api import (
     get_project,
     create_project,
@@ -34,6 +35,8 @@ from ftrack_common import (
 
 if typing.TYPE_CHECKING:
     import ftrack_api.entity.base.Entity
+
+NOT_SET = object()
 
 
 def _get_ftrack_project(session, project_name):
@@ -74,6 +77,7 @@ class SyncFromFtrack:
         self._ft_session = session
         self._project_name = project_name
         self._ids_mapping = IdsMapping()
+        self._ayon_project = NOT_SET
 
         ft_users = session.query("select id, username, email from User").all()
         users_mapping = map_ftrack_users_to_ayon_users(ft_users)
@@ -97,6 +101,8 @@ class SyncFromFtrack:
         self._im_renamed_entity_ids = set()
         self._im_moved_entity_ids = set()
         self._im_removed_entity_ids = set()
+
+        self._missing_link_type = None
 
     @property
     def project_name(self):
@@ -366,7 +372,12 @@ class SyncFromFtrack:
             for item in workflow_statuses
         }
 
-    def project_exists_in_ayon(self):
+    def get_ayon_project(self) -> Optional[dict[str, Any]]:
+        if self._ayon_project is NOT_SET:
+            self._ayon_project = get_project(self.project_name)
+        return self._ayon_project
+
+    def project_exists_in_ayon(self) -> bool:
         """Does project exists on AYON server by name.
 
         Returns:
@@ -374,8 +385,7 @@ class SyncFromFtrack:
         """
 
         # Make sure project exists on server
-        project = get_project(self.project_name)
-        if not project:
+        if not self.get_ayon_project():
             return False
         return True
 
@@ -587,6 +597,9 @@ class SyncFromFtrack:
             ft_entities_by_id
         )
         self._entity_hub.commit_changes()
+
+        self.log.info("Updating entity links")
+        self.update_links_from_ftrack(ft_entities_by_id)
 
         self.log.info("Updating server ids on ftrack entities")
         self.update_ftrack_attributes(
@@ -977,7 +990,10 @@ class SyncFromFtrack:
         if entity.entity_type in scope:
             entity.set_status(ayon_status["name"])
 
-    def update_assignees_from_ftrack(self, ft_entities_by_id):
+    def update_assignees_from_ftrack(
+        self,
+        ft_entities_by_id: dict[str, "ftrack_api.entity.base.Entity"],
+    ):
         task_entities_by_id = {}
         for entity in ft_entities_by_id.values():
             if entity.entity_type == "Task":
@@ -1102,6 +1118,118 @@ class SyncFromFtrack:
 
                 if key in entity.attribs:
                     entity.attribs[key] = value
+
+    def update_links_from_ftrack(
+        self,
+        ft_entities_by_id: dict[str, "ftrack_api.entity.base.Entity"],
+    ):
+        settings = self.get_ftrack_settings()
+        ay_link_type = (
+            settings
+            ["service_event_handlers"]
+            ["sync_from_ftrack"]
+            ["sync_link_type"]
+        )
+        if ay_link_type == "< Skip >":
+            self.log.info("Links sync is not set to be skipped.")
+            return
+
+        project_entity = self.get_ayon_project()
+        exists = False
+        for link_type in project_entity["linkTypes"]:
+            if (
+                link_type["linkType"] == ay_link_type
+                and link_type["inputType"] == "folder"
+                and link_type["outputType"] == "folder"
+            ):
+                exists = True
+
+        if not exists:
+            self._missing_link_type = ay_link_type
+            self.log.warning(
+                f"Skipping links sync because link type '{ay_link_type}'"
+                f" does not exist on project '{self.project_name}'."
+            )
+            return
+
+        # Prepare ftrack links
+        ft_folder_ids = set()
+        for ftrack_id, ft_entity in ft_entities_by_id.items():
+            if ft_entity.entity_type.lower() != "task":
+                ft_folder_ids.add(ftrack_id)
+
+        ft_links = []
+        for ftrack_ids_chunk in create_chunks(ft_folder_ids, 50):
+            joined_ids = ",".join([
+                f'"{ftrack_id}"'
+                for ftrack_id in ftrack_ids_chunk
+            ])
+            for link in self._ft_session.query(
+                f"select from_id, to_id from TypedContextLink"
+                f" where to_id in ({joined_ids})"
+            ).all():
+                # Filter only folder links
+                if link["from_id"] in ft_folder_ids:
+                    ft_links.append(link)
+
+        # Skip rest of logic if there are no links
+        if not ft_links:
+            return
+
+        hierarchy_queue = collections.deque()
+        hierarchy_queue.extend(
+            self._entity_hub.project_entity.children
+        )
+        folder_ids = set()
+        while hierarchy_queue:
+            entity = hierarchy_queue.popleft()
+            # Add children to queue
+            for child_entity in entity.children:
+                if child_entity.entity_type == "folder":
+                    hierarchy_queue.append(child_entity)
+
+            ftrack_id = self._ids_mapping.get_ftrack_mapping(entity.id)
+            if ftrack_id is not None:
+                folder_ids.add(entity.id)
+
+        _ay_in_links_by_id: dict[str, list[dict[str, Any]]] = (
+            ayon_api.get_folders_links(
+                self.project_name,
+                folder_ids=folder_ids,
+                link_types={ay_link_type},
+                link_direction="in",
+            )
+        )
+        ay_in_links_by_id = {}
+        for ayon_id, entity_links in _ay_in_links_by_id.items():
+            ay_in_links_by_id[ayon_id] = {
+                link["entityId"]
+                for link in entity_links
+            }
+
+        for link in ft_links:
+            ft_in_id = link["from_id"]
+            ft_out_id = link["to_id"]
+            # Not sure how, but can happen...
+            if ft_in_id == ft_out_id:
+                continue
+
+            ay_in_id = self._ids_mapping.get_server_mapping(ft_in_id)
+            ay_out_id = self._ids_mapping.get_server_mapping(ft_out_id)
+            if ay_in_id is None or ay_out_id is None:
+                continue
+
+            if ay_out_id in ay_in_links_by_id[ay_in_id]:
+                continue
+
+            ayon_api.create_link(
+                self.project_name,
+                ay_link_type,
+                ay_in_id,
+                "folder",
+                ay_out_id,
+                "folder",
+            )
 
     def _prepare_attribute_values(
         self, ft_session, attr_confs, ft_entities_by_id
@@ -1370,5 +1498,14 @@ class SyncFromFtrack:
                         "type": "label",
                         "value": f"- {path}"
                     })
+
+        if self._missing_link_type:
+            report_items.append({
+                "type": "label",
+                "value": (
+                    f"## Link type '{self._missing_link_type}' was"
+                    f" not found on project '{self.project_name}'"
+                ),
+            })
 
         self._report_items = report_items
