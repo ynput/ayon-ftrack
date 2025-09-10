@@ -68,6 +68,25 @@ class Delivery(LocalAction):
                 "message": f"Project \"{project_name}\" not found in AYON."
             }
 
+        review_session_ids = set()
+        for entity in entities:
+            entity_type_low = entity.entity_type.lower()
+            if entity_type_low == "reviewsession":
+                review_session_ids.add(entity["id"])
+
+        session_name = None
+        if review_session_ids:
+            joined_ids = self.join_query_keys(review_session_ids)
+            for review_session in session.query(
+                f"select name from ReviewSession where id in ({joined_ids})"
+            ).all():
+                session_name = review_session["name"]
+                break
+
+        if session_name is None:
+            datetime_data = get_datetime_data()
+            session_name = "{yy}{mm}{dd}".format_map(datetime_data)
+
         repre_names = self._get_repre_names(project_name, session, entities)
 
         items.append({
@@ -143,6 +162,16 @@ class Delivery(LocalAction):
             }
 
         items.append({
+            "value": "<h2>Session name used in template</h2>",
+            "type": "label",
+        })
+        items.append({
+            "type": "text",
+            "value": session_name,
+            "name": "__session_name__",
+        })
+
+        items.append({
             "value": "<h1>Choose Components to deliver</h1>",
             "type": "label"
         })
@@ -154,6 +183,20 @@ class Delivery(LocalAction):
                 "label": repre_name,
                 "name": repre_name
             })
+
+        items.append(item_splitter)
+
+        items.append({
+            "value": "<h2>Choose delivery template</h2>",
+            "type": "label",
+        })
+
+        items.append({
+            "type": "enumerator",
+            "name": "__delivery_template__",
+            "data": delivery_templates_items,
+            "value": first,
+        })
 
         items.append(item_splitter)
 
@@ -172,29 +215,7 @@ class Delivery(LocalAction):
         items.append({
             "type": "text",
             "name": "__location_path__",
-            "empty_text": "Type location path here...(Optional)"
-        })
-
-        items.append(item_splitter)
-
-        items.append({
-            "value": "<h2>Anatomy of delivery files</h2>",
-            "type": "label"
-        })
-
-        items.append({
-            "type": "label",
-            "value": (
-                "<p><i>NOTE: These can be set in Anatomy.yaml"
-                " within `delivery` key.</i></p>"
-            )
-        })
-
-        items.append({
-            "type": "enumerator",
-            "name": "__delivery_template__",
-            "data": delivery_templates_items,
-            "value": first
+            "empty_text": "Type location path here...(Optional)",
         })
 
         return {
@@ -289,6 +310,7 @@ class Delivery(LocalAction):
         location_path = values.pop("__location_path__")
         template_name = values.pop("__delivery_template__")
         project_name = values.pop("__project_name__")
+        session_name = values.pop("__session_name__")
 
         repre_names = set()
         for key, value in values.items():
@@ -338,6 +360,10 @@ class Delivery(LocalAction):
                 f" '{repre_id}'"
             )
             template_data = template_data_by_repre_id[repre_id]
+            if session_name:
+                template_data["ftrack"] = {
+                    "session_name": session_name,
+                }
             new_report_items = check_destination_path(
                 repre_id,
                 anatomy,
