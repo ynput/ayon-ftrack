@@ -360,9 +360,10 @@ class Delivery(LocalAction):
                 f" '{repre_id}'"
             )
             template_data = template_data_by_repre_id[repre_id]
-            template_data["ftrack"] = {
-                "session_name": session_name,
-            }
+            if session_name:
+                template_data["ftrack"] = {
+                    "session_name": session_name,
+                }
             new_report_items = check_destination_path(
                 repre_id,
                 anatomy,
