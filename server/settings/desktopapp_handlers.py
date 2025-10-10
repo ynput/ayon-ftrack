@@ -20,7 +20,8 @@ class SimpleLocalAction(BaseSettingsModel):
 class ApplicationLaunchStatuses(BaseSettingsModel):
     """Application launch statuses
 
-    Change task's status to left side if current task status is in list on right side
+    Change task's status to left side if current task status
+        is in list on right side
     """
     enabled: bool = True
     ignored_statuses: list[str] = SettingsField(

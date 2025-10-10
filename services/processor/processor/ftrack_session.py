@@ -10,6 +10,7 @@ import collections
 import appdirs
 import arrow
 import requests
+import ftrack_api  # noqa: F401
 import ftrack_api.session
 import ftrack_api.cache
 import ftrack_api.operation

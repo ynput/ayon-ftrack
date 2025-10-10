@@ -590,4 +590,3 @@ def ensure_mandatory_custom_attributes_exists(
 
         if changed:
             session.commit()
-

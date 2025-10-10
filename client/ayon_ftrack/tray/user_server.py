@@ -8,10 +8,10 @@ import logging
 import getpass
 import atexit
 import collections
-import appdirs
+import platformdirs
 
 import requests
-import ftrack_api
+import ftrack_api  # noqa: F401
 import ftrack_api.session
 import ftrack_api.cache
 import ftrack_api.operation
@@ -186,7 +186,7 @@ class CustomEventHubSession(ftrack_api.session.Session):
         # rebuilding types)?
         if schema_cache_path is not False:
             if schema_cache_path is None:
-                schema_cache_path = appdirs.user_cache_dir()
+                schema_cache_path = platformdirs.user_cache_dir()
                 schema_cache_path = os.environ.get(
                     'FTRACK_API_SCHEMA_CACHE_PATH', schema_cache_path
                 )

@@ -19,7 +19,7 @@ Warning: entityType is not entity_type!
     entityType "show" == entity_type "Project"
     entityType "task" == entity_type "Task", "Shot", "Library", "Folder", ...
 
-"""
+"""  # noqa: E501
 import webbrowser
 
 from ayon_core.pipeline import LauncherAction

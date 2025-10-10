@@ -45,7 +45,10 @@ class FtrackServiceSettings(BaseSettingsModel):
 
 class PostLaunchHookMapping(BaseSettingsModel):
     name: str = SettingsField("", title="New status")
-    value: list[str] = SettingsField(default_factory=list, title="From statuses")
+    value: list[str] = SettingsField(
+        default_factory=list,
+        title="From statuses",
+    )
 
 
 class PostLaunchHookSettings(BaseSettingsModel):

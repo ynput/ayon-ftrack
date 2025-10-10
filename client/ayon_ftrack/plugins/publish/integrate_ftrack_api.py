@@ -490,7 +490,6 @@ class IntegrateFtrackApi(plugin.FtrackPublishInstancePlugin):
             # Deleting existing members on component entity
             for member in component_entity.get("members", []):
                 session.delete(member)
-                del(member)
 
             session.commit()
 

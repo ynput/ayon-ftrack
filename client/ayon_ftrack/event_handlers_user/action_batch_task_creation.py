@@ -5,14 +5,10 @@ Taken from https://github.com/tokejepsen/ftrack-hooks/tree/master/batch_tasks
 from ayon_ftrack.common import LocalAction
 from ayon_ftrack.lib import get_ftrack_icon_url
 
+
 class BatchTasksAction(LocalAction):
-    '''Batch Tasks action
-    `label` a descriptive string identifing your action.
-    `varaint` To group actions together, give them the same
-    label and specify a unique variant per action.
-    `identifier` a unique identifier for your action.
-    `description` a verbose descriptive text for you action
-     '''
+    """Batch Tasks action."""
+
     label = "Batch Task Create"
     variant = None
     identifier = "ayon.batch-tasks"
@@ -20,17 +16,6 @@ class BatchTasksAction(LocalAction):
     icon = get_ftrack_icon_url("BatchTasks.svg")
 
     def discover(self, session, entities, event):
-        '''Return true if we can handle the selected entities.
-        *session* is a `ftrack_api.Session` instance
-        *entities* is a list of tuples each containing the entity type and the
-        entity id.
-        If the entity is a hierarchical you will always get the entity
-        type TypedContext, once retrieved through a get operation you
-        will have the "real" entity type ie. example Shot, Sequence
-        or Asset Build.
-        *event* the unmodified original event
-        '''
-
         not_allowed = ["assetversion", "project", "ReviewSession"]
         if entities[0].entity_type.lower() in not_allowed:
             return False
@@ -98,21 +83,6 @@ class BatchTasksAction(LocalAction):
             )
 
     def launch(self, session, entities, event):
-        '''Callback method for the custom action.
-        return either a bool ( True if successful or False if the action
-        failed ) or a dictionary with they keys `message` and `success`, the
-        message should be a string and will be displayed as feedback to the
-        user, success should be a bool, True if successful or False if the
-        action failed.
-        *session* is a `ftrack_api.Session` instance
-        *entities* is a list of tuples each containing the entity type and the
-        entity id.
-        If the entity is a hierarchical you will always get the entity
-        type TypedContext, once retrieved through a get operation you
-        will have the "real" entity type ie. example Shot, Sequence
-        or Asset Build.
-        *event* the unmodified original event
-        '''
         if 'values' in event['data']:
             values = event['data']['values']
             if 'number_of_tasks' in values:
