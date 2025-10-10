@@ -613,7 +613,7 @@ class SyncFromFtrack:
         t_end = time.perf_counter()
         self.log.info((
             f"Synchronization of project \"{project_name}\" finished"
-            f" in {t_end-t_start}"
+            f" in {t_end - t_start}"
         ))
 
     def update_project_types(self, object_types, task_types):
@@ -763,8 +763,8 @@ class SyncFromFtrack:
                     "type": "label",
                     "value": (
                         "Sync ftrack > AYON requires some mandatory"
-                        " custom attributes. ftrack API key used for services does"
-                        " not have enough permissions to create them."
+                        " custom attributes. ftrack API key used for services"
+                        " does not have enough permissions to create them."
                         "<br/><br/>Please add 'Manage settings' permissions"
                         " to used ftrack API key, or use admin ftrack API key"
                         " for services."
@@ -897,7 +897,9 @@ class SyncFromFtrack:
                 #       removed or created.
                 if matching_name_entity.id in self._processed_server_ids:
                     self._processed_ftrack_ids.add(ft_entity_id)
-                    self._duplicated_ftrack_ids[ft_entity_id] = matching_name_entity
+                    self._duplicated_ftrack_ids[ft_entity_id] = (
+                        matching_name_entity
+                    )
                     _add_children_to_queue(ft_entity_id)
                     self.log.debug(
                         f"{ft_entity_path} - Server id already processed")
