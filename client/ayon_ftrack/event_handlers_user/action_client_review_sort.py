@@ -55,7 +55,8 @@ class ClientReviewSort(LocalAction):
     def launch(self, session, entities, event):
         entity = entities[0]
 
-        # Get all objects from Review Session and all 'sort order' possibilities
+        # Get all objects from Review Session and all 'sort order'
+        #    possibilities
         obj_list = []
         sort_order_list = []
         for obj in entity["review_session_objects"]:

@@ -22,7 +22,6 @@ class BatchTasksAction(LocalAction):
 
         return True
 
-
     def get_task_form_items(self, session, number_of_tasks):
         items = []
 
