@@ -222,7 +222,7 @@ class BaseHandler(metaclass=ABCMeta):
         self,
         event: ftrack_api.event.base.Event,
         message: str,
-        success: Optional[bool]=False,
+        success: Optional[bool] = False,
     ):
         """Shows message to user who triggered event.
 

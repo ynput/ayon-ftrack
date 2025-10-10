@@ -268,22 +268,26 @@ class FillWorkfileAttributeAction(LocalAction):
 
         # When project is selected then we can query whole project
         if project_selected:
-            folder_entities_with_ft_task_entities = self._get_asset_docs_for_project(
-                session,
-                ft_project_entity,
-                folder_entities,
-                task_entities_by_folder_id,
-                report
+            folder_entities_with_ft_task_entities = (
+                self._get_asset_docs_for_project(
+                    session,
+                    ft_project_entity,
+                    folder_entities,
+                    task_entities_by_folder_id,
+                    report
+                )
             )
 
         else:
-            folder_entities_with_ft_task_entities = self._get_tasks_for_selection(
-                session,
-                other_entities,
-                ft_task_entities,
-                folder_entities,
-                task_entities_by_folder_id,
-                report
+            folder_entities_with_ft_task_entities = (
+                self._get_tasks_for_selection(
+                    session,
+                    other_entities,
+                    ft_task_entities,
+                    folder_entities,
+                    task_entities_by_folder_id,
+                    report
+                )
             )
 
         job_entity["data"] = json.dumps({
@@ -300,7 +304,9 @@ class FillWorkfileAttributeAction(LocalAction):
         templates_by_key = {}
 
         operations = []
-        for folder_entity, ft_task_entities in folder_entities_with_ft_task_entities:
+        for folder_entity, ft_task_entities in (
+            folder_entities_with_ft_task_entities
+        ):
             folder_id = folder_entity["id"]
             folder_path = folder_entity["path"]
             task_entities_by_name = {

@@ -803,7 +803,9 @@ class CreateDailyListServerAction(ServerAction):
             )
             project_settings = {"ftrack": ftrack_project_settings}
             if is_ftrack_enabled_in_settings(ftrack_project_settings):
-                action_settings = self._extract_action_settings(project_settings)
+                action_settings = self._extract_action_settings(
+                    project_settings
+                )
             else:
                 action_settings = {}
             settings_by_project_id[project_id] = action_settings

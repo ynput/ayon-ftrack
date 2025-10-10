@@ -843,4 +843,3 @@ class PrepareProjectServer(ServerAction):
                 ayon_usernames.remove(ayon_username)
 
         return ayon_usernames
-

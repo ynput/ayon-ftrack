@@ -390,7 +390,6 @@ class CustomAttributes(LocalAction):
                 report_text = context.get_report_text()
                 self._upload_report(session, job, report_text)
 
-
             job["status"] = job_status
 
             session.commit()

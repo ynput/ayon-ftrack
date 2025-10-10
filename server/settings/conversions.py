@@ -117,7 +117,9 @@ def _convert_custom_attributes_1_4_0(overrides):
                     new_value[key] = value[key]
             if not new_value:
                 continue
-            mandatory_overrides = overrides.setdefault("mandatory_attributes", {})
+            mandatory_overrides = overrides.setdefault(
+                "mandatory_attributes", {}
+            )
             mandatory_overrides[key] = new_value
 
 
