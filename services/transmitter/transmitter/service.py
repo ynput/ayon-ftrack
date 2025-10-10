@@ -52,6 +52,7 @@ def _prepare_source_topics():
     yield "entity.task.assignees_changed"
     yield "reviewable.created"
 
+
 SOURCE_TOPICS = list(_prepare_source_topics())
 
 TARGET_TOPIC = "ftrack.sync"

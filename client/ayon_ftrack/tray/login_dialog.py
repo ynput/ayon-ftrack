@@ -335,7 +335,8 @@ class _CredentialsDialog(QtWidgets.QDialog):
             self._set_widget_state(self._api_input, False)
 
         if len(missing) > 0:
-            self._set_error("You didn't enter {}".format(" and ".join(missing)))
+            joined = " and ".join(missing)
+            self._set_error(f"You didn't enter {joined}")
             return
 
         if not self._login_with_credentials(username, api_key):

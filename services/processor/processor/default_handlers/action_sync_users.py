@@ -258,7 +258,8 @@ class SyncUsersFromFtrackAction(ServerAction):
                 )
                 if response.status_code != 204:
                     self.log.error(
-                        f"Failed to create user {ftrack_username}: {response.data}"
+                        f"Failed to create user {ftrack_username}:"
+                        f" {response.data}"
                     )
                 self.log.debug(f"AYON user {ftrack_username} created.")
                 continue

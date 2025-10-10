@@ -78,7 +78,7 @@ class EntityEventData:
     entity_type: Literal[
         "project", "folder", "task", "product", "version"
     ]
-    entity_id : str
+    entity_id: str
     # 'entity_data' is filled when action is 'deleted'
     entity_data: Optional[Dict[str, Any]]
     # 'update_key' and 'changes' are filled when action is 'updated'
@@ -245,7 +245,7 @@ class EventProcessor:
 
     def soft_cleanup_sync_comment_events(
         self, last_comments_soft_cleanup: int
-    )-> bool:
+    ) -> bool:
         """Remove sync comment events that did not sync any comments.
 
         These comments are not relevant for any reference. The logic makes

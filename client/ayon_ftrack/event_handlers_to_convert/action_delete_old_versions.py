@@ -378,7 +378,7 @@ class DeleteOldVersions(LocalAction):
             product_entity = product_entities_by_id.get(product_id)
             if product_entity is None:
                 self.log.warning(
-                    "Product with ID `{}` was not found.".format(str(product_id))
+                    f"Product with ID '{product_id}' was not found."
                 )
                 continue
 

@@ -4,6 +4,8 @@ import logging
 import pyblish.api
 import ayon_api
 
+from ayon_core.pipeline import PublishError
+
 from ayon_ftrack.common import FTRACK_ID_ATTRIB
 from ayon_ftrack.pipeline import plugin
 
@@ -17,15 +19,13 @@ class CollectFtrackApi(plugin.FtrackPublishContextPlugin):
     def process(self, context):
         ftrack_log = logging.getLogger("ftrack_api")
         ftrack_log.setLevel(logging.WARNING)
-        ftrack_log = logging.getLogger("ftrack_api_old")
-        ftrack_log.setLevel(logging.WARNING)
 
         # Collect session
         # NOTE Import python module here to know if import was successful
         import ftrack_api
 
         session = ftrack_api.Session(auto_connect_event_hub=False)
-        self.log.debug("ftrack user: \"{0}\"".format(session.api_user))
+        self.log.debug(f"ftrack user: \"{session.api_user}\"")
 
         # Collect task
         project_name = context.data["projectName"]
@@ -33,22 +33,21 @@ class CollectFtrackApi(plugin.FtrackPublishContextPlugin):
         task_name = context.data["task"]
 
         # Find project entity
-        project_query = 'Project where full_name is "{0}"'.format(project_name)
-        self.log.debug("Project query: < {0} >".format(project_query))
-        project_entities = list(session.query(project_query).all())
-        if len(project_entities) == 0:
-            raise AssertionError(
-                "Project \"{0}\" not found in ftrack.".format(project_name)
+        project_entity = session.query(
+            f'Project where full_name is "{project_name}"'
+        ).first()
+        if project_entity is None:
+            raise PublishError(
+                f"Failed to find project \"{project_name}\" in ftrack.",
+                "Project not found in ftrack",
+                (
+                    f"Project \"{project_name}\" was not found in ftrack."
+                    " Make sure the project does exist in ftrack and"
+                    f" ftrack user \"{session.api_user}\" has access to it."
+                )
             )
-        # QUESTION Is possible to happen?
-        elif len(project_entities) > 1:
-            raise AssertionError((
-                "Found more than one project with name \"{0}\" in ftrack."
-            ).format(project_name))
 
-        project_entity = project_entities[0]
-
-        self.log.debug("Project found: {0}".format(project_entity))
+        self.log.debug(f"Project found: {project_entity}")
 
         context_ftrack_entity = None
         if folder_path:
@@ -58,35 +57,42 @@ class CollectFtrackApi(plugin.FtrackPublishContextPlugin):
             )
             context_ftrack_entity = entities_by_path[folder_path]
             if context_ftrack_entity is None:
-                raise AssertionError((
-                    "Entity with path \"{}\" not found"
-                    " in ftrack project \"{}\"."
-                ).format(folder_path, project_name))
+                raise PublishError(
+                    (
+                        f"Entity with path \"{folder_path}\" not found"
+                        f" in ftrack project \"{project_name}\"."
+                    ),
+                    "Entity not found in project",
+                    (
+                        f"Entity with path \"{folder_path}\" was not found in"
+                        f" ftrack project \"{project_name}\". Make sure the"
+                        " entity does exist in ftrack and your ftrack user"
+                        f" \"{session.api_user}\" has access to it."
+                    )
+                )
 
-        self.log.debug("Folder found: {}".format(context_ftrack_entity))
+        self.log.debug(f"Folder found: {context_ftrack_entity}")
 
         task_entity = None
         # Find task entity if task is set
-        if not context_ftrack_entity:
+        if context_ftrack_entity is None:
             self.log.warning(
                 "Folder entity is not set. Skipping query of task entity."
             )
         elif not task_name:
             self.log.warning("Task name is not set.")
         else:
-            task_query = (
-                'Task where name is "{}" and parent_id is "{}"'
-            ).format(task_name, context_ftrack_entity["id"])
-            self.log.debug("Task entity query: < {} >".format(task_query))
-            task_entity = session.query(task_query).first()
-            if not task_entity:
-                self.log.warning(
-                    "Task entity with name \"{0}\" was not found.".format(
-                        task_name
-                    )
-                )
+            entity_id = context_ftrack_entity["id"]
+            task_entity = session.query(
+                f'Task where name is "{task_name}"'
+                f' and parent_id is "{entity_id}"'
+            ).first()
+            if task_entity:
+                self.log.debug(f"Task entity found: {task_entity}")
             else:
-                self.log.debug("Task entity found: {0}".format(task_entity))
+                self.log.warning(
+                    f"Task entity with name \"{task_name}\" was not found."
+                )
 
         context.data["ftrackSession"] = session
         context.data["ftrackPythonModule"] = ftrack_api
@@ -116,7 +122,7 @@ class CollectFtrackApi(plugin.FtrackPublishContextPlugin):
                 continue
             filtered_instances.append(instance)
             self.log.debug(
-                "Checking entities of instance \"{}\"".format(str(instance))
+                f"Checking entities of instance \"{instance}\""
             )
             instance_folder_path = instance.data.get("folderPath")
             instance_task_name = instance.data.get("task")
@@ -134,10 +140,11 @@ class CollectFtrackApi(plugin.FtrackPublishContextPlugin):
                     instance_folder_path == context_folder_path
                     and instance_task_name == context_task_name
                 ):
-                    self.log.debug((
+                    self.log.debug(
                         "Instance's context is same as in publish context."
-                        " Folder: {} | Task: {}"
-                    ).format(context_folder_path, context_task_name))
+                        f" Folder: {context_folder_path}"
+                        f" | Task: {context_task_name}"
+                    )
                     instance.data["ftrackEntity"] = context_ftrack_entity
                     instance.data["ftrackTask"] = context_task_entity
                     continue
@@ -146,10 +153,10 @@ class CollectFtrackApi(plugin.FtrackPublishContextPlugin):
 
             elif instance_task_name:
                 if instance_task_name == context_task_name:
-                    self.log.debug((
+                    self.log.debug(
                         "Instance's context task is same as in publish"
-                        " context. Task: {}"
-                    ).format(context_task_name))
+                        f" context. Task: {context_task_name}"
+                    )
                     instance.data["ftrackEntity"] = context_ftrack_entity
                     instance.data["ftrackTask"] = context_task_entity
                     continue
@@ -159,10 +166,10 @@ class CollectFtrackApi(plugin.FtrackPublishContextPlugin):
 
             elif instance_folder_path:
                 if instance_folder_path == context_folder_path:
-                    self.log.debug((
+                    self.log.debug(
                         "Instance's context folder is same as in publish"
-                        " context. Folder: {}"
-                    ).format(context_folder_path))
+                        f" context. Folder: {context_folder_path}"
+                    )
                     instance.data["ftrackEntity"] = context_ftrack_entity
                     instance.data["ftrackTask"] = context_task_entity
                     continue
@@ -181,6 +188,7 @@ class CollectFtrackApi(plugin.FtrackPublishContextPlugin):
 
         session = context.data["ftrackSession"]
         project_entity = context.data["ftrackProject"]
+        project_name = project_entity["full_name"]
         folder_paths = set(instance_by_folder_and_task.keys())
 
         entities_by_path = self.find_ftrack_entities(
@@ -191,13 +199,16 @@ class CollectFtrackApi(plugin.FtrackPublishContextPlugin):
             entity = entities_by_path[folder_path]
             task_entity_by_name = {}
             if not entity:
-                self.log.warning((
-                    "Didn't find entity with name \"{}\" in Project \"{}\""
-                ).format(folder_path, project_entity["full_name"]))
+                self.log.warning(
+                    f"Didn't find folder with path \"{folder_path}\""
+                    f" in Project \"{project_name}\""
+                )
             else:
-                task_entities = session.query((
-                    "select id, name from Task where parent_id is \"{}\""
-                ).format(entity["id"])).all()
+                entity_id = entity["id"]
+                task_entities = session.query(
+                    "select id, name from Task"
+                    f" where parent_id is \"{entity_id}\""
+                ).all()
                 for task_entity in task_entities:
                     task_name_low = task_entity["name"].lower()
                     task_entity_by_name[task_name_low] = task_entity
@@ -211,10 +222,11 @@ class CollectFtrackApi(plugin.FtrackPublishContextPlugin):
                     instance.data["ftrackEntity"] = entity
                     instance.data["ftrackTask"] = task_entity
 
-                    self.log.debug((
-                        "Instance {} has own ftrack entities"
-                        " as has different context. TypedContext: {} Task: {}"
-                    ).format(str(instance), str(entity), str(task_entity)))
+                    self.log.debug(
+                        f"Instance {instance} has own ftrack entities"
+                        " as has different context."
+                        f" TypedContext: {entity} Task: {task_entity}"
+                    )
 
     def find_ftrack_entities(self, session, project_entity, folder_paths):
         output = {path: None for path in folder_paths}
@@ -228,7 +240,7 @@ class CollectFtrackApi(plugin.FtrackPublishContextPlugin):
             folder_paths=folder_paths_s,
             fields={
                 "path",
-                "attrib.{}".format(FTRACK_ID_ATTRIB),
+                f"attrib.{FTRACK_ID_ATTRIB}",
             },
             own_attributes=True
         )
@@ -251,11 +263,11 @@ class CollectFtrackApi(plugin.FtrackPublishContextPlugin):
         entities_by_id = {}
         if folder_path_by_ftrack_id:
             joined_ftrack_ids = ",".join({
-                '"{}"'.format(ftrack_id)
+                f'"{ftrack_id}"'
                 for ftrack_id in folder_path_by_ftrack_id
             })
             entities = session.query(
-                "TypedContext where id in ({})".format(joined_ftrack_ids)
+                f"TypedContext where id in ({joined_ftrack_ids})"
             ).all()
             entities_by_id = {
                 entity["id"]: entity
@@ -291,7 +303,7 @@ class CollectFtrackApi(plugin.FtrackPublishContextPlugin):
             names |= set(folder_path.split("/"))
         names.discard("")
 
-        joined_names = ",".join('"{}"'.format(n) for n in names)
+        joined_names = ",".join(f'"{n}"' for n in names)
 
         entities = session.query(
             (
@@ -324,4 +336,3 @@ class CollectFtrackApi(plugin.FtrackPublishContextPlugin):
             if entity is not None:
                 output[folder_path] = entity
         return output
-

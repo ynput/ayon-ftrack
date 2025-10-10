@@ -35,7 +35,6 @@ class BaseEventHandler(BaseHandler):
         """
         return self.launch(self.session, event)
 
-
     def launch(
         self,
         session: ftrack_api.Session,
