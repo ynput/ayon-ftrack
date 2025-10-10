@@ -10,7 +10,6 @@ import collections
 import appdirs
 import arrow
 import requests
-import ftrack_api
 import ftrack_api.session
 import ftrack_api.cache
 import ftrack_api.operation
@@ -171,7 +170,9 @@ class CustomEventHubSession(ftrack_api.session.Session):
         self.kwargs = kwargs
 
         super(ftrack_api.session.Session, self).__init__()
-        self.logger = logging.getLogger(__name__ + "." + self.__class__.__name__)
+        self.logger = logging.getLogger(
+            __name__ + "." + self.__class__.__name__
+        )
         self._closed = False
 
         if server_url is None:
@@ -225,7 +226,9 @@ class CustomEventHubSession(ftrack_api.session.Session):
 
         if new_api:
             self._record_operations = collections.defaultdict(lambda: True)
-            self._auto_populate = collections.defaultdict(lambda: auto_populate)
+            self._auto_populate = collections.defaultdict(
+                lambda: auto_populate
+            )
         else:
             self.record_operations = True
             self.auto_populate = auto_populate
@@ -236,7 +239,9 @@ class CustomEventHubSession(ftrack_api.session.Session):
 
         # Enforce always having a memory cache at top level so that the same
         # in-memory instance is returned from session.
-        self.cache = ftrack_api.cache.LayeredCache([ftrack_api.cache.MemoryCache()])
+        self.cache = ftrack_api.cache.LayeredCache(
+            [ftrack_api.cache.MemoryCache()]
+        )
 
         if cache is not None:
             if callable(cache):
@@ -279,9 +284,8 @@ class CustomEventHubSession(ftrack_api.session.Session):
 
         self._plugin_paths = plugin_paths
         if self._plugin_paths is None:
-            self._plugin_paths = os.environ.get("FTRACK_EVENT_PLUGIN_PATH", "").split(
-                os.pathsep
-            )
+            env_paths = os.environ.get("FTRACK_EVENT_PLUGIN_PATH", "")
+            self._plugin_paths = env_paths.split(os.pathsep)
 
         self._discover_plugins(plugin_arguments=plugin_arguments)
 

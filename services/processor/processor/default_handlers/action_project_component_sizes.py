@@ -45,7 +45,7 @@ class ProjectComponentsSizesCalculator(BaseEventHandler):
 
     def launch(self, session, event):
         project_id = event["data"]["project_id"]
-        job_id  = event["data"]["job_id"]
+        job_id = event["data"]["job_id"]
         job_entity = session.query(
             f"select id, data from Job where id is '{job_id}'"
         ).first()

@@ -881,7 +881,6 @@ class SyncToAvalonEvent(BaseEventHandler):
             username = user_entity["username"] or username
         return username
 
-
     def process_removed(self):
         """
             Handles removed entities (not removed tasks - handle separately).
@@ -1215,7 +1214,7 @@ class SyncToAvalonEvent(BaseEventHandler):
 
         # Parents, Hierarchy
         ent_path_items = [ent["name"] for ent in ftrack_ent["link"]]
-        parents = ent_path_items[1:len(ent_path_items)-1:]
+        parents = ent_path_items[1:len(ent_path_items) - 1:]
 
         # TODO logging
         self.log.debug(
@@ -1597,7 +1596,7 @@ class SyncToAvalonEvent(BaseEventHandler):
                     self.ftrack_ents_by_id[ftrack_id] = ftrack_ent
 
                 ent_path_items = [ent["name"] for ent in ftrack_ent["link"]]
-                parents = ent_path_items[1:len(ent_path_items)-1:]
+                parents = ent_path_items[1:len(ent_path_items) - 1:]
 
                 avalon_ent_parents = (
                     avalon_ent_by_name.get("data", {}).get("parents")
@@ -2093,7 +2092,7 @@ class SyncToAvalonEvent(BaseEventHandler):
             ftrack_id = avalon_ent["data"]["ftrackId"]
             ftrack_ent = self.ftrack_ents_by_id[ftrack_id]
             ent_path_items = [ent["name"] for ent in ftrack_ent["link"]]
-            parents = ent_path_items[1:len(ent_path_items)-1:]
+            parents = ent_path_items[1:len(ent_path_items) - 1:]
             stored_parents_by_mongo[mongo_id] = parents
 
         for mongo_id, parents in stored_parents_by_mongo.items():
@@ -2577,7 +2576,9 @@ class SyncToAvalonEvent(BaseEventHandler):
                 self.ftrack_ents_by_id[ftrack_id] = ftrack_ent
 
             name = ftrack_ent["name"]
-            ent_path_items = [_ent["name"] for _ent in ftrack_ent["link"][:-1]]
+            ent_path_items = [
+                _ent["name"] for _ent in ftrack_ent["link"][:-1]
+            ]
             ent_path_items.append("<strong>{}</strong>".format(name))
             ent_path = "/".join(ent_path_items)
             items.append({

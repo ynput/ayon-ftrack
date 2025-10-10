@@ -329,7 +329,7 @@ class SyncFromFtrack:
         self,
         ft_entity: "ftrack_api.entity.base.Entity",
         project_schema_id: str,
-    ) :
+    ):
         fields = {
             "asset_version_workflow_schema",
             "task_workflow_schema",
@@ -342,7 +342,6 @@ class SyncFromFtrack:
             f"select {joined_fields} from ProjectSchema"
             f" where id is '{project_schema_id}'"
         ).first()
-
 
         type_id = ft_entity["type_id"]
         task_workflow_override_ids = {

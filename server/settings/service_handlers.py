@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 from pydantic import validator
 
 from ayon_server.lib.postgres import Postgres
