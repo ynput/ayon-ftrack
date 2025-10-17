@@ -1,5 +1,5 @@
 name = "ftrack"
-version = "1.4.10+dev"
+version = "1.4.11"
 title = "ftrack"
 client_dir = "ayon_ftrack"
 
