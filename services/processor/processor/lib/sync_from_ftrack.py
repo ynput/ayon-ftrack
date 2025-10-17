@@ -888,6 +888,16 @@ class SyncFromFtrack:
                 self.log.debug(f"{ft_entity_path} - Skipped")
                 continue
 
+            if (
+                parent_entity.entity_type == "project"
+                and ft_entity.entity_type.lower() == "task"
+            ):
+                self._skipped_ftrack_ids.add(ft_entity_id)
+                self.log.debug(
+                    f"{ft_entity_path} - Skipped task at projectroot"
+                )
+                continue
+
             label = ft_entity["name"]
             name = slugify_string(label)
             matching_name_entity = None
