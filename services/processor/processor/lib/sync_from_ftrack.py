@@ -88,6 +88,7 @@ class SyncFromFtrack:
         # Create entity hub which handle entity changes
         self._entity_hub = EntityHub(project_name)
         self._ftrack_settings = None
+        self._ftrack_project_settings = None
 
         self._report_items = []
 
@@ -179,8 +180,15 @@ class SyncFromFtrack:
 
     def get_ftrack_settings(self):
         if self._ftrack_settings is None:
-            self._ftrack_settings = get_addons_settings()["ftrack"]
+            settings = get_addons_settings()
+            self._ftrack_settings = settings["ftrack"]
         return copy.deepcopy(self._ftrack_settings)
+
+    def get_ftrack_project_settings(self):
+        if self._ftrack_project_settings is None:
+            settings = get_addons_settings(project_name=self.project_name)
+            self._ftrack_project_settings = settings["ftrack"]
+        return copy.deepcopy(self._ftrack_project_settings)
 
     def sync_statuses(self, ft_project, ft_session):
         fields = {
@@ -1124,7 +1132,7 @@ class SyncFromFtrack:
         self,
         ft_entities_by_id: dict[str, "ftrack_api.entity.base.Entity"],
     ):
-        settings = self.get_ftrack_settings()
+        settings = self.get_ftrack_project_settings()
         ay_link_type = (
             settings
             ["service_event_handlers"]
@@ -1239,7 +1247,7 @@ class SyncFromFtrack:
         attr_mapping: CustomAttributesMapping = (
             get_custom_attributes_mapping(
                 ft_session,
-                self.get_ftrack_settings(),
+                self.get_ftrack_project_settings(),
                 attr_confs,
             )
         )
