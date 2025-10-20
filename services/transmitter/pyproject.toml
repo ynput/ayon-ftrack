@@ -1,10 +1,10 @@
 [project]
 name = "ftrack-transmitter"
-version = "1.4.10+dev"
+version = "1.4.11+dev"
 description = ""
 authors = [{name = "Ynput s.r.o.", email ="info@ynput.io"}]
 dependencies = [
-    "ayon-python-api==1.2.2",
+    "ayon-python-api==1.2.3",
     "ftrack-python-api==2.3.3"
 ]
 
