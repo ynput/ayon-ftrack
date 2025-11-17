@@ -130,7 +130,7 @@ class IntegrateFtrackInstance(plugin.FtrackPublishInstancePlugin):
             },
             "assetversion_data": {
                 "version": version_number,
-                "comment": instance.context.data.get("comment") or "",
+                "comment": instance.data.get("comment") or "",
                 "status_name": status_name,
                 "custom_attributes": av_custom_attributes
             },
