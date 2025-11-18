@@ -1,6 +1,6 @@
 [project]
 name = "ftrack-leecher"
-version = "1.4.11+dev"
+version = "1.4.12"
 description = ""
 authors = [{name = "Ynput s.r.o.", email ="info@ynput.io"}]
 dependencies = [
