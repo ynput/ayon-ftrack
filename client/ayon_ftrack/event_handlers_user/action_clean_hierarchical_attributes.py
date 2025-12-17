@@ -31,7 +31,7 @@ class CleanHierarchicalAttrsAction(LocalAction):
         project_id = entities[0]["id"]
 
         user_message = "This may take some time"
-        self.show_message(event, user_message, result=True)
+        self.show_message(event, user_message, True)
         self.log.debug("Preparing entities for cleanup.")
 
         all_entities = session.query(
