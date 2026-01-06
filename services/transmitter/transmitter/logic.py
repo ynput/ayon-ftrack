@@ -399,11 +399,12 @@ class EventProcessor:
             return
 
         ftrack_project = self._session.query(
-            "select id, project_schema_id from Project"
+            "select id from Project"
             f" where full_name is '{project_name}'"
         ).first()
         if not ftrack_project:
             self._log.info(f"Project '{project_name}' not found in ftrack.")
+            return
 
         if action == "created":
             self._create_ftrack_list(source_event, ftrack_project)
@@ -450,7 +451,7 @@ class EventProcessor:
         entity_key = collections.OrderedDict(id=ft_list["id"])
         self._session.recorded_operations.push(
             ftrack_api.operation.DeleteEntityOperation(
-                "CustomAttributeValue",
+                "List",
                 entity_key
             )
         )
@@ -656,7 +657,7 @@ class EventProcessor:
                 version_entity["productId"]
                 for version_entity in version_entites
             },
-            fields={"id", "name", "folderIds"},
+            fields={"id", "name", "folderId"},
         ):
             folder_ids.add(product_entity["folderId"])
             product_id = product_entity["id"]
@@ -683,7 +684,7 @@ class EventProcessor:
         }
         ft_asset_ids = set()
         for ft_asset in self._session.query(
-            "select id, name, context_id from TypedContext"
+            "select id, name, context_id from Asset"
             f" where context_id in ({joined_ft_ids})"
         ).all():
             parent_id = ft_asset["context_id"]
