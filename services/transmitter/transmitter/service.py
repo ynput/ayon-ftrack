@@ -51,6 +51,9 @@ def _prepare_source_topics():
     yield "entity.version.task_changed"
     yield "entity.task.assignees_changed"
     yield "reviewable.created"
+    yield "entity_list.created"
+    yield "entity_list.changed"
+    yield "entity_list.deleted"
 
 
 SOURCE_TOPICS = list(_prepare_source_topics())

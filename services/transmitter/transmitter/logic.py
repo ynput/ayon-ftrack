@@ -14,6 +14,7 @@ import ftrack_api.operation
 
 from ftrack_common import (
     FTRACK_ID_ATTRIB,
+    CUST_ATTR_KEY_SERVER_ID,
     map_ftrack_users_to_ayon_users,
     is_ftrack_enabled_in_settings,
     join_filter_values,
@@ -25,7 +26,7 @@ from ftrack_common import (
 from .structures import JobEventType
 
 if typing.TYPE_CHECKING:
-    import ftrack_api.entity.base
+    import ftrack_api.entity.base.Entity as FtrackEntityType
     import ftrack_api.entity.user
 
 log = logging.getLogger(__name__)
@@ -138,6 +139,8 @@ class EventProcessor:
             topic: str = source_event["topic"]
             if topic == "reviewable.created":
                 self._process_reviewable_created(source_event)
+            elif topic.startswith("entity_list"):
+                self._process_list_event(source_event)
             elif topic.startswith("entity"):
                 self._process_entity_event(source_event)
             else:
@@ -355,11 +358,387 @@ class EventProcessor:
             return event
         return None
 
-    def _process_reviewable_created(self, source_event: Dict[str, Any]):
+    def _is_project_enabled(
+        self,
+        project_name: str,
+        *,
+        project_settings: Optional[dict[str, Any]] = None,
+    ) -> bool:
+        if project_settings is None:
+            project_settings = ayon_api.get_addons_settings(
+                project_name=project_name
+            )
+
+        if not is_ftrack_enabled_in_settings(project_settings["ftrack"]):
+            self._log.info(
+                f"Project '{project_name}' is disabled for ftrack."
+            )
+            return False
+        return True
+
+    def _process_reviewable_created(self, source_event: dict[str, Any]):
         # TODO implement
         pass
 
-    def _process_entity_event(self, source_event: Dict[str, Any]):
+    def _process_list_event(self, source_event: dict[str, Any]) -> None:
+        entity_type = source_event["summary"]["entity_type"]
+        # We do support only version list for now
+        # - ftrack support list that can have both task and folder entities
+        #   which is not supported in AYON
+        if entity_type != "version":
+            return
+
+        topic = source_event["topic"]
+        action = topic.removeprefix("entity_list.")
+        if action not in ("created", "deleted", "changed"):
+            self._log.warning(f"Unhandled list event topic: {topic}")
+            return
+
+        project_name = source_event["project"]
+        if not self._is_project_enabled(project_name):
+            return
+
+        ftrack_project = self._session.query(
+            "select id, project_schema_id from Project"
+            f" where full_name is '{project_name}'"
+        ).first()
+        if not ftrack_project:
+            self._log.info(f"Project '{project_name}' not found in ftrack.")
+
+        if action == "created":
+            self._create_ftrack_list(source_event, ftrack_project)
+
+        elif action == "deleted":
+            self._delete_ftrack_list(source_event, ftrack_project)
+
+        elif action == "changed":
+            self._update_ftrack_list(source_event, ftrack_project)
+
+    def _find_matching_ftrack_list(self, project_id, source_event):
+        # TODO look for 'FTRACK_ID_ATTRIB' attribute value first
+        summary = source_event["summary"]
+        label = summary["label"]
+        ft_lists = self._session.query(
+            "select id, category_id, name from List"
+            f" where project_id is '{project_id}'"
+        ).all()
+        match_name = label.lower()
+        for ft_list in ft_lists:
+            ft_name = ft_list["name"].lower()
+            if ft_name == match_name:
+                return ft_list
+        return None
+
+    def _delete_ftrack_list(
+        self,
+        source_event: dict[str, Any],
+        ftrack_project: "FtrackEntityType",
+    ) -> None:
+        summary = source_event["summary"]
+        entity_type = summary["entity_type"]
+        if entity_type != "version":
+            return
+
+        # project_name = source_event["project"]
+        # list_id = summary["id"]
+
+        ft_project_id = ftrack_project["id"]
+        ft_list = self._find_matching_ftrack_list(ft_project_id, source_event)
+        if ft_list is None:
+            return
+
+        entity_key = collections.OrderedDict(id=ft_list["id"])
+        self._session.recorded_operations.push(
+            ftrack_api.operation.DeleteEntityOperation(
+                "CustomAttributeValue",
+                entity_key
+            )
+        )
+        try:
+            self._session.commit()
+        finally:
+            self._session.recorded_operations.clear()
+
+    def _create_ftrack_list(
+        self,
+        source_event: dict[str, Any],
+        ftrack_project: "FtrackEntityType",
+    ) -> None:
+        # For now, it looks like the logic is the same
+        self._update_ftrack_list(source_event, ftrack_project)
+
+    def _update_ftrack_list(
+        self,
+        source_event: dict[str, Any],
+        ftrack_project: "FtrackEntityType",
+    ) -> None:
+        summary = source_event["summary"]
+        entity_type = summary["entity_type"]
+        if entity_type != "version":
+            self._log.debug(
+                "Skipped list sync."
+                " List for entity type '%s' is not supported.",
+                entity_type
+            )
+            return
+
+        project_name = source_event["project"]
+        list_id = summary["id"]
+        label = summary["label"]
+
+        ft_project_id = ftrack_project["id"]
+        match_list = self._find_matching_ftrack_list(
+            ft_project_id, source_event
+        )
+        if match_list is not None:
+            if match_list["system_type"] != "assetversion":
+                self._log.warning(
+                    "Failed to sync list '%s'. List already exists in ftrack"
+                    " but with entity type '%s'.",
+                    label, match_list["system_type"]
+                )
+                return
+
+            ft_list_id = match_list["id"]
+
+        else:
+            # TODO better way how to determine list category on ftrack
+            list_category = self._session.query(
+                "select id from ListCategory"
+            ).first()
+
+            ft_list_id = str(uuid.uuid4())
+            entity_key = collections.OrderedDict(id=ft_list_id)
+            op = ftrack_api.operation.CreateEntityOperation(
+                "List",
+                entity_key,
+                {
+                    "id": ft_list_id,
+                    "name": label,
+                    "is_open": True,
+                    "category_id": list_category["id"],
+                    "project_id": ftrack_project["id"],
+                    "system_type": "assetversion",
+                }
+            )
+            self._session.recorded_operations.push(op)
+            self._log.info(
+                "Creating new list '%s' on ftrack.",
+                label
+            )
+            try:
+                self._session.commit()
+            finally:
+                self._session.recorded_operations.clear()
+
+            ayon_api.update_entity_list(
+                project_name,
+                list_id,
+                attrib={FTRACK_ID_ATTRIB: ft_list_id},
+            )
+
+        # ---------------------------
+        # --- Update list objects ---
+        # ---------------------------
+        ft_list_objects = self._session.query(
+            "select id, entity_id from ListObject"
+            f" where list_id is '{ft_list_id}'"
+        ).all()
+        entity_list = ayon_api.get_entity_list_by_id(project_name, list_id)
+        entity_list_items = entity_list["items"]
+        # Both are empty
+        if not entity_list_items and not ft_list_objects:
+            return
+        entity_list_items.sort(key=lambda i: i["position"])
+        version_ids = {
+            item["entityId"]
+            for item in entity_list_items
+        }
+        version_entities_by_id = {
+            version_entity["id"]: version_entity
+            for version_entity in ayon_api.get_versions(
+                project_name,
+                version_ids=version_ids,
+                fields={"id", f"attrib.{FTRACK_ID_ATTRIB}", "productId"}
+            )
+        }
+        ids_mapping = {
+            version_id: None
+            for version_id in version_ids
+        }
+        version_entities_wo_ft = []
+        for version_id, version_entity in version_entities_by_id.items():
+            ftrack_id = version_entity["attrib"].get(FTRACK_ID_ATTRIB)
+            if ftrack_id:
+                ids_mapping[version_id] = ftrack_id
+            else:
+                version_entities_wo_ft.append(version_entity)
+
+        ids_mapping.update(self._find_ftrack_versions(
+            project_name,
+            version_entities_wo_ft,
+        ))
+        ids_to_add = set(ids_mapping.values())
+        ids_to_add.discard(None)
+
+        current_ids = {
+            item["entity_id"]: item["id"]
+            for item in ft_list_objects
+        }
+        ids_to_remove = set(current_ids) - ids_to_add
+
+        ft_cust_attr_ay_ids = []
+        if ids_to_remove:
+            attr_def = self._session.query(
+                 "select id from CustomAttributeConfiguration"
+                 f" where key is '{CUST_ATTR_KEY_SERVER_ID}'"
+            ).first()
+            if attr_def:
+                ft_cust_attr_ay_ids = query_custom_attribute_values(
+                    self._session,
+                    {attr_def["id"]},
+                    ids_to_remove,
+                )
+
+        # Discard AssetVersions that don't have ayon id filled
+        for value_item in ft_cust_attr_ay_ids:
+            entity_id = value_item["entity_id"]
+            if not value_item["value"]:
+                ids_to_remove.discard(entity_id)
+
+        for ftrack_id in ids_to_add:
+            item_id = str(uuid.uuid4())
+            entity_key = collections.OrderedDict(id=item_id)
+            op = ftrack_api.operation.CreateEntityOperation(
+                "ListObject",
+                entity_key,
+                {
+                    "id": item_id,
+                    "entity_id": ftrack_id,
+                    "list_id": ft_list_id,
+                }
+            )
+            self._session.recorded_operations.push(op)
+
+        for ftrack_id in ids_to_remove:
+            list_item_id = current_ids[ftrack_id]
+            entity_key = collections.OrderedDict(id=list_item_id)
+            op = ftrack_api.operation.DeleteEntityOperation(
+                "ListObject",
+                entity_key
+            )
+            self._session.recorded_operations.push(op)
+
+        self._log.info("Changing ftrack list objects to match AYON items")
+        if self._session.recorded_operations:
+            try:
+                self._session.commit()
+            finally:
+                self._session.recorded_operations.clear()
+
+    def _find_ftrack_versions(
+        self,
+        project_name: str,
+        version_entites: list[dict[str, Any]],
+    ) -> dict[str, Optional[str]]:
+        output = {
+            version_entity["id"]: None
+            for version_entity in version_entites
+        }
+        if not version_entites:
+            return output
+
+        products_by_id = {}
+        folder_ids = set()
+        for product_entity in ayon_api.get_products(
+            project_name,
+            product_ids={
+                version_entity["productId"]
+                for version_entity in version_entites
+            },
+            fields={"id", "name", "folderIds"},
+        ):
+            folder_ids.add(product_entity["folderId"])
+            product_id = product_entity["id"]
+            products_by_id[product_id] = product_entity
+
+        ft_ids = set()
+        ftrack_id_by_folder_id = {}
+        for folder_entity in ayon_api.get_folders(
+            project_name,
+            folder_ids=folder_ids,
+            fields={"id", f"attrib.{FTRACK_ID_ATTRIB}"},
+        ):
+            ftrack_id = folder_entity["attrib"].get(FTRACK_ID_ATTRIB)
+            if not ftrack_id:
+                continue
+            folder_id = folder_entity["id"]
+            ft_ids.add(ftrack_id)
+            ftrack_id_by_folder_id[folder_id] = ftrack_id
+
+        joined_ft_ids = join_filter_values(ft_ids)
+        ft_assets_by_parent_id = {
+            ft_id: []
+            for ft_id in ft_ids
+        }
+        ft_asset_ids = set()
+        for ft_asset in self._session.query(
+            "select id, name, context_id from TypedContext"
+            f" where context_id in ({joined_ft_ids})"
+        ).all():
+            parent_id = ft_asset["context_id"]
+            ft_assets_by_parent_id[parent_id].append(ft_asset)
+            ft_asset_ids.add(ft_asset["id"])
+
+        joined_ft_asset_ids = join_filter_values(ft_asset_ids)
+        ft_versions_by_asset_id = {
+            asset_id: []
+            for asset_id in ft_asset_ids
+        }
+        for ft_version in self._session.query(
+            "select id, asset_id, version from AssetVersion"
+            f" where asset_id in ({joined_ft_asset_ids})"
+        ).all():
+            asset_id = ft_version["asset_id"]
+            ft_versions_by_asset_id[asset_id].append(ft_version)
+
+        for version_entity in version_entites:
+            product_id = version_entity["productId"]
+            product_entity = products_by_id.get(product_id)
+            if not product_entity:
+                continue
+
+            folder_id = product_entity["folderId"]
+            ft_id = ftrack_id_by_folder_id.get(folder_id)
+            if not ft_id:
+                continue
+
+            product_name_low = product_entity["name"].lower()
+            matching_ft_asset = None
+            alternatives = []
+            for ft_asset in ft_assets_by_parent_id[ft_id]:
+                low_name = ft_asset["name"].lower()
+                if low_name == product_name_low:
+                    matching_ft_asset = ft_asset
+                    break
+
+                if product_name_low in low_name:
+                    alternatives.append(ft_asset)
+
+            if matching_ft_asset is None and alternatives:
+                matching_ft_asset = alternatives[0]
+
+            if matching_ft_asset is None:
+                continue
+
+            for version in ft_versions_by_asset_id[matching_ft_asset["id"]]:
+                if version["version"] == version_entity["version"]:
+                    output[version_entity["id"]] = version["id"]
+                    break
+
+        return output
+
+    def _process_entity_event(self, source_event: dict[str, Any]):
         entity_data: Optional[EntityEventData] = self._convert_entity_event(
             source_event
         )
@@ -507,10 +886,10 @@ class EventProcessor:
         project_settings = ayon_api.get_addons_settings(
             project_name=project_name
         )
-        if not is_ftrack_enabled_in_settings(project_settings["ftrack"]):
-            self._log.info(
-                f"Project '{project_name}' is disabled for ftrack."
-            )
+        if not self._is_project_enabled(
+            project_name,
+            project_settings=project_settings,
+        ):
             return
 
         # TODO implement more logic
@@ -687,7 +1066,7 @@ class EventProcessor:
 
     def _get_available_ft_statuses(
         self,
-        ft_entity: "ftrack_api.entity.base.Entity",
+        ft_entity: "FtrackEntityType",
         project_schema_id: str,
     ) -> Set[str]:
         is_version = is_folder = False
@@ -1070,10 +1449,7 @@ class EventProcessor:
 
         project_names = []
         for project_name in ayon_project_names & ft_project_names:
-            project_settings = ayon_api.get_addons_settings(
-                project_name=project_name
-            )
-            if is_ftrack_enabled_in_settings(project_settings["ftrack"]):
+            if self._is_project_enabled(project_name):
                 project_names.append(project_name)
         return project_names
 
