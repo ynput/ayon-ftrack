@@ -1,3 +1,4 @@
+import json
 import time
 import datetime
 import collections
@@ -415,14 +416,29 @@ class EventProcessor:
         elif action == "changed":
             self._update_ftrack_list(source_event, ftrack_project)
 
-    def _find_matching_ftrack_list(self, project_id, source_event):
-        # TODO look for 'FTRACK_ID_ATTRIB' attribute value first
+    def _find_matching_ftrack_list(
+        self,
+        project_id: str,
+        source_event: dict[str, Any],
+        entity_list: Optional[dict[str, Any]] = None,
+    ):
+        ft_lists = self._session.query(
+            "select id, name from List"
+            f" where project_id is '{project_id}'"
+            " and system_type is 'assetversion'"
+        ).all()
+
+        # It won't be possible to find an entity list in AYON if was removed
+        ftrack_id = None
+        if entity_list:
+            ftrack_id = entity_list["attrib"].get(FTRACK_ID_ATTRIB)
+        if ftrack_id:
+            for ft_list in ft_lists:
+                if ft_list["id"] == ftrack_id:
+                    return ft_list
+
         summary = source_event["summary"]
         label = summary["label"]
-        ft_lists = self._session.query(
-            "select id, category_id, name from List"
-            f" where project_id is '{project_id}'"
-        ).all()
         match_name = label.lower()
         for ft_list in ft_lists:
             ft_name = ft_list["name"].lower()
@@ -440,9 +456,6 @@ class EventProcessor:
         if entity_type != "version":
             return
 
-        # project_name = source_event["project"]
-        # list_id = summary["id"]
-
         ft_project_id = ftrack_project["id"]
         ft_list = self._find_matching_ftrack_list(ft_project_id, source_event)
         if ft_list is None:
@@ -459,6 +472,19 @@ class EventProcessor:
             self._session.commit()
         finally:
             self._session.recorded_operations.clear()
+
+    def _get_entity_list_by_id(
+        self, project_name: str, list_id: str
+    ) -> dict[str, Any]:
+        list_fields = ayon_api.get_default_fields_for_type("entityList")
+        list_fields.add("allAttrib")
+        entity_list = ayon_api.get_entity_list_by_id(
+            project_name, list_id, fields=list_fields
+        )
+        # This does not contain all attributes
+        all_attrib = json.loads(entity_list.get("allAttrib") or "{}")
+        entity_list["attrib"] = all_attrib
+        return entity_list
 
     def _create_ftrack_list(
         self,
@@ -485,11 +511,12 @@ class EventProcessor:
 
         project_name = source_event["project"]
         list_id = summary["id"]
+        entity_list = self._get_entity_list_by_id(project_name, list_id)
         label = summary["label"]
 
         ft_project_id = ftrack_project["id"]
         match_list = self._find_matching_ftrack_list(
-            ft_project_id, source_event
+            ft_project_id, source_event, entity_list
         )
         if match_list is not None:
             if match_list["system_type"] != "assetversion":
@@ -537,6 +564,7 @@ class EventProcessor:
                 list_id,
                 attrib={FTRACK_ID_ATTRIB: ft_list_id},
             )
+            entity_list["attrib"][FTRACK_ID_ATTRIB] = ft_list_id
 
         # ---------------------------
         # --- Update list objects ---
@@ -545,7 +573,6 @@ class EventProcessor:
             "select id, entity_id from ListObject"
             f" where list_id is '{ft_list_id}'"
         ).all()
-        entity_list = ayon_api.get_entity_list_by_id(project_name, list_id)
         entity_list_items = entity_list["items"]
         # Both are empty
         if not entity_list_items and not ft_list_objects:
@@ -587,6 +614,7 @@ class EventProcessor:
             for item in ft_list_objects
         }
         ids_to_remove = set(current_ids) - ids_to_add
+        ids_to_add = ids_to_add - set(current_ids)
 
         ft_cust_attr_ay_ids = []
         if ids_to_remove:
