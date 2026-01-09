@@ -1965,11 +1965,9 @@ class SyncProcess:
             self._process_list_item_changes()
             return
 
-        fields = ayon_api.get_default_fields_for_type("entityList")
-        fields.add("allAttrib")
         ayon_lists = list(ayon_api.get_entity_lists(
             self.project_name,
-            fields=fields
+            fields={"id", "label", "entityType", "allAttrib"}
         ))
         ay_lists_by_ftrack_id = {}
         ay_lists_by_label_low = {}
@@ -2175,11 +2173,9 @@ class SyncProcess:
             return
 
         if ayon_lists is None:
-            fields = ayon_api.get_default_fields_for_type("entityList")
-            fields.add("allAttrib")
             ayon_lists = list(ayon_api.get_entity_lists(
                 self.project_name,
-                fields=fields
+                fields={"id", "label", "entityType", "allAttrib"},
             ))
 
         # No lists, nothing to update...
@@ -2265,9 +2261,14 @@ class SyncProcess:
                 continue
 
             list_type = ayon_list["entityType"]
+            l_w_items = ayon_api.get_entity_list_by_id(
+                self.project_name,
+                ayon_list["id"],
+                fields={"items.id", "items.entityId"},
+            )
             items_by_entity_id = {
                 item["entityId"]: item
-                for item in ayon_list["items"]
+                for item in l_w_items["items"]
             }
 
             to_add_ids = set()
