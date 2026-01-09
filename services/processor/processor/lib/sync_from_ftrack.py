@@ -479,6 +479,7 @@ class SyncFromFtrack:
         server_id_conf_id = None
         server_path_conf_id = None
         sync_failed_conf_id = None
+        list_type_conf = None
         for attr_conf in attr_confs:
             if attr_conf["key"] == CUST_ATTR_KEY_SERVER_ID:
                 server_id_conf_id = attr_conf["id"]
@@ -486,6 +487,8 @@ class SyncFromFtrack:
                 server_path_conf_id = attr_conf["id"]
             elif attr_conf["key"] == CUST_ATTR_KEY_SYNC_FAIL:
                 sync_failed_conf_id = attr_conf["id"]
+            elif attr_conf["key"] == CUST_ATTR_KEY_LIST_TYPE:
+                list_type_conf = attr_conf
 
         missing_attrs = []
         if not server_id_conf_id:
@@ -625,6 +628,7 @@ class SyncFromFtrack:
         self.sync_lists(
             ft_project,
             server_id_conf_id,
+            list_type_conf,
         )
 
         self.create_report(ft_entities_by_id)
@@ -1418,91 +1422,183 @@ class SyncFromFtrack:
     def sync_lists(
         self,
         ft_project,
-        server_id_conf_id,
+        server_id_conf_id: str,
+        list_type_conf,
     ) -> None:
         # TODO right now it does not remove AYON lists
         project_id = ft_project["id"]
-        ft_lists = self._ft_session.query(
-            "select id, category_id, name from List"
-            f" where project_id is '{project_id}'"
-            " and system_type is 'assetversion'"
-        ).all()
-        if not ft_lists:
+        ft_lists_by_id = {
+            l["id"]: l
+            for l in self._ft_session.query(
+                "select id, category_id, name, system_type from List"
+                f" where project_id is '{project_id}'"
+            ).all()
+        }
+        if not ft_lists_by_id:
             return
+
+        list_type_by_id = {}
+        if list_type_conf is not None:
+            default = list_type_conf["default"]
+            if isinstance(default, list):
+                default = default[0]
+
+            # Only lists that have different value from 'default' will have
+            #   set the value
+            list_type_by_id = {
+                l["id"]: default
+                for l in ft_lists_by_id.values()
+                if l["system_type"] == "task"
+            }
+
+            for item in query_custom_attribute_values(
+                self._ft_session,
+                {list_type_conf["id"]},
+                list_type_by_id
+            ):
+                value = item["value"]
+                entity_id = item["entity_id"]
+                if value:
+                    if isinstance(value, list):
+                        value = value[0]
+                    list_type_by_id[entity_id] = value
 
         # Attributes fetching for lists is not implemented by default in
         #   ayon_api 1.2.7
         list_fields = ayon_api.get_default_fields_for_type("entityList")
         list_fields.add("allAttrib")
         ay_lists = list(ayon_api.get_entity_lists(
-            self.project_name, fields=list_fields
+            self.project_name,
+            fields={"id", "label", "entityType", "allAttrib"}
         ))
+        ay_lists_by_entity_type = {}
         ay_lists_by_ftrack_id = {}
         for ay_list in ay_lists:
+            entity_type = ay_list["entityType"]
+            ay_lists_by_entity_type.setdefault(
+                entity_type, []
+            ).append(ay_list)
             attrib = json.loads(ay_list["allAttrib"])
             ay_list["attrib"] = attrib
             ftrack_id = attrib.get(FTRACK_ID_ATTRIB)
             if ftrack_id:
                 ay_lists_by_ftrack_id[ftrack_id] = ay_list
 
+        # Fetch items for lists
+        # - it is not possible to be fetched at once if have different
+        #   'entityType'
+        for ls in ay_lists_by_entity_type.values():
+            ls_by_id = {l["id"]: l for l in ls}
+            for l in ayon_api.get_entity_lists(
+                self.project_name,
+                list_ids=ls_by_id,
+                fields={"id", "items.id", "items.entityId"},
+            ):
+                ls_by_id[l["id"]]["items"] = l["items"]
+
         # Try to match lists based on label
         ay_lists_by_label = {
             ay_list["label"]: ay_list
             for ay_list in ay_lists
         }
-        for ft_list in ft_lists:
-            ftrack_id = ft_list["id"]
-            if ftrack_id in ay_lists_by_ftrack_id:
+        for ft_list_id, ft_list in ft_lists_by_id.items():
+            if ft_list_id in ay_lists_by_ftrack_id:
                 continue
 
             name_low = ft_list["name"].lower()
             for label, ay_list in ay_lists_by_label.items():
                 if name_low == label.lower():
-                    ay_lists_by_ftrack_id[ftrack_id] = ay_list
+                    ay_lists_by_ftrack_id[ft_list_id] = ay_list
                     break
 
         # Fetch all list items to find AYON equivalents
-        joined_list_ids = join_filter_values({l["id"] for l in ft_lists})
-        ft_list_items_by_list_id = {
-            l["id"]: []
-            for l in ft_lists
-        }
-        version_ids = set()
+        joined_list_ids = join_filter_values(ft_lists_by_id)
+        ft_list_items_by_list_id = {i: [] for i in ft_lists_by_id}
+        ft_version_ids = set()
+        ft_entity_ids = set()
         ft_list_items = self._ft_session.query(
             "select id, entity_id, list_id from ListObject"
             f" where list_id in ({joined_list_ids})"
         ).all()
         for ft_list_item in ft_list_items:
             list_id = ft_list_item["list_id"]
+            entity_id = ft_list_item["entity_id"]
             ft_list_items_by_list_id[list_id].append(ft_list_item)
-            version_ids.add(ft_list_item["entity_id"])
+            ft_list = ft_lists_by_id[list_id]
+            if ft_list["system_type"] == "assetversion":
+                ft_version_ids.add(entity_id)
+            else:
+                ft_entity_ids.add(entity_id)
 
+        # Tasks and folders already have mapping prepared from entities sync
         ay_id_by_ft_id = {}
+        for entity_id in ft_entity_ids:
+            ayon_id = self._ids_mapping.get_server_mapping(entity_id)
+            if ayon_id:
+                ay_id_by_ft_id[entity_id] = ayon_id
+
+        # Fetch versions mapping
         for item in query_custom_attribute_values(
-            self._ft_session, {server_id_conf_id}, version_ids
+            self._ft_session,
+            {server_id_conf_id},
+            ft_version_ids,
         ):
             entity_id = item["entity_id"]
-            ay_id_by_ft_id[entity_id] = item["value"]
+            value = item["value"]
+            if value:
+                ay_id_by_ft_id[entity_id] = value
 
-        ay_id_by_ft_id = self._prepare_ftrack_list_items_mapping(
-            ft_list_items,
+        # Prepares ONLY versions
+        version_list_items = []
+        for item in ft_list_items:
+            ftrack_id = item["entity_id"]
+            if ftrack_id in ft_version_ids:
+                version_list_items.append(item)
+
+        self._prepare_ftrack_list_items_mapping(
+            version_list_items,
             ay_id_by_ft_id,
             server_id_conf_id,
         )
-        for ft_list in ft_lists:
-            ftrack_id = ft_list["id"]
+        for ftrack_id, ft_list in ft_lists_by_id.items():
             ay_list = ay_lists_by_ftrack_id.get(ftrack_id)
-            items = self._prepare_list_items(
+            list_type = "version"
+            if ft_list["system_type"] != "assetversion":
+                list_type = list_type_by_id.get(ftrack_id)
+
+            # Check if AYON list type matches ftrack list type
+            if ay_list is not None:
+                # TODO add logs of skipped sync
+                if ft_list["system_type"] == "assetversion":
+                    # Both ftrack and AYON lists are for versions
+                    if ay_list["entityType"] != "version":
+                        continue
+
+                elif not list_type:
+                    # AYON list type is not set
+                    continue
+
+                elif ft_list["system_type"] != "task":
+                    # Unknown list type in ftrack
+                    # - probably could be validated ahead?
+                    continue
+
+                elif ay_list["entityType"] != list_type:
+                    # AYON list type does not match type defined in ftrack
+                    # - maybe could be validated ahead?
+                    continue
+
+            to_add, to_remove = self._prepare_list_items(
                 ft_list_items_by_list_id[ftrack_id],
+                list_type,
                 ay_list,
                 ay_id_by_ft_id,
             )
-
             if ay_list is None:
                 response = ayon_api.post(
                     f"projects/{self.project_name}/lists",
-                    entityType="version",
-                    items=items,
+                    entityType=list_type,
+                    items=[{"entityId": i} for i in to_add],
                     label=ft_list["name"],
                     attrib={FTRACK_ID_ATTRIB: ftrack_id},
                 )
@@ -1525,32 +1621,19 @@ class SyncFromFtrack:
                     label=ft_list["name"],
                 )
 
-            version_ids = {i["entityId"] for i in ay_list["items"]}
-            new_version_ids = {i["entityId"] for i in items}
-
-            items_to_add = [
-                {"entityId": ayon_id}
-                for ayon_id in new_version_ids - version_ids
-            ]
-            if items_to_add:
-                ayon_api.update_entity_list_items(
+            if to_add:
+                self._update_entity_list_items(
                     self.project_name,
                     ay_list["id"],
-                    items=items_to_add,
+                    items=[{"entityId": i} for i in to_add],
                     mode="merge",
                 )
 
-            ids_to_remove = version_ids - new_version_ids
-            items_to_remove = [
-                {"id": i["id"]}
-                for i in ay_list["items"]
-                if i["entityId"] in ids_to_remove
-            ]
-            if items_to_remove:
-                ayon_api.update_entity_list_items(
+            if to_remove:
+                self._update_entity_list_items(
                     self.project_name,
                     ay_list["id"],
-                    items=items_to_remove,
+                    items=[{"id": i} for i in to_remove],
                     mode="delete",
                 )
             
@@ -1563,31 +1646,47 @@ class SyncFromFtrack:
                     attrib={FTRACK_ID_ATTRIB: ftrack_id},
                 )
 
+    def _update_entity_list_items(
+        self,
+        project_name: str,
+        list_id: str,
+        items: list[dict[str, Any]],
+        mode: str,
+    ) -> None:
+        # TODO remove when ayon_api has fixed bug (used POST instead of PATCH)
+        #   is not fixed in 1.2.7
+        response = ayon_api.patch(
+            f"projects/{project_name}/lists/{list_id}/items",
+            items=items,
+            mode=mode,
+        )
+        response.raise_for_status()
+
     def _prepare_ftrack_list_items_mapping(
         self,
         ft_list_items,
-        ay_id_by_ft_id: dict[str, str],
+        ay_id_by_ft_id: dict[str, Optional[str]],
         server_id_conf_id: str,
-    ) -> dict[str, Optional[str]]:
-        output = {}
+    ) -> None:
+        """Prepares only mapping for ftrack AssetVersions."""
         if not ft_list_items:
-            return output
+            return 
 
         ayon_ids_m = {}
         missing_ayon_ids = set()
         for item in ft_list_items:
             ftrack_id = item["entity_id"]
             ay_id = ay_id_by_ft_id.get(ftrack_id)
-            output[ftrack_id] = ay_id
             if ay_id is None:
                 missing_ayon_ids.add(ftrack_id)
-            else:
-                try:
-                    uuid.UUID(ay_id)
-                    ayon_ids_m[ay_id] = ftrack_id
-                except ValueError:
-                    missing_ayon_ids.add(ftrack_id)
-                    output[ftrack_id] = None
+                continue
+
+            try:
+                uuid.UUID(ay_id)
+                ayon_ids_m[ay_id] = ftrack_id
+            except ValueError:
+                missing_ayon_ids.add(ftrack_id)
+                ay_id_by_ft_id[ftrack_id] = None
 
         # Filter available ids
         filtered_ids = {
@@ -1601,14 +1700,14 @@ class SyncFromFtrack:
         for ayon_id, ftrack_id in ayon_ids_m.items():
             if ayon_id not in filtered_ids:
                 missing_ayon_ids.add(ftrack_id)
-                output[ftrack_id] = None
+                ay_id_by_ft_id[ftrack_id] = None
 
         guessed_ids = self._guess_asset_version_ayon_ids(missing_ayon_ids)
         for ftrack_id, ayon_id in guessed_ids.items():
             if not ayon_id:
                 continue
 
-            output[ftrack_id] = ayon_id
+            ay_id_by_ft_id[ftrack_id] = ayon_id
 
             entity_key = collections.OrderedDict((
                 ("configuration_id", server_id_conf_id),
@@ -1626,35 +1725,42 @@ class SyncFromFtrack:
                 self._ft_session.commit()
             finally:
                 self._ft_session.recorded_operations.clear()
-        return output
 
     def _prepare_list_items(
         self,
         ft_list_items,
+        list_type,
         ayon_list,
         ay_id_by_ft_id: dict[str, str],
-    ) -> list[dict[str, Any]]:
+    ) -> tuple[set[str], set[str]]:
+        to_add = set()
+        to_remove = set()
         if not ft_list_items:
-            return []
+            return to_add, to_remove
 
-        ayon_ids = set()
         for item in ft_list_items:
             ftrack_id = item["entity_id"]
             ay_id = ay_id_by_ft_id.get(ftrack_id)
-            if ay_id:
-                ayon_ids.add(ay_id)
+            if not ay_id:
+                continue
 
-        output = []
-        if ayon_list is not None:
+            if list_type == "version":
+                to_add.add(ay_id)
+                continue
+
+            entity = self._entity_hub.get_entity_by_id(ay_id)
+            if entity and entity.entity_type == list_type:
+                to_add.add(ay_id)
+
+        if ayon_list:
             for item in ayon_list["items"]:
-                if item["entityId"] not in ayon_ids:
-                    continue
-                new_item = copy.deepcopy(item)
-                output.append(new_item)
+                entity_id = item["entityId"]
+                if entity_id in to_add:
+                    to_add.discard(entity_id)
+                else:
+                    to_remove.add(item["id"])
 
-        for ayon_id in ayon_ids:
-            output.append({"entityId": ayon_id})
-        return output
+        return to_add, to_remove
 
     def _guess_asset_version_ayon_ids(
         self, asset_version_ids: set[str]
