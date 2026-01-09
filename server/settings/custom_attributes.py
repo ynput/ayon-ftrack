@@ -58,6 +58,10 @@ class MandatoryAttributesModel(BaseSettingsModel):
         default_factory=CustomAttributeModel,
         title="AYON path",
     )
+    ayon_list_type: CustomAttributeModel = CustomAttributeModel(
+        default_factory=CustomAttributeModel,
+        title="AYON list type",
+    )
     ayon_sync_failed: CustomAttributeModel = CustomAttributeModel(
         default_factory=CustomAttributeModel,
         title="AYON sync failed",
@@ -103,6 +107,10 @@ DEFAULT_CUSTOM_ATTRIBUTES_SETTINGS = {
             "read_security_roles": []
         },
         "ayon_path": {
+            "write_security_roles": [],
+            "read_security_roles": []
+        },
+        "ayon_list_type": {
             "write_security_roles": [],
             "read_security_roles": []
         },
