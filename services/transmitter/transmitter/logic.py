@@ -531,11 +531,12 @@ class EventProcessor:
             system_type = "assetversion"
             list_type_value = None
             if entity_list["entityType"] != "version":
+                system_type = "task"
+                list_type_value = entity_list["entityType"]
                 list_type_conf = self._session.query(
                     "select id from CustomAttributeConfiguration"
                     f" where key is '{CUST_ATTR_KEY_LIST_TYPE}'"
                 ).first()
-                list_type_value = entity_list["entityType"]
                 if list_type_conf is None:
                     self._log.info(
                         (
