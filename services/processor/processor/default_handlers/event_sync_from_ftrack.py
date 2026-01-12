@@ -2355,7 +2355,7 @@ class SyncProcess:
             av_by_asset_id[av["asset_id"]].append(av)
 
         joined_asset_id = join_filter_values(asset_ids)
-        
+
         assets = self.session.query(
             "select id, name, context_id from Asset"
             f" where id in ({joined_asset_id})"

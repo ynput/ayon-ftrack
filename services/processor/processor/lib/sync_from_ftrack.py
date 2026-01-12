@@ -1428,8 +1428,8 @@ class SyncFromFtrack:
         # TODO right now it does not remove AYON lists
         project_id = ft_project["id"]
         ft_lists_by_id = {
-            l["id"]: l
-            for l in self._ft_session.query(
+            le["id"]: le
+            for le in self._ft_session.query(
                 "select id, category_id, name, system_type from List"
                 f" where project_id is '{project_id}'"
             ).all()
@@ -1446,9 +1446,9 @@ class SyncFromFtrack:
             # Only lists that have different value from 'default' will have
             #   set the value
             list_type_by_id = {
-                l["id"]: default
-                for l in ft_lists_by_id.values()
-                if l["system_type"] == "task"
+                le["id"]: default
+                for le in ft_lists_by_id.values()
+                if le["system_type"] == "task"
             }
 
             for item in query_custom_attribute_values(
@@ -1488,13 +1488,13 @@ class SyncFromFtrack:
         # - it is not possible to be fetched at once if have different
         #   'entityType'
         for ls in ay_lists_by_entity_type.values():
-            ls_by_id = {l["id"]: l for l in ls}
-            for l in ayon_api.get_entity_lists(
+            ls_by_id = {le["id"]: le for le in ls}
+            for list_e in ayon_api.get_entity_lists(
                 self.project_name,
                 list_ids=ls_by_id,
                 fields={"id", "items.id", "items.entityId"},
             ):
-                ls_by_id[l["id"]]["items"] = l["items"]
+                ls_by_id[list_e["id"]]["items"] = list_e["items"]
 
         # Try to match lists based on label
         ay_lists_by_label = {
@@ -1636,7 +1636,7 @@ class SyncFromFtrack:
                     items=[{"id": i} for i in to_remove],
                     mode="delete",
                 )
-            
+
             attrib = ay_list["attrib"]
             attr_ftrack_id = attrib.get(FTRACK_ID_ATTRIB)
             if attr_ftrack_id != ftrack_id:
@@ -1670,7 +1670,7 @@ class SyncFromFtrack:
     ) -> None:
         """Prepares only mapping for ftrack AssetVersions."""
         if not ft_list_items:
-            return 
+            return
 
         ayon_ids_m = {}
         missing_ayon_ids = set()
