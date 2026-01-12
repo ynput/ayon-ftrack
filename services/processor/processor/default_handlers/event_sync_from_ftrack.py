@@ -1967,14 +1967,12 @@ class SyncProcess:
 
         ayon_lists = list(ayon_api.get_entity_lists(
             self.project_name,
-            fields={"id", "label", "entityType", "allAttrib"}
+            fields={"id", "label", "entityType", "attrib"}
         ))
         ay_lists_by_ftrack_id = {}
         ay_lists_by_label_low = {}
         for ay_list in ayon_lists:
-            all_attrib = json.loads(ay_list["allAttrib"] or "{}")
-            ay_list["attrib"] = all_attrib
-            ftrack_id = all_attrib.get(FTRACK_ID_ATTRIB)
+            ftrack_id = ay_list["attrib"].get(FTRACK_ID_ATTRIB)
             if ftrack_id:
                 ay_lists_by_ftrack_id[ftrack_id] = ay_list
             label_low = ay_list["label"].lower()
