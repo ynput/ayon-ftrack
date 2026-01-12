@@ -1463,13 +1463,9 @@ class SyncFromFtrack:
                         value = value[0]
                     list_type_by_id[entity_id] = value
 
-        # Attributes fetching for lists is not implemented by default in
-        #   ayon_api 1.2.7
-        list_fields = ayon_api.get_default_fields_for_type("entityList")
-        list_fields.add("allAttrib")
         ay_lists = list(ayon_api.get_entity_lists(
             self.project_name,
-            fields={"id", "label", "entityType", "allAttrib"}
+            fields={"id", "label", "entityType", "attrib"}
         ))
         ay_lists_by_entity_type = {}
         ay_lists_by_ftrack_id = {}
@@ -1478,9 +1474,7 @@ class SyncFromFtrack:
             ay_lists_by_entity_type.setdefault(
                 entity_type, []
             ).append(ay_list)
-            attrib = json.loads(ay_list["allAttrib"])
-            ay_list["attrib"] = attrib
-            ftrack_id = attrib.get(FTRACK_ID_ATTRIB)
+            ftrack_id = ay_list["attrib"].get(FTRACK_ID_ATTRIB)
             if ftrack_id:
                 ay_lists_by_ftrack_id[ftrack_id] = ay_list
 
@@ -1595,23 +1589,13 @@ class SyncFromFtrack:
                 ay_id_by_ft_id,
             )
             if ay_list is None:
-                response = ayon_api.post(
-                    f"projects/{self.project_name}/lists",
-                    entityType=list_type,
+                ayon_api.create_entity_list(
+                    self.project_name,
+                    list_type,
+                    ft_list["name"],
                     items=[{"entityId": i} for i in to_add],
-                    label=ft_list["name"],
                     attrib={FTRACK_ID_ATTRIB: ftrack_id},
                 )
-                response.raise_for_status()
-                # Create entity list has/d a bug using wrong endpoint in
-                #   ayon_api 1.2.7
-                # ayon_api.create_entity_list(
-                #     self.project_name,
-                #     "version",
-                #     ft_list["name"],
-                #     items=items,
-                #     attrib={FTRACK_ID_ATTRIB: ftrack_id},
-                # )
                 continue
 
             if ft_list["name"] != ay_list["label"]:
@@ -1622,7 +1606,7 @@ class SyncFromFtrack:
                 )
 
             if to_add:
-                self._update_entity_list_items(
+                ayon_api.update_entity_list_items(
                     self.project_name,
                     ay_list["id"],
                     items=[{"entityId": i} for i in to_add],
@@ -1630,7 +1614,7 @@ class SyncFromFtrack:
                 )
 
             if to_remove:
-                self._update_entity_list_items(
+                ayon_api.update_entity_list_items(
                     self.project_name,
                     ay_list["id"],
                     items=[{"id": i} for i in to_remove],
@@ -1645,22 +1629,6 @@ class SyncFromFtrack:
                     ay_list["id"],
                     attrib={FTRACK_ID_ATTRIB: ftrack_id},
                 )
-
-    def _update_entity_list_items(
-        self,
-        project_name: str,
-        list_id: str,
-        items: list[dict[str, Any]],
-        mode: str,
-    ) -> None:
-        # TODO remove when ayon_api has fixed bug (used POST instead of PATCH)
-        #   is not fixed in 1.2.7
-        response = ayon_api.patch(
-            f"projects/{project_name}/lists/{list_id}/items",
-            items=items,
-            mode=mode,
-        )
-        response.raise_for_status()
 
     def _prepare_ftrack_list_items_mapping(
         self,

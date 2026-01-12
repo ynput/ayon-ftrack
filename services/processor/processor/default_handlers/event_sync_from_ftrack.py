@@ -2049,22 +2049,12 @@ class SyncProcess:
                 continue
 
             self.log.info(f"Creating list '{label}' in AYON")
-            response = ayon_api.post(
-                f"projects/{self.project_name}/lists",
-                entityType=entity_type,
-                label=label,
+            ayon_api.create_entity_list(
+                self.project_name,
+                entity_type,
+                label,
                 attrib={FTRACK_ID_ATTRIB: ftrack_id},
             )
-            response.raise_for_status()
-            # Create entity list has/d a bug using wrong endpoint in
-            #   ayon_api 1.2.7
-            # ayon_api.create_entity_list(
-            #     self.project_name,
-            #     "version",
-            #     ft_list["name"],
-            #     items=items,
-            #     attrib={FTRACK_ID_ATTRIB: ftrack_id},
-            # )
 
         # Propagate changes of list
         for ent_info in list_changed:
@@ -2304,7 +2294,7 @@ class SyncProcess:
                         to_remove_ids.add(item["id"])
 
             if to_remove_ids:
-                self._update_entity_list_items(
+                ayon_api.update_entity_list_items(
                     self.project_name,
                     ayon_list["id"],
                     items=[{"id": i} for i in to_remove_ids],
@@ -2312,28 +2302,12 @@ class SyncProcess:
                 )
 
             if to_add_ids:
-                self._update_entity_list_items(
+                ayon_api.update_entity_list_items(
                     self.project_name,
                     ayon_list["id"],
                     items=[{"entityId": i} for i in to_add_ids],
                     mode="merge",
                 )
-
-    def _update_entity_list_items(
-        self,
-        project_name: str,
-        list_id: str,
-        items: list[dict[str, Any]],
-        mode: str,
-    ) -> None:
-        # TODO remove when ayon_api has fixed bug (used POST instead of PATCH)
-        #   is not fixed in 1.2.7
-        response = ayon_api.patch(
-            f"projects/{project_name}/lists/{list_id}/items",
-            items=items,
-            mode=mode,
-        )
-        response.raise_for_status()
 
     def _find_matching_ayon_versions(
         self, ftrack_ids: set[str]

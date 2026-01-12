@@ -461,20 +461,6 @@ class EventProcessor:
         finally:
             self._session.recorded_operations.clear()
 
-    def _get_entity_list_by_id(
-        self, project_name: str, list_id: str
-    ) -> dict[str, Any]:
-        list_fields = ayon_api.get_default_fields_for_type("entityList")
-        list_fields.add("allAttrib")
-        list_fields.add("items.entityId")
-        entity_list = ayon_api.get_entity_list_by_id(
-            project_name, list_id, fields=list_fields
-        )
-        # This does not contain all attributes
-        all_attrib = json.loads(entity_list.get("allAttrib") or "{}")
-        entity_list["attrib"] = all_attrib
-        return entity_list
-
     def _create_ftrack_list(
         self,
         source_event: dict[str, Any],
@@ -498,7 +484,17 @@ class EventProcessor:
 
         project_name = source_event["project"]
         list_id = summary["id"]
-        entity_list = self._get_entity_list_by_id(project_name, list_id)
+        entity_list = ayon_api.get_entity_list_by_id(
+            project_name,
+            list_id,
+            fields={
+                "id",
+                "label",
+                "entityType",
+                f"attrib.{FTRACK_ID_ATTRIB}",
+                "items.entityId",
+            },
+        )
         label = summary["label"]
 
         ft_project_id = ftrack_project["id"]
