@@ -1,6 +1,5 @@
 import re
 import collections
-import json
 import time
 import copy
 import logging
