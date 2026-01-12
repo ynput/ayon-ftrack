@@ -2026,9 +2026,11 @@ class SyncProcess:
                 if list_type is None:
                     list_type = attr_def["default"]
 
-                if list_type not in ("task", "folder"):
-                    continue
-                entity_type = list_type
+                if list_type and isinstance(list_type, list):
+                    list_type = list_type[0]
+
+                if list_type in ("task", "folder"):
+                    entity_type = list_type
 
             label = ent_info["changes"]["name"]["new"]
             ay_list = ay_lists_by_ftrack_id.get(ftrack_id)
