@@ -2137,7 +2137,7 @@ class SyncProcess:
 
     def _process_list_item_changes(
         self, ayon_lists: Optional[list[dict[str, Any]]] = None
-    ) ->None:
+    ) -> None:
         list_item_change: dict[str, list[dict[str, Any]]] = (
             self.entities_by_action["list_item_change"]
         )
