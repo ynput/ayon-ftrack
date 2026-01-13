@@ -2002,8 +2002,8 @@ class SyncProcess:
                 if ay_list["entityType"] != "version":
                     continue
             elif ent_info["entity_type"] == "TypedContextList":
-                # - We can't get expected type for 'TypedContextList' because the
-                #   custom attribute value to find out is already deleted.
+                # - We can't get expected type for 'TypedContextList' because
+                #   the custom attribute value to find out is already deleted.
                 if ay_list["entityType"] not in ("folder", "task"):
                     continue
 
