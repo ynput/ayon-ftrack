@@ -1994,8 +1994,20 @@ class SyncProcess:
             #   actually the same?
             # - in case someone wants to "fix" wrong type of the ftrack list
             #   he will loose AYON list with this
-            if ay_list:
-                ayon_api.delete_entity_list(self.project_name, ay_list["id"])
+            if not ay_list:
+                continue
+
+            # Remove list only if is meant for the same type
+            if ent_info["entity_type"] == "AssetVersionList":
+                if ay_list["entityType"] != "version":
+                    continue
+            elif ent_info["entity_type"] == "TypedContextList":
+                # - We can't get expected type for 'TypedContextList' because the
+                #   custom attribute value to find out is already deleted.
+                if ay_list["entityType"] not in ("folder", "task"):
+                    continue
+
+            ayon_api.delete_entity_list(self.project_name, ay_list["id"])
 
         added_ids = set()
         for ent_info in list_added:
