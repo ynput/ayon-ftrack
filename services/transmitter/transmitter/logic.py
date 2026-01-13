@@ -416,7 +416,7 @@ class EventProcessor:
         entity_list: Optional[dict[str, Any]] = None,
     ):
         ft_lists = self._session.query(
-            "select id, name from List"
+            "select id, name, category_id from List"
             f" where project_id is '{project_id}'"
         ).all()
 
@@ -500,6 +500,7 @@ class EventProcessor:
         match_list = self._find_matching_ftrack_list(
             ft_project_id, source_event, entity_list
         )
+        ft_list_label = None
         if match_list is not None:
             expected_type = None
             if entity_type == "version":
@@ -521,6 +522,7 @@ class EventProcessor:
                 return
 
             ft_list_id = match_list["id"]
+            ft_list_label = match_list["name"]
 
         else:
             system_type = "assetversion"
@@ -542,6 +544,8 @@ class EventProcessor:
                         label, list_type_value, CUST_ATTR_KEY_LIST_TYPE
                     )
                     return
+
+            ft_list_label = label
 
             # TODO better way how to determine list category on ftrack
             list_category = self._session.query(
@@ -584,6 +588,21 @@ class EventProcessor:
                 "Creating new list '%s' on ftrack.",
                 label
             )
+            try:
+                self._session.commit()
+            finally:
+                self._session.recorded_operations.clear()
+
+        if ft_list_label and ft_list_label != label:
+            entity_key = collections.OrderedDict(id=ft_list_id)
+            op = ftrack_api.operation.UpdateEntityOperation(
+                "List",
+                entity_key,
+                "name",
+                ft_list_label,
+                label
+            )
+            self._session.recorded_operations.push(op)
             try:
                 self._session.commit()
             finally:
