@@ -448,6 +448,35 @@ class EventProcessor:
         if ft_list is None:
             return
 
+        summary = source_event["summary"]
+        entity_type = summary["entity_type"]
+        if ft_list.entity_type == "AssetVersionList":
+            if entity_type != "version":
+                return
+        elif ft_list.entity_type == "TypedContextList":
+            list_type_conf = self._session.query(
+                "select id from CustomAttributeConfiguration"
+                f" where key is '{CUST_ATTR_KEY_LIST_TYPE}'"
+            ).first()
+            if list_type_conf is None:
+                return
+
+            value = None
+            for item in query_custom_attribute_values(
+                self._session,
+                {list_type_conf["id"]},
+                {ft_list["id"]},
+            ):
+                value = item["value"]
+                if value:
+                    break
+
+            if value and isinstance(value, list):
+                value = value[0]
+
+            if value != entity_type:
+                return
+
         entity_key = collections.OrderedDict(id=ft_list["id"])
         self._session.recorded_operations.push(
             ftrack_api.operation.DeleteEntityOperation(
