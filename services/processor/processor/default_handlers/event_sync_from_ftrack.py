@@ -8,6 +8,7 @@ from typing import Optional, Any
 import arrow
 import ftrack_api
 
+import ayon_api
 from ayon_api import (
     get_project,
     get_folders,
@@ -29,6 +30,7 @@ from ftrack_common import (
 
     CUST_ATTR_KEY_SERVER_ID,
     CUST_ATTR_KEY_SERVER_PATH,
+    CUST_ATTR_KEY_LIST_TYPE,
     CUST_ATTR_KEY_SYNC_FAIL,
 
     CUST_ATTR_AUTO_SYNC,
@@ -495,11 +497,62 @@ class SyncProcess:
             "add": {},
             "assignee_change": {},
             "link_change": [],
+            "list_added": [],
+            "list_removed": [],
+            "list_changed": [],
+            "list_item_change": {},
         }
         found_actions = set()
         ft_project_removed = False
         for ent_info in self.event["data"]["entities"]:
             base_type = ent_info["entityType"]
+            if base_type == "list":
+                action = ent_info["action"]
+                if action == "remove":
+                    action = "list_removed"
+                elif action == "add":
+                    action = "list_added"
+
+                elif action == "update":
+                    action = "list_changed"
+
+                    valid = "name" in ent_info["changes"]
+
+                    entity_type = ent_info["entity_type"]
+                    if (
+                        entity_type == "TypedContextList"
+                        and CUST_ATTR_KEY_LIST_TYPE in ent_info["changes"]
+                    ):
+                        valid = True
+
+                    if not valid:
+                        continue
+
+                else:
+                    continue
+
+                found_actions.add(action)
+                entities_by_action[action].append(ent_info)
+                continue
+
+            if base_type == "listobject":
+                action = ent_info["action"]
+                if action not in ("remove", "add"):
+                    continue
+
+                if action == "add":
+                    list_id = ent_info["changes"]["listid"]["new"]
+                else:
+                    list_id = ent_info["changes"]["listid"]["old"]
+
+                action = "list_item_change"
+                found_actions.add(action)
+                list_entities = entities_by_action[action].setdefault(
+                    list_id, []
+                )
+                list_entities.append(ent_info)
+                continue
+
             if base_type == "appointment":
                 if ent_info["action"] not in ("remove", "add"):
                     continue
@@ -1234,7 +1287,7 @@ class SyncProcess:
         ayon_id_attr = self._get_server_id_attribute()
         value_items = query_custom_attribute_values(
             self.session,
-            {ayon_id_attr},
+            {ayon_id_attr["id"]},
             ftrack_ids,
         )
         ayon_id_by_ftrack_id = {ftrack_id: None for ftrack_id in ftrack_ids}
@@ -1903,6 +1956,472 @@ class SyncProcess:
                     "folder",
                 )
 
+    def _propagate_list_changes(self) -> None:
+        list_added = self.entities_by_action["list_added"]
+        list_removed = self.entities_by_action["list_removed"]
+        list_changed = self.entities_by_action["list_changed"]
+        list_item_change = self.entities_by_action["list_item_change"]
+        if not list_added and not list_removed and not list_changed:
+            self._process_list_item_changes()
+            return
+
+        ayon_lists = list(ayon_api.get_entity_lists(
+            self.project_name,
+            fields={"id", "label", "entityType", "attrib"}
+        ))
+        ay_lists_by_ftrack_id = {}
+        ay_lists_by_label_low = {}
+        for ay_list in ayon_lists:
+            ftrack_id = ay_list["attrib"].get(FTRACK_ID_ATTRIB)
+            if ftrack_id:
+                ay_lists_by_ftrack_id[ftrack_id] = ay_list
+            label_low = ay_list["label"].lower()
+            ay_lists_by_label_low[label_low] = ay_list
+
+        for ent_info in list_removed:
+            ftrack_id = ent_info["entityId"]
+            # We don't care about changes of items related to the removed list
+            list_item_change.pop(ftrack_id, None)
+
+            # Try to find AYON list by ftrack id
+            ay_list = ay_lists_by_ftrack_id.get(ftrack_id)
+            if not ay_list:
+                # Try to find AYON list by name
+                name = ent_info["changes"]["name"]["old"].lower()
+                ay_list = ay_lists_by_label_low.get(name)
+
+            # NOTE we might check if the entity type of AYON list is
+            #   actually the same?
+            # - in case someone wants to "fix" wrong type of the ftrack list
+            #   he will loose AYON list with this
+            if not ay_list:
+                continue
+
+            # Remove list only if is meant for the same type
+            if ent_info["entity_type"] == "AssetVersionList":
+                if ay_list["entityType"] != "version":
+                    continue
+            elif ent_info["entity_type"] == "TypedContextList":
+                # - We can't get expected type for 'TypedContextList' because
+                #   the custom attribute value to find out is already deleted.
+                if ay_list["entityType"] not in ("folder", "task"):
+                    continue
+
+            ayon_api.delete_entity_list(self.project_name, ay_list["id"])
+
+        added_ids = set()
+        for ent_info in list_added:
+            ftrack_id = ent_info["entityId"]
+            added_ids.add(ftrack_id)
+            entity_type = "version"
+            if ent_info["entity_type"] != "AssetVersionList":
+                attr_def = self._get_list_type_attribute()
+                if attr_def is None:
+                    self.log.warning(
+                        "Can't sync task List because of missing"
+                        f" custom attribute '{CUST_ATTR_KEY_LIST_TYPE}'"
+                    )
+                    continue
+
+                list_type = None
+                for item in query_custom_attribute_values(
+                    self.session,
+                    {attr_def["id"]},
+                    {ftrack_id},
+                ):
+                    value = item["value"]
+                    if value:
+                        list_type = value
+
+                if list_type is None:
+                    list_type = attr_def["default"]
+
+                if list_type and isinstance(list_type, list):
+                    list_type = list_type[0]
+
+                if list_type in ("task", "folder"):
+                    entity_type = list_type
+
+            label = ent_info["changes"]["name"]["new"]
+            ay_list = ay_lists_by_ftrack_id.get(ftrack_id)
+            if not ay_list:
+                # Try to find AYON list by name
+                ay_list = ay_lists_by_label_low.get(label.lower())
+
+            if ay_list:
+                ay_entity_type = ay_list["entityType"]
+                if ay_entity_type == entity_type:
+                    self.log.info(f"List '{label}' already exists in AYON")
+                else:
+                    self.log.warning(
+                        f"List '{label}' already exists but for different"
+                        f" entity type (Expected '{entity_type}'"
+                        f" Current: '{ay_entity_type})"
+                    )
+                continue
+
+            self.log.info(f"Creating list '{label}' in AYON")
+            ayon_api.create_entity_list(
+                self.project_name,
+                entity_type,
+                label,
+                attrib={FTRACK_ID_ATTRIB: ftrack_id},
+            )
+
+        # Propagate changes of list
+        for ent_info in list_changed:
+            ftrack_id = ent_info["entityId"]
+            # Ignore created lists as all values are fetched anyways
+            if ftrack_id in added_ids:
+                continue
+
+            # Find ayon list
+            ay_list = ay_lists_by_ftrack_id.get(ftrack_id)
+            ay_changes = {}
+            if not ay_list:
+                ft_list = self.session.query(
+                    f"select name from List where id is '{ftrack_id}'"
+                ).first()
+                if ft_list is None:
+                    continue
+                name = ft_list["name"].lower()
+                ay_list = ay_lists_by_label_low.get(name)
+                if ay_list:
+                    ay_changes["attrib"] = {FTRACK_ID_ATTRIB: ftrack_id}
+
+            if not ay_list:
+                continue
+
+            if "name" in ent_info["changes"]:
+                name = ent_info["changes"]["name"]["new"]
+                if name != ay_list["label"]:
+                    ay_changes["label"] = name
+
+            if ay_changes:
+                ayon_api.update_entity_list(
+                    self.project_name,
+                    ay_list["id"],
+                    **ay_changes
+                )
+
+            # Handle changes of 'ayon_list_type'. Right now it changes value
+            #   to entity type set on AYON's list if exists.
+            # NOTE it might be possible to change the type, but that would
+            #   to delete AYON list and create new
+            if (
+                CUST_ATTR_KEY_LIST_TYPE not in ent_info["changes"]
+                or ent_info["entity_type"] != "TypedContextList"
+            ):
+                continue
+
+            attr_def = self._get_list_type_attribute()
+            new_value = None
+            for item in query_custom_attribute_values(
+                self.session, {attr_def["id"]}, {ftrack_id}
+            ):
+                value = item["value"]
+                if value is not None:
+                    new_value = value
+
+            if new_value == ay_list["entityType"]:
+                continue
+
+            op = self._create_ft_attr_operation(
+                attr_def["id"],
+                ftrack_id,
+                new_value is None,
+                ay_list["entityType"],
+                new_value
+            )
+            self.session.recorded_operations.push(op)
+
+        self._process_list_item_changes(ayon_lists)
+
+    def _process_list_item_changes(
+        self, ayon_lists: Optional[list[dict[str, Any]]] = None
+    ) -> None:
+        list_item_change: dict[str, list[dict[str, Any]]] = (
+            self.entities_by_action["list_item_change"]
+        )
+        if not list_item_change:
+            return
+
+        # TODO implement list item changes propagation
+        ft_version_ids = set()
+        ft_entity_ids = set()
+        ent_info_by_list_id = {}
+        for list_id, ent_infos in list_item_change.items():
+            list_type = None
+            for ent_info in ent_infos:
+                if list_type is None:
+                    for parent in ent_info["parents"]:
+                        if parent["entityType"] == "list":
+                            list_type = parent["entity_type"]
+                            break
+
+                action = ent_info["action"]
+                if action == "add":
+                    entity_id = ent_info["changes"]["entityid"]["new"]
+                else:
+                    entity_id = ent_info["changes"]["entityid"]["old"]
+
+                ent_info_by_list_id.setdefault(list_id, []).append(ent_info)
+                if list_type == "AssetVersionList":
+                    ft_version_ids.add(entity_id)
+                else:
+                    ft_entity_ids.add(entity_id)
+
+        if not ent_info_by_list_id:
+            return
+
+        if ayon_lists is None:
+            ayon_lists = list(ayon_api.get_entity_lists(
+                self.project_name,
+                fields={"id", "label", "entityType", "allAttrib"},
+            ))
+
+        # No lists, nothing to update...
+        if not ayon_lists:
+            return
+
+        ay_lists_by_ftrack_id = {}
+        ay_lists_by_label_low = {}
+        for ay_list in ayon_lists:
+            all_attrib = json.loads(ay_list["allAttrib"] or "{}")
+            ay_list["attrib"] = all_attrib
+            ftrack_id = all_attrib.get(FTRACK_ID_ATTRIB)
+            if ftrack_id:
+                ay_lists_by_ftrack_id[ftrack_id] = ay_list
+            label_low = ay_list["label"].lower()
+            ay_lists_by_label_low[label_low] = ay_list
+
+        ids_mapping = self._get_server_id_by_ftrack_ids(
+            ft_entity_ids | ft_version_ids
+        )
+
+        missing_ft_version_ids = set()
+        for ftrack_id in ft_version_ids:
+            ayon_id = ids_mapping[ftrack_id]
+            if not ayon_id:
+                missing_ft_version_ids.add(ftrack_id)
+
+        ids_mapping.update(self._find_matching_ayon_versions(
+            missing_ft_version_ids
+        ))
+
+        ft_missing_list_ids = set()
+        for ft_list_id in ent_info_by_list_id:
+            ay_list = ay_lists_by_ftrack_id.get(ft_list_id)
+            if not ay_list:
+                ft_missing_list_ids.add(ft_list_id)
+
+        if ft_missing_list_ids:
+            joined_list_ids = join_filter_values(ft_missing_list_ids)
+            ft_lists = self.session.query(
+                f"select id, name from List where id in ({joined_list_ids})"
+            ).all()
+            for ft_list in ft_lists:
+                name = ft_list["name"].lower()
+                ay_list = ay_lists_by_label_low.get(name)
+                if ay_list:
+                    ayon_api.update_entity_list(
+                        self.project_name,
+                        ay_list["id"],
+                        attrib={FTRACK_ID_ATTRIB: ft_list["id"]}
+                    )
+                    ay_lists_by_ftrack_id[ft_list["id"]] = ay_list
+
+        ft_task_ids = set()
+        ft_folder_ids = set()
+        if ft_entity_ids:
+            joined_entity_ids = join_filter_values(ft_entity_ids)
+            task_type = self.session.query(
+                "select id from ObjectType where name is 'Task'"
+            ).one()
+            for entity in self.session.query(
+                "select id, object_type_id from TypedContext"
+                f" where id in ({joined_entity_ids})"
+            ):
+                if entity["object_type_id"] == task_type["id"]:
+                    ft_task_ids.add(entity["id"])
+                else:
+                    ft_folder_ids.add(entity["id"])
+
+        ayon_list_ids = set()
+        for ft_list_id, ent_infos in ent_info_by_list_id.items():
+            ayon_list = ay_lists_by_ftrack_id.get(ft_list_id)
+            if ayon_list:
+                ayon_list_ids.add(ayon_list["id"])
+
+        if not ayon_list_ids:
+            return
+
+        for ft_list_id, ent_infos in ent_info_by_list_id.items():
+            ayon_list = ay_lists_by_ftrack_id.get(ft_list_id)
+            if not ayon_list:
+                # QUESTION should we create the list in AYON?
+                continue
+
+            list_type = ayon_list["entityType"]
+            l_w_items = ayon_api.get_entity_list_by_id(
+                self.project_name,
+                ayon_list["id"],
+                fields={"items.id", "items.entityId"},
+            )
+            items_by_entity_id = {
+                item["entityId"]: item
+                for item in l_w_items["items"]
+            }
+
+            to_add_ids = set()
+            to_remove_ids = set()
+            for ent_info in ent_infos:
+                action = ent_info["action"]
+                if action == "add":
+                    entity_id = ent_info["changes"]["entityid"]["new"]
+                else:
+                    entity_id = ent_info["changes"]["entityid"]["old"]
+
+                ayon_id = ids_mapping.get(entity_id)
+                if not ayon_id:
+                    continue
+
+                # Filter items that have incompatible type for AYON list
+                if list_type == "folder":
+                    if entity_id not in ft_folder_ids:
+                        continue
+                elif list_type == "task":
+                    if entity_id not in ft_task_ids:
+                        continue
+                elif list_type == "version":
+                    if entity_id not in ft_version_ids:
+                        continue
+
+                if action == "add":
+                    if ayon_id not in items_by_entity_id:
+                        to_add_ids.add(ayon_id)
+                else:
+                    item = items_by_entity_id.get(ayon_id)
+                    if item:
+                        to_remove_ids.add(item["id"])
+
+            if to_remove_ids:
+                ayon_api.update_entity_list_items(
+                    self.project_name,
+                    ayon_list["id"],
+                    items=[{"id": i} for i in to_remove_ids],
+                    mode="delete",
+                )
+
+            if to_add_ids:
+                ayon_api.update_entity_list_items(
+                    self.project_name,
+                    ayon_list["id"],
+                    items=[{"entityId": i} for i in to_add_ids],
+                    mode="merge",
+                )
+
+    def _find_matching_ayon_versions(
+        self, ftrack_ids: set[str]
+    ) -> dict[str, Optional[str]]:
+        """Versions did not have stored ayon_id in attribute for some time."""
+        output = {i: None for i in ftrack_ids}
+        if not ftrack_ids:
+            return output
+
+        joined_av_ids = join_filter_values(ftrack_ids)
+        asset_versions = self.session.query(
+            f"select id, asset_id, version from AssetVersion"
+            f" where id in ({joined_av_ids})"
+        ).all()
+        ft_version_ints = {av["version"] for av in asset_versions}
+        asset_ids = {av["asset_id"] for av in asset_versions}
+        av_by_asset_id = {a_id: [] for a_id in asset_ids}
+        for av in asset_versions:
+            av_by_asset_id[av["asset_id"]].append(av)
+
+        joined_asset_id = join_filter_values(asset_ids)
+
+        assets = self.session.query(
+            "select id, name, context_id from Asset"
+            f" where id in ({joined_asset_id})"
+        ).all()
+        assets_by_id = {a["id"]: a for a in assets}
+        context_ids = {a["context_id"] for a in assets}
+        assets_by_parent_id = {i: [] for i in context_ids}
+        for asset in assets:
+            assets_by_parent_id[asset["context_id"]].append(asset)
+
+        parents_mapping = self._get_server_id_by_ftrack_ids(context_ids)
+
+        folder_ids = {
+            folder_id
+            for folder_id in parents_mapping.values()
+            if folder_id
+        }
+        if not folder_ids:
+            return output
+
+        product_ids = set()
+        products_by_folder_id = {i: [] for i in folder_ids}
+        for product in ayon_api.get_products(
+            self.project_name,
+            folder_ids=folder_ids,
+            fields={"id", "name", "folderId"}
+        ):
+            folder_id = product["folderId"]
+            product_ids.add(product["id"])
+            products_by_folder_id[folder_id].append(product)
+
+        version_ids_by_product_id = {i: {} for i in product_ids}
+        for version_entity in ayon_api.get_versions(
+            self.project_name,
+            versions=ft_version_ints,
+            product_ids=product_ids,
+            fields={"id", "version", "productId"},
+        ):
+            product_id = version_entity["productId"]
+            version = version_entity["version"]
+            version_id = version_entity["id"]
+            version_ids_by_product_id[product_id][version] = version_id
+
+        for asset_version in asset_versions:
+            ft_asset_id = asset_version["asset_id"]
+            ft_asset = assets_by_id[ft_asset_id]
+            ft_context_id = ft_asset["context_id"]
+            folder_id = parents_mapping.get(ft_context_id)
+            if not folder_id:
+                continue
+
+            products = products_by_folder_id.get(folder_id)
+            if not products:
+                continue
+
+            ft_asset_name = ft_asset["name"].lower()
+            matching_product = None
+            alternatives = []
+            for product_entity in products:
+                product_name = product_entity["name"].lower()
+                if product_name == ft_asset_name:
+                    matching_product = product_entity
+                    break
+                if product_name in ft_asset_name:
+                    alternatives.append(product_entity)
+
+            if matching_product is None and alternatives:
+                matching_product = alternatives[0]
+
+            if not matching_product:
+                continue
+
+            product_id = matching_product["id"]
+            ft_version = asset_version["version"]
+            version_id = version_ids_by_product_id[product_id].get(ft_version)
+            if version_id:
+                output[asset_version["id"]] = version_id
+
+        return output
+
     def _create_ft_attr_operation(
         self, conf_id, entity_id, is_new, new_value, old_value=None
     ):
@@ -2051,6 +2570,12 @@ class SyncProcess:
                 return attr
         return None
 
+    def _get_list_type_attribute(self):
+        for attr in self.ft_cust_attrs:
+            if attr["key"] == CUST_ATTR_KEY_LIST_TYPE:
+                return attr
+        return None
+
     def process_event_data(self):
         # Check if auto-sync custom attribute exists
         entities_by_action = self.entities_by_action
@@ -2060,6 +2585,10 @@ class SyncProcess:
             "update": "Updated",
             "assignee_change": "Assignee changed",
             "link_change": "Link changed",
+            "list_added": "List added",
+            "list_removed": "List removed",
+            "list_changed": "List changed",
+            "list_item_change": "List item added/removed",
         }
         debug_msg = "\n".join([
             f"- {debug_action_map[action]}: {len(entities_info)}"
@@ -2114,16 +2643,19 @@ class SyncProcess:
             # 4. Propage link changes
             self._propagate_link_changes()
             time_5 = time.time()
-            # 5. Commit changes to server
-            self.entity_hub.commit_changes()
-            # 6. Propagate entity changes to ftack
+            # 5. Propage list changes
+            self._propagate_list_changes()
             time_6 = time.time()
+            # 6. Commit changes to server
+            self.entity_hub.commit_changes()
+            # 7. Propagate entity changes to ftack
+            time_7 = time.time()
             self._propagate_ftrack_attributes()
             # TODO propagate entities to ftrack
             #  - server id, server path, sync failed
-            time_7 = time.time()
+            time_8 = time.time()
 
-            total_time = f"{time_7 - time_1:.2f}"
+            total_time = f"{time_8 - time_1:.2f}"
             mid_times = ", ".join([
                 f"{diff:.2f}"
                 for diff in (
@@ -2133,6 +2665,7 @@ class SyncProcess:
                     time_5 - time_4,
                     time_6 - time_5,
                     time_7 - time_6,
+                    time_8 - time_7,
                 )
             ])
             self.log.debug(f"Process time: {total_time} <{mid_times}>")

@@ -6,6 +6,7 @@ REMOVED_ID_VALUE = "removed"
 # Custom attribute where server id is stored
 CUST_ATTR_KEY_SERVER_ID = "ayon_id"
 CUST_ATTR_KEY_SERVER_PATH = "ayon_path"
+CUST_ATTR_KEY_LIST_TYPE = "ayon_list_type"
 CUST_ATTR_KEY_SYNC_FAIL = "ayon_sync_failed"
 
 # Group which marks custom attribute to synchronize

@@ -199,7 +199,9 @@ class FtrackAddon(BaseServerAddon):
             "title": "ftrack path",
             "inherit": False,
         }
-        ftrack_id_expected_scope = ["project", "folder", "task", "version"]
+        ftrack_id_expected_scope = [
+            "project", "folder", "task", "version", "list"
+        ]
         ftrack_path_expected_scope = ["project", "folder", "task"]
 
         ftrack_id_match_position = None

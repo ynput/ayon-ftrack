@@ -13,6 +13,7 @@ from .constants import (
     CUST_ATTR_GROUP,
     CUST_ATTR_KEY_SERVER_ID,
     CUST_ATTR_KEY_SERVER_PATH,
+    CUST_ATTR_KEY_LIST_TYPE,
     CUST_ATTR_KEY_SYNC_FAIL,
     CUST_ATTR_AUTO_SYNC,
 )
@@ -494,6 +495,23 @@ def ensure_mandatory_custom_attributes_exists(
             "default": "",
             "is_hierarchical": True,
             "config": {"markdown": False},
+            "group_id": group_id,
+        },
+        {
+            "key": CUST_ATTR_KEY_LIST_TYPE,
+            "type": "enumerator",
+            "label": "AYON list type",
+            "default": "folder",
+            "entity_type": "list",
+            "is_hierarchical": False,
+            "config": {
+                "data": json.dumps([
+                    {"value": "folder", "menu": "Folder"},
+                    {"value": "task", "menu": "Task"},
+                    {"value": "version", "menu": "version"},
+                ]),
+                "multiSelect": False,
+            },
             "group_id": group_id,
         },
         {
