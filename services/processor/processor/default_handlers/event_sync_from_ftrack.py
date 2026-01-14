@@ -3,7 +3,7 @@ import collections
 import json
 import time
 import atexit
-from typing import Optional, Any
+from typing import Optional, Any, Union
 
 import arrow
 import ftrack_api
@@ -1801,150 +1801,11 @@ class SyncProcess:
     ) -> Optional[VersionEntity]:
         parents = entity_info["parents"]
         asset_version_id = parents[0]["entityId"]
-        asset_id = parents[1]["entityId"]
-        parent_id = parents[2]["entityId"]
-        return self._find_ayon_version(
-            asset_version_id,
-            asset_id,
-            parent_id,
-        )
-
-    def _find_ayon_version(
-        self,
-        asset_version_id: str,
-        asset_id: Optional[str] = None,
-        parent_id: Optional[str] = None,
-    ) -> Optional[VersionEntity]:
-        ayon_id_attr = self._get_server_id_attribute()
-
-        ayon_id_by_ft_id = {}
-        entity_ids = {asset_version_id}
-        ayon_id_fetched = False
-        if parent_id:
-            ayon_id_fetched = True
-            entity_ids.add(parent_id)
-
-        for item in query_custom_attribute_values(
-            self.session,
-            {ayon_id_attr["id"]},
-            entity_ids,
-        ):
-            value = item["value"]
-            ayon_id_by_ft_id[item["entity_id"]] = value or None
-
-        ay_version_id = ayon_id_by_ft_id.get(asset_version_id)
-        if ay_version_id:
-            entity = self.entity_hub.get_version_by_id(ay_version_id)
-            if entity is not None:
-                return entity
-
-        filters = {
-            "conditions": [{
-                "key": f"attrib.{FTRACK_ID_ATTRIB}",
-                "operation": "eq",
-                "value": asset_version_id,
-            }]
-        }
-        version = next(
-            ayon_api.get_versions(
-                self.project_name,
-                filters=filters,
-                fields={"id"},
-            ),
-            None
-        )
-        if version:
-            return self.entity_hub.get_version_by_id(version["id"])
-
-        # TODO we might want to find the version by parent folder and
-        #   product name
-        ft_av = self.session.query(
-            "select asset_id, version from AssetVersion"
-            f" where id is '{asset_version_id}'"
-        ).first()
-        if asset_id is None and ft_av:
-            asset_id = ft_av["asset_id"]
-
-        if not asset_id:
-            return None
-
-        asset = self.session.query(
-            "select id, name, context_id from Asset"
-            f" where id is '{asset_id}'"
-        ).first()
-        if not asset:
-            return None
-
-        if parent_id is None:
-            parent_id = asset["context_id"]
-
-        parent_ayon_id = ayon_id_by_ft_id.get(parent_id)
-        if not ayon_id_fetched:
-            for item in query_custom_attribute_values(
-                self.session,
-                {ayon_id_attr["id"]},
-                {parent_id},
-            ):
-                value = item["value"]
-                if value:
-                    parent_ayon_id = value
-                    break
-
-        if not parent_ayon_id:
-            return None
-
-        ft_low_asset_name = asset["name"].lower()
-        match_product_id = None
-        alternatives = []
-        for product in ayon_api.get_products(
-            self.project_name,
-            folder_ids={parent_ayon_id},
-            fields={"id", "name"},
-        ):
-            prod_name_low = product["name"].lower()
-            if prod_name_low == ft_low_asset_name:
-                match_product_id = product["id"]
-                break
-            if prod_name_low in ft_low_asset_name:
-                alternatives.append(product["id"])
-
-        if not match_product_id and alternatives:
-            match_product_id = alternatives[0]
-
-        if not match_product_id:
-            return None
-
-        version = next(
-            ayon_api.get_versions(
-                self.project_name,
-                product_ids={match_product_id},
-                versions={ft_av["version"]},
-                fields={"id"}
-            ),
-            None
-        )
-        if version is None:
-            return None
-
-        # Update AYON version entity with ftrack id
-        ayon_api.update_version(
-            self.project_name,
-            version["id"],
-            attrib={FTRACK_ID_ATTRIB: asset_version_id}
-        )
-
-        # Update ftrack AssetVersion with AYON id
-        op = self._create_ft_attr_operation(
-            ayon_id_attr["id"],
-            asset_version_id,
-            asset_version_id not in ayon_id_by_ft_id,
-            ayon_id_by_ft_id.get(asset_version_id),
-            version["id"]
-        )
-        self.session.recorded_operations.push(op)
-        self.session.commit()
-
-        return self.entity_hub.get_version_by_id(version["id"])
+        mapping = self._find_matching_ayon_versions({asset_version_id})
+        ayon_id = mapping[asset_version_id]
+        if ayon_id:
+            return self.entity_hub.get_version_by_id(ayon_id)
+        return None
 
     def _propagate_assignee_changes(self):
         assignee_changes = self.entities_by_action["assignee_change"]
@@ -2478,6 +2339,32 @@ class SyncProcess:
                     mode="merge",
                 )
 
+    def _update_versions_ayon_id(
+        self,
+        ayon_id_attr_id: str,
+        available_values: dict[str, Union[str, None]],
+        mapping: dict[str, Union[str, None]],
+    ) -> None:
+        """Update ayon_id custom attribute in ftrack."""
+        for ftrack_id, ayon_id in mapping.items():
+            if not ayon_id:
+                continue
+            current_id = available_values.get(ftrack_id)
+            if current_id == ayon_id:
+                continue
+
+            op = self._create_ft_attr_operation(
+                ayon_id_attr_id,
+                ftrack_id,
+                ftrack_id not in available_values,
+                current_id,
+                ayon_id
+            )
+            self.session.recorded_operations.push(op)
+            # Also update available values
+            available_values[ftrack_id] = ayon_id
+        self.session.commit()
+
     def _find_matching_ayon_versions(
         self, ftrack_ids: set[str]
     ) -> dict[str, Optional[str]]:
@@ -2486,7 +2373,53 @@ class SyncProcess:
         if not ftrack_ids:
             return output
 
-        joined_av_ids = join_filter_values(ftrack_ids)
+        ayon_id_attr = self._get_server_id_attribute()
+
+        available_values = {}
+        for item in query_custom_attribute_values(
+            self.session,
+            {ayon_id_attr["id"]},
+            ftrack_ids,
+        ):
+            value = item["value"]
+            entity_id = item["entity_id"]
+            available_values[entity_id] = value
+            if value:
+                output[entity_id] = value
+
+        missing_ids = {
+            ft_id
+            for ft_id, ay_id in output.items()
+            if not ay_id
+        }
+
+        if not missing_ids:
+            return output
+
+        filters = {
+            "conditions": [{
+                "key": f"attrib.{FTRACK_ID_ATTRIB}",
+                "operator": "in",
+                "value": list(missing_ids),
+            }]
+        }
+
+        for version in ayon_api.get_versions(
+            self.project_name,
+            filters=filters,
+            fields={"id", f"attrib.{FTRACK_ID_ATTRIB}"},
+        ):
+            ftack_id = version["attrib"][FTRACK_ID_ATTRIB]
+            missing_ids.discard(ftack_id)
+            output[ftack_id] = version["id"]
+
+        if not missing_ids:
+            self._update_versions_ayon_id(
+                ayon_id_attr["id"], available_values, output
+            )
+            return output
+
+        joined_av_ids = join_filter_values(missing_ids)
         asset_versions = self.session.query(
             f"select id, asset_id, version from AssetVersion"
             f" where id in ({joined_av_ids})"
@@ -2517,6 +2450,9 @@ class SyncProcess:
             if folder_id
         }
         if not folder_ids:
+            self._update_versions_ayon_id(
+                ayon_id_attr["id"], available_values, output
+            )
             return output
 
         product_ids = set()
@@ -2577,6 +2513,9 @@ class SyncProcess:
             if version_id:
                 output[asset_version["id"]] = version_id
 
+        self._update_versions_ayon_id(
+            ayon_id_attr["id"], available_values, output
+        )
         return output
 
     def _create_ft_attr_operation(
