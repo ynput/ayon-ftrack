@@ -658,32 +658,41 @@ class SyncFromFtrack:
             sync_failed_conf_id
         )
 
-        self.log.info("Synchronizing versions")
-        t_version_start = time.perf_counter()
-        self.update_versions(
-            ft_session,
-            ft_entities_by_id,
-            server_id_conf_id,
-            ayon_statuses_by_name,
+        settings = self.get_ftrack_project_settings()
+        sync_versions: bool = (
+            settings
+            ["service_event_handlers"]
+            ["sync_from_ftrack"]
+            ["sync_versions"]
         )
-        t_version_end = time.perf_counter()
-        self.log.info(
-            "Synchronizing versions took"
-            f" {t_version_end - t_version_start} seconds"
-        )
+        if sync_versions:
+            self.log.info("Synchronizing versions")
+            t_version_start = time.perf_counter()
+            self.update_versions(
+                ft_session,
+                ft_entities_by_id,
+                server_id_conf_id,
+                ayon_statuses_by_name,
+            )
+            t_version_end = time.perf_counter()
+            self.log.info(
+                "Synchronizing versions took"
+                f" {t_version_end - t_version_start:.2f} seconds"
+            )
 
         self.log.info("Synchronizing version lists")
         self.sync_lists(
             ft_project,
             server_id_conf_id,
             list_type_conf,
+            sync_versions,
         )
 
         self.create_report(ft_entities_by_id)
         t_end = time.perf_counter()
         self.log.info((
             f"Synchronization of project \"{project_name}\" finished"
-            f" in {t_end - t_start}"
+            f" in {t_end - t_start:.2f} seconds"
         ))
 
     def update_project_types(
@@ -1630,6 +1639,7 @@ class SyncFromFtrack:
         ft_project: "FtrackEntity",
         server_id_conf_id: str,
         list_type_conf: "FtrackEntity",
+        sync_versions: bool,
     ) -> None:
         # TODO right now it does not remove AYON lists
         project_id = ft_project["id"]
@@ -1732,34 +1742,26 @@ class SyncFromFtrack:
 
         # Tasks and folders already have mapping prepared from entities sync
         ay_id_by_ft_id = {}
-        for entity_id in ft_entity_ids:
+
+        # Sync of ftrack versions is enabled so mapping of versions is
+        #   already filled in '_ids_mapping'
+        _mapping_ids = set(ft_entity_ids)
+        if sync_versions:
+            _mapping_ids |= ft_version_ids
+        for entity_id in _mapping_ids:
             ayon_id = self._ids_mapping.get_server_mapping(entity_id)
             if ayon_id:
                 ay_id_by_ft_id[entity_id] = ayon_id
 
-        # Fetch versions mapping
-        for item in query_custom_attribute_values(
-            self._ft_session,
-            {server_id_conf_id},
-            ft_version_ids,
-        ):
-            entity_id = item["entity_id"]
-            value = item["value"]
-            if value:
-                ay_id_by_ft_id[entity_id] = value
+        # Sync of versions is disabled
+        if not sync_versions:
+            self._prepare_ftrack_list_items_mapping(
+                ft_list_items,
+                ft_version_ids,
+                ay_id_by_ft_id,
+                server_id_conf_id,
+            )
 
-        # Prepares ONLY versions
-        version_list_items = []
-        for item in ft_list_items:
-            ftrack_id = item["entity_id"]
-            if ftrack_id in ft_version_ids:
-                version_list_items.append(item)
-
-        self._prepare_ftrack_list_items_mapping(
-            version_list_items,
-            ay_id_by_ft_id,
-            server_id_conf_id,
-        )
         for ftrack_id, ft_list in ft_lists_by_id.items():
             ay_list = ay_lists_by_ftrack_id.get(ftrack_id)
             list_type = "version"
@@ -1839,16 +1841,35 @@ class SyncFromFtrack:
     def _prepare_ftrack_list_items_mapping(
         self,
         ft_list_items: list["FtrackEntity"],
+        ft_version_ids: set[str],
         ay_id_by_ft_id: dict[str, Optional[str]],
         server_id_conf_id: str,
     ) -> None:
         """Prepares only mapping for ftrack AssetVersions."""
-        if not ft_list_items:
+        # Filter ONLY versions
+        version_list_items = []
+        for item in ft_list_items:
+            ftrack_id = item["entity_id"]
+            if ftrack_id in ft_version_ids:
+                version_list_items.append(item)
+
+        if not version_list_items:
             return
+
+        # Fetch versions mapping
+        for item in query_custom_attribute_values(
+            self._ft_session,
+            {server_id_conf_id},
+            ft_version_ids,
+        ):
+            entity_id = item["entity_id"]
+            value = item["value"]
+            if value:
+                ay_id_by_ft_id[entity_id] = value
 
         ayon_ids_m = {}
         missing_ayon_ids = set()
-        for item in ft_list_items:
+        for item in version_list_items:
             ftrack_id = item["entity_id"]
             ay_id = ay_id_by_ft_id.get(ftrack_id)
             if ay_id is None:
