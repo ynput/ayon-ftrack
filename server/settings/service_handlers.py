@@ -54,6 +54,14 @@ async def project_link_types_enum(project_name: str | None = None):
 
 class SyncFromFtrackModel(BaseSettingsModel):
     enabled: bool = True
+    sync_versions: bool = SettingsField(
+        False,
+        title="Sync version statuses",
+        description=(
+            "Synchronize version statuses from ftrack. Enabling"
+            " this may cause sync slowdown."
+        ),
+    )
     sync_link_type: str = SettingsField(
         "< Skip >",
         title="Sync Link Type",
