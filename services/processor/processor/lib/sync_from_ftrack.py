@@ -15,6 +15,7 @@ from ayon_api import (
     slugify_string,
     get_addons_settings,
 )
+from ayon_api.operations import OperationsSession
 from ayon_api.entity_hub import EntityHub, BaseEntity
 import ftrack_api
 from ftrack_api.exception import ServerError
@@ -655,6 +656,20 @@ class SyncFromFtrack:
             server_id_conf_id,
             server_path_conf_id,
             sync_failed_conf_id
+        )
+
+        self.log.info("Synchronizing versions")
+        t_version_start = time.perf_counter()
+        self.update_versions(
+            ft_session,
+            ft_entities_by_id,
+            server_id_conf_id,
+            ayon_statuses_by_name,
+        )
+        t_version_end = time.perf_counter()
+        self.log.info(
+            "Synchronizing versions took"
+            f" {t_version_end - t_version_start} seconds"
         )
 
         self.log.info("Synchronizing version lists")
@@ -1479,6 +1494,137 @@ class SyncFromFtrack:
                 self._ft_session.recorded_operations.push(operation)
             self._ft_session.commit()
 
+    def update_versions(
+        self,
+        ft_session: "FtrackSession",
+        ft_entities_by_id: dict[str, "FtrackEntity"],
+        server_id_conf_id: str,
+        ayon_statuses_by_name: dict[str, dict[str, Any]],
+    ) -> None:
+        """Synchronize versions information to AYON.
+
+        Args:
+            ft_session (FtrackSession): Ftrack session.
+            ft_entities_by_id (dict[str, FtrackEntity]): Mapping of ftrack
+                entity ids.
+            server_id_conf_id (str): Id of 'ayon_id' custom attribute.
+            ayon_statuses_by_name (dict[str, dict[str, Any]]): Mapping of AYON
+                statuses by name.
+
+        """
+        context_ids = set()
+        for entity in ft_entities_by_id.values():
+            if entity.entity_type != "Task":
+                context_ids.add(entity["id"])
+
+        if not context_ids:
+            return
+
+        assets_by_id = {}
+        asset_ids_by_context_id = {
+            context_id: []
+            for context_id in context_ids
+        }
+        for chunk in create_chunks(context_ids, 50):
+            joined_ids = join_filter_values(chunk)
+            for asset in ft_session.query(
+                "select id, context_id, name from Asset"
+                f" where context_id in ({joined_ids})"
+            ):
+                asset_id = asset["id"]
+                context_id = asset["context_id"]
+                assets_by_id[asset_id] = asset
+                asset_ids_by_context_id[context_id].append(asset_id)
+
+        if not assets_by_id:
+            return
+
+        asset_version_by_id = {}
+        asset_version_ids_by_asset_id = {
+            asset_id: []
+            for asset_id in assets_by_id
+        }
+        for chunk in create_chunks(assets_by_id, 50):
+            joined_ids = join_filter_values(chunk)
+            for asset_version in ft_session.query(
+                "select id, asset_id, version, status_id from AssetVersion"
+                f" where asset_id in ({joined_ids})"
+            ):
+                av_id = asset_version["id"]
+                asset_id = asset_version["asset_id"]
+                asset_version_by_id[av_id] = asset_version
+                asset_version_ids_by_asset_id[asset_id].append(av_id)
+
+        version_mapping = self._find_versions_ayon_mapping(
+            ft_session,
+            server_id_conf_id,
+            set(asset_version_by_id.keys()),
+        )
+        ayon_ids = set(version_mapping.values())
+        ayon_ids.discard(None)
+        if not ayon_ids:
+            return
+
+        versions_by_id = {
+            version["id"]: version
+            for version in ayon_api.get_versions(
+                self.project_name,
+                version_ids=ayon_ids,
+                fields={"id", "status"},
+            )
+        }
+        status_name_by_id = {
+            status["id"]: status["name"]
+            for status in self._ft_session.query(
+                "select id, name from Status"
+            ).all()
+        }
+
+        op_count = 0
+        operations = OperationsSession()
+        for ftrack_id, ayon_id in version_mapping.items():
+            # Mapping to AYON entity was not found
+            if not ayon_id:
+                continue
+
+            ay_version = versions_by_id.get(ayon_id)
+            ft_av = asset_version_by_id.get(ftrack_id)
+            # Entities are not found
+            if ay_version is None or ft_av is None:
+                continue
+
+            # AYON version was already mapped to a different ftrack version
+            if self._ids_mapping.get_ftrack_mapping(ayon_id):
+                continue
+            self._ids_mapping.set_ftrack_to_server(ftrack_id, ayon_id)
+
+            ft_status_id = ft_av["status_id"]
+            status_name = status_name_by_id[ft_status_id]
+            ayon_status_name = self._get_ayon_status(
+                ayon_statuses_by_name,
+                "version",
+                status_name
+            )
+            # AYON status is not available or is same as current status
+            if (
+                not ayon_status_name
+                or ay_version["status"] == ayon_status_name
+            ):
+                continue
+
+            operations.update_version(
+                self.project_name,
+                ayon_id,
+                status=ayon_status_name,
+            )
+            op_count += 1
+            if op_count == 100:
+                operations.commit()
+                op_count = 0
+
+        if op_count > 0:
+            operations.commit()
+
     def sync_lists(
         self,
         ft_project: "FtrackEntity",
@@ -1789,6 +1935,68 @@ class SyncFromFtrack:
                     to_remove.add(item["id"])
 
         return to_add, to_remove
+
+    def _find_versions_ayon_mapping(
+        self,
+        ft_session: "FtrackSession",
+        server_id_conf_id: str,
+        asset_version_ids: set[str],
+    ) -> dict[str, Union[str, None]]:
+        ayon_id_by_av_id = {
+            asset_version_id: None
+            for asset_version_id in asset_version_ids
+        }
+        if not ayon_id_by_av_id:
+            return ayon_id_by_av_id
+
+        real_values = {}
+        for item in query_custom_attribute_values(
+            ft_session,
+            {server_id_conf_id},
+            asset_version_ids,
+        ):
+            value = item["value"]
+            entity_id = item["entity_id"]
+            real_values[entity_id] = value
+            if value:
+                try:
+                    uuid.UUID(value)
+                except ValueError:
+                    continue
+                ayon_id_by_av_id[entity_id] = value
+
+        missing_ids = {
+            ftrack_id
+            for ftrack_id, ayon_id in ayon_id_by_av_id.items()
+            if not ayon_id
+        }
+        if not missing_ids:
+            return ayon_id_by_av_id
+
+        guessed_ids = self._guess_asset_version_ayon_ids(missing_ids)
+        for ftrack_id, ayon_id in guessed_ids.items():
+            if not ayon_id:
+                continue
+
+            ayon_id_by_av_id[ftrack_id] = ayon_id
+
+            entity_key = collections.OrderedDict((
+                ("configuration_id", server_id_conf_id),
+                ("entity_id", ftrack_id)
+            ))
+            op = ftrack_api.operation.CreateEntityOperation(
+                "CustomAttributeValue",
+                entity_key,
+                {"value": ayon_id}
+            )
+            self._ft_session.recorded_operations.push(op)
+
+        if self._ft_session.recorded_operations:
+            try:
+                self._ft_session.commit()
+            finally:
+                self._ft_session.recorded_operations.clear()
+        return ayon_id_by_av_id
 
     def _guess_asset_version_ayon_ids(
         self, asset_version_ids: set[str]
