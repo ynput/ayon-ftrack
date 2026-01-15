@@ -586,11 +586,12 @@ class SyncProcess:
             action = ent_info["action"]
             ftrack_id = ent_info["entityId"]
 
-            # Skip deleted projects
             if action == "remove":
                 # ignore removement of versions
                 if base_type == "assetversion":
                     continue
+
+                # Skip deleted projects
                 elif base_type == "show":
                     ft_project_removed = True
 
