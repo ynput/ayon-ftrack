@@ -4,7 +4,7 @@ version = "1.4.13+dev"
 description = ""
 authors = [{name = "Ynput s.r.o.", email ="info@ynput.io"}]
 dependencies = [
-    "ayon-python-api==1.2.8",
+    "ayon-python-api==1.2.9",
     "ftrack-python-api==2.3.3"
 ]
 

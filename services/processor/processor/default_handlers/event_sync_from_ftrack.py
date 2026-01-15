@@ -3,7 +3,7 @@ import collections
 import json
 import time
 import atexit
-from typing import Optional, Any
+from typing import Optional, Any, Union
 
 import arrow
 import ftrack_api
@@ -19,7 +19,7 @@ from ayon_api import (
     delete_link,
 )
 
-from ayon_api.entity_hub import EntityHub
+from ayon_api.entity_hub import EntityHub, VersionEntity
 
 from ftrack_common import (
     BaseEventHandler,
@@ -58,12 +58,12 @@ DEFAULT_ATTRS_MAPPING = {
 
 
 class SyncProcess:
-    interest_base_types = ["show", "task"]
-    ignore_ent_types = ["Milestone"]
-    ignore_change_keys = [
+    interest_base_types = {"show", "task", "assetversion"}
+    ignore_ent_types = {"Milestone"}
+    ignore_change_keys = {
         "thumbid",
         "priorityid",
-    ]
+    }
 
     project_query = (
         "select id, full_name, name, custom_attributes,"
@@ -586,9 +586,14 @@ class SyncProcess:
             action = ent_info["action"]
             ftrack_id = ent_info["entityId"]
 
-            # Skip deleted projects
-            if action == "remove" and base_type == "show":
-                ft_project_removed = True
+            if action == "remove":
+                # ignore removement of versions
+                if base_type == "assetversion":
+                    continue
+
+                # Skip deleted projects
+                elif base_type == "show":
+                    ft_project_removed = True
 
             # Change 'move' events to 'update'
             # - they may contain more changes than just 'parent_id'
@@ -1724,6 +1729,9 @@ class SyncProcess:
                         entity_id, entity_types
                     )
 
+            elif info["entityType"] == "assetversion":
+                entity = self._find_ayon_version_from_ent_info(info)
+
             if entity is None:
                 continue
 
@@ -1788,6 +1796,17 @@ class SyncProcess:
 
         self._propagate_task_type_changes(task_type_changes)
         self._propagate_status_changes(status_changes)
+
+    def _find_ayon_version_from_ent_info(
+        self, entity_info: dict[str, Any]
+    ) -> Optional[VersionEntity]:
+        parents = entity_info["parents"]
+        asset_version_id = parents[0]["entityId"]
+        mapping = self._find_matching_ayon_versions({asset_version_id})
+        ayon_id = mapping[asset_version_id]
+        if ayon_id:
+            return self.entity_hub.get_version_by_id(ayon_id)
+        return None
 
     def _propagate_assignee_changes(self):
         assignee_changes = self.entities_by_action["assignee_change"]
@@ -2321,6 +2340,32 @@ class SyncProcess:
                     mode="merge",
                 )
 
+    def _update_versions_ayon_id(
+        self,
+        ayon_id_attr_id: str,
+        available_values: dict[str, Union[str, None]],
+        mapping: dict[str, Union[str, None]],
+    ) -> None:
+        """Update ayon_id custom attribute in ftrack."""
+        for ftrack_id, ayon_id in mapping.items():
+            if not ayon_id:
+                continue
+            current_id = available_values.get(ftrack_id)
+            if current_id == ayon_id:
+                continue
+
+            op = self._create_ft_attr_operation(
+                ayon_id_attr_id,
+                ftrack_id,
+                ftrack_id not in available_values,
+                current_id,
+                ayon_id
+            )
+            self.session.recorded_operations.push(op)
+            # Also update available values
+            available_values[ftrack_id] = ayon_id
+        self.session.commit()
+
     def _find_matching_ayon_versions(
         self, ftrack_ids: set[str]
     ) -> dict[str, Optional[str]]:
@@ -2329,7 +2374,53 @@ class SyncProcess:
         if not ftrack_ids:
             return output
 
-        joined_av_ids = join_filter_values(ftrack_ids)
+        ayon_id_attr = self._get_server_id_attribute()
+
+        available_values = {}
+        for item in query_custom_attribute_values(
+            self.session,
+            {ayon_id_attr["id"]},
+            ftrack_ids,
+        ):
+            value = item["value"]
+            entity_id = item["entity_id"]
+            available_values[entity_id] = value
+            if value:
+                output[entity_id] = value
+
+        missing_ids = {
+            ft_id
+            for ft_id, ay_id in output.items()
+            if not ay_id
+        }
+
+        if not missing_ids:
+            return output
+
+        filters = {
+            "conditions": [{
+                "key": f"attrib.{FTRACK_ID_ATTRIB}",
+                "operator": "in",
+                "value": list(missing_ids),
+            }]
+        }
+
+        for version in ayon_api.get_versions(
+            self.project_name,
+            filters=filters,
+            fields={"id", f"attrib.{FTRACK_ID_ATTRIB}"},
+        ):
+            ftack_id = version["attrib"][FTRACK_ID_ATTRIB]
+            missing_ids.discard(ftack_id)
+            output[ftack_id] = version["id"]
+
+        if not missing_ids:
+            self._update_versions_ayon_id(
+                ayon_id_attr["id"], available_values, output
+            )
+            return output
+
+        joined_av_ids = join_filter_values(missing_ids)
         asset_versions = self.session.query(
             f"select id, asset_id, version from AssetVersion"
             f" where id in ({joined_av_ids})"
@@ -2360,6 +2451,9 @@ class SyncProcess:
             if folder_id
         }
         if not folder_ids:
+            self._update_versions_ayon_id(
+                ayon_id_attr["id"], available_values, output
+            )
             return output
 
         product_ids = set()
@@ -2420,6 +2514,9 @@ class SyncProcess:
             if version_id:
                 output[asset_version["id"]] = version_id
 
+        self._update_versions_ayon_id(
+            ayon_id_attr["id"], available_values, output
+        )
         return output
 
     def _create_ft_attr_operation(

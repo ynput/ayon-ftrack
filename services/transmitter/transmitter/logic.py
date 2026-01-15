@@ -1045,7 +1045,7 @@ class EventProcessor:
             type_fields = {"type_id", "object_type_id"}
 
         if ft_entity_type is None:
-            return
+            return None
 
         if fields is None:
             fields = {"id"}
