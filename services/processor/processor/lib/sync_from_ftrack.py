@@ -1757,12 +1757,12 @@ class SyncFromFtrack:
 
         # Sync of versions is disabled
         if not sync_versions:
-            self._prepare_ftrack_list_items_mapping(
-                ft_list_items,
-                ft_version_ids,
-                ay_id_by_ft_id,
+            mapping = self._find_versions_ayon_mapping(
+                self._ft_session,
                 server_id_conf_id,
+                ft_version_ids,
             )
+            ay_id_by_ft_id.update(mapping)
 
         for ftrack_id, ft_list in ft_lists_by_id.items():
             ay_list = ay_lists_by_ftrack_id.get(ftrack_id)
@@ -1839,89 +1839,6 @@ class SyncFromFtrack:
                     ay_list["id"],
                     attrib={FTRACK_ID_ATTRIB: ftrack_id},
                 )
-
-    def _prepare_ftrack_list_items_mapping(
-        self,
-        ft_list_items: list["FtrackEntity"],
-        ft_version_ids: set[str],
-        ay_id_by_ft_id: dict[str, Optional[str]],
-        server_id_conf_id: str,
-    ) -> None:
-        """Prepares only mapping for ftrack AssetVersions."""
-        # Filter ONLY versions
-        version_list_items = []
-        for item in ft_list_items:
-            ftrack_id = item["entity_id"]
-            if ftrack_id in ft_version_ids:
-                version_list_items.append(item)
-
-        if not version_list_items:
-            return
-
-        # Fetch versions mapping
-        for item in query_custom_attribute_values(
-            self._ft_session,
-            {server_id_conf_id},
-            ft_version_ids,
-        ):
-            entity_id = item["entity_id"]
-            value = item["value"]
-            if value:
-                ay_id_by_ft_id[entity_id] = value
-
-        ayon_ids_m = {}
-        missing_ayon_ids = set()
-        for item in version_list_items:
-            ftrack_id = item["entity_id"]
-            ay_id = ay_id_by_ft_id.get(ftrack_id)
-            if ay_id is None:
-                missing_ayon_ids.add(ftrack_id)
-                continue
-
-            try:
-                uuid.UUID(ay_id)
-                ayon_ids_m[ay_id] = ftrack_id
-            except ValueError:
-                missing_ayon_ids.add(ftrack_id)
-                ay_id_by_ft_id[ftrack_id] = None
-
-        # Filter available ids
-        filtered_ids = {
-            version["id"]
-            for version in ayon_api.get_versions(
-                self.project_name,
-                version_ids=set(ayon_ids_m),
-                fields={"id"}
-            )
-        }
-        for ayon_id, ftrack_id in ayon_ids_m.items():
-            if ayon_id not in filtered_ids:
-                missing_ayon_ids.add(ftrack_id)
-                ay_id_by_ft_id[ftrack_id] = None
-
-        guessed_ids = self._guess_asset_version_ayon_ids(missing_ayon_ids)
-        for ftrack_id, ayon_id in guessed_ids.items():
-            if not ayon_id:
-                continue
-
-            ay_id_by_ft_id[ftrack_id] = ayon_id
-
-            entity_key = collections.OrderedDict((
-                ("configuration_id", server_id_conf_id),
-                ("entity_id", ftrack_id)
-            ))
-            op = ftrack_api.operation.CreateEntityOperation(
-                "CustomAttributeValue",
-                entity_key,
-                {"value": ayon_id}
-            )
-            self._ft_session.recorded_operations.push(op)
-
-        if self._ft_session.recorded_operations:
-            try:
-                self._ft_session.commit()
-            finally:
-                self._ft_session.recorded_operations.clear()
 
     def _prepare_list_items(
         self,
