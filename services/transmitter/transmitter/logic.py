@@ -865,6 +865,8 @@ class EventProcessor:
 
         if entity_data.action == "updated":
             self._handle_update_event(entity_data)
+        elif entity_data.action == "created":
+            self._handle_create_event(entity_data)
         else:
             self._log.info(f"Unhandled action '{entity_data.action}'")
 
@@ -979,7 +981,7 @@ class EventProcessor:
 
         return change_type, changes
 
-    def _handle_update_event(self, entity_data: EntityEventData):
+    def _handle_update_event(self, entity_data: EntityEventData) -> None:
         entity_type = entity_data.entity_type
         self._log.info(
             f"Entity {entity_type} <{entity_data.entity_id}> changed"
@@ -1025,6 +1027,227 @@ class EventProcessor:
                 self._handle_task_assignees_change(entity_data)
         else:
             self._log.info("Unhandled entity update event")
+
+    def _handle_create_event(self, entity_data: EntityEventData) -> None:
+        if entity_data.entity_type == "folder":
+            self._handle_create_folder_event(entity_data)
+        elif entity_data.entity_type == "task":
+            self._handle_create_task_event(entity_data)
+        else:
+            self._log.info("Unhandled entity create event")
+
+    def _handle_create_folder_event(self, entity_data: EntityEventData) -> None:
+        ay_entity = entity_data.get_ayon_entity()
+        if not ay_entity:
+            return
+
+        ay_path = ay_entity["path"]
+        src_name_low = ay_entity["name"].lower()
+        self._log.info(f"Handling created folder '{ay_path}'")
+
+        # TODO check if the entity has already ftrack created
+        ftrack_id = ay_entity["attrib"][FTRACK_ID_ATTRIB]
+        if ftrack_id is not None:
+            ft_entity = self._session.query(
+                "select id, name from TypedContext"
+                f" where id is '{ftrack_id}'"
+            ).first()
+            if (
+                ft_entity is not None
+                and ft_entity["name"].lower() == src_name_low
+            ):
+                self._log.debug("ftrack counterpart already exists")
+                return
+
+        ay_parent_id = ay_entity["parentId"]
+        if ay_parent_id is None:
+            ft_parent = self._session.query(
+                "select id from Project"
+                f" where full_name is '{entity_data.project_name}'"
+            ).first()
+
+        else:
+            ay_parent = ayon_api.get_folder_by_id(
+                entity_data.project_name,
+                ay_parent_id,
+            )
+            ft_parent = self._find_ftrack_entity(
+                entity_data.project_name,
+                entity_data.entity_type,
+                ay_parent,
+            )
+            if ft_parent is None:
+                self._log.debug(
+                    "Failed to find parent ftrack entity. Skipped sync."
+                )
+                return
+
+        ft_parent_id = ft_parent["id"]
+        for child in self._session.query(
+            "select id, name, type_id, object_type_id from TypedContext"
+            f" where parent_id is '{ft_parent_id}'"
+        ):
+            child_name = child["name"].lower()
+            if child_name == src_name_low:
+                self._log.debug(
+                    "Created AYON entity already has ftrack counterpart."
+                )
+                return
+            
+        folder_type = ay_entity["folderType"]
+        folder_type_low = folder_type.lower()
+        match_object_type = None
+        for object_type in self._session.query(
+            "select id, name from ObjectType"
+        ).all():
+            if object_type["name"].lower() == folder_type_low:
+                match_object_type = object_type
+                break
+
+        if match_object_type is None:
+            self._log.warning(
+                "Failed to create AYON counterpart because ObjectType"
+                f" '{folder_type}' is not available in ftrack."
+            )
+            return
+
+        new_id = str(uuid.uuid4())
+        ayon_api.update_folder(
+            entity_data.project_name,
+            ay_entity["id"],
+            attrib={FTRACK_ID_ATTRIB: new_id},
+        )
+        self._session.create(
+            "TypedContext",
+            {
+                "id": new_id,
+                "parent_id": ft_parent_id,
+                "name": ay_entity["name"],
+                "object_type_id": match_object_type["id"],
+            }
+        )
+        self._session.commit()
+        server_id_def = self._session.query(
+            "select id from CustomAttributeConfiguration"
+            f" where key is '{CUST_ATTR_KEY_SERVER_ID}'"
+        ).first()
+        if not server_id_def:
+            return
+
+        op = self._get_ft_attr_value_operation(
+            server_id_def["id"],
+            new_id,
+            True,
+            ay_entity["id"],
+            None
+        )
+        self._session.recorded_operations.push(op)
+        self._session.commit()
+
+    def _handle_create_task_event(self, entity_data: EntityEventData) -> None:
+        ay_entity = entity_data.get_ayon_entity()
+        if not ay_entity:
+            return
+
+        src_name = ay_entity["name"]
+        src_name_low = src_name.lower()
+        self._log.info(f"Handling created task '{src_name}'")
+
+        # TODO check if the entity has already ftrack created
+        ftrack_id = ay_entity["attrib"][FTRACK_ID_ATTRIB]
+        if ftrack_id is not None:
+            ft_entity = self._session.query(
+                "select id, name from TypedContext"
+                f" where id is '{ftrack_id}'"
+            ).first()
+            if (
+                ft_entity is not None
+                and ft_entity["name"].lower() == src_name_low
+            ):
+                self._log.debug("ftrack counterpart already exists")
+                return
+
+        ay_parent_id = ay_entity["folderId"]
+        ay_parent = ayon_api.get_folder_by_id(
+            entity_data.project_name,
+            ay_parent_id,
+        )
+        ft_parent = self._find_ftrack_entity(
+            entity_data.project_name,
+            entity_data.entity_type,
+            ay_parent,
+        )
+        if ft_parent is None:
+            self._log.debug(
+                "Failed to find parent ftrack entity. Skipped sync."
+            )
+            return
+
+        ft_parent_id = ft_parent["id"]
+        for child in self._session.query(
+            "select id, name, type_id, object_type_id from TypedContext"
+            f" where parent_id is '{ft_parent_id}'"
+        ):
+            child_name = child["name"].lower()
+            if child_name == src_name_low:
+                self._log.debug(
+                    "Created AYON entity already has ftrack counterpart."
+                )
+                return
+
+        task_type = ay_entity["taskType"]
+        task_type_low = task_type.lower()
+        ft_task_type = self._session.query(
+            "select id, name from ObjectType where name is 'Task'"
+        ).one()
+        match_type = None
+        for ft_type in self._session.query(
+            "select id, name from Type"
+        ).all():
+            if ft_type["name"].lower() == task_type_low:
+                match_type = ft_type
+                break
+
+        if match_type is None:
+            self._log.warning(
+                "Failed to create AYON counterpart because Type"
+                f" '{task_type}' is not available in ftrack."
+            )
+            return
+
+        new_id = str(uuid.uuid4())
+        ayon_api.update_task(
+            entity_data.project_name,
+            ay_entity["id"],
+            attrib={FTRACK_ID_ATTRIB: new_id},
+        )
+        self._session.create(
+            "TypedContext",
+            {
+                "id": new_id,
+                "parent_id": ft_parent_id,
+                "name": ay_entity["name"],
+                "object_type_id": ft_task_type["id"],
+                "type_id": match_type["id"],
+            }
+        )
+        self._session.commit()
+        server_id_def = self._session.query(
+            "select id from CustomAttributeConfiguration"
+            f" where key is '{CUST_ATTR_KEY_SERVER_ID}'"
+        ).first()
+        if not server_id_def:
+            return
+
+        op = self._get_ft_attr_value_operation(
+            server_id_def["id"],
+            new_id,
+            True,
+            ay_entity["id"],
+            None
+        )
+        self._session.recorded_operations.push(op)
+        self._session.commit()
 
     def _find_ftrack_entity(
         self,
