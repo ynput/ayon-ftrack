@@ -1036,7 +1036,9 @@ class EventProcessor:
         else:
             self._log.info("Unhandled entity create event")
 
-    def _handle_create_folder_event(self, entity_data: EntityEventData) -> None:
+    def _handle_create_folder_event(
+        self, entity_data: EntityEventData
+    ) -> None:
         ay_entity = entity_data.get_ayon_entity()
         if not ay_entity:
             return
@@ -1093,7 +1095,7 @@ class EventProcessor:
                     "Created AYON entity already has ftrack counterpart."
                 )
                 return
-            
+
         folder_type = ay_entity["folderType"]
         folder_type_low = folder_type.lower()
         match_object_type = None
