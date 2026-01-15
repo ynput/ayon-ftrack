@@ -5,7 +5,7 @@ import copy
 import logging
 import uuid
 import typing
-from typing import Any, Optional, Dict
+from typing import Any, Optional, Dict, Union
 
 import arrow
 import ayon_api
@@ -37,7 +37,9 @@ from ftrack_common import (
 )
 
 if typing.TYPE_CHECKING:
-    import ftrack_api.entity.base.Entity
+    import ftrack_api.entity.base.Entity as FtrackEntity
+    import ftrack_api.operation.Operation as FtrackOperation
+    import ftrack_api.Session as FtrackSession
 
 NOT_SET = object()
 
@@ -338,7 +340,7 @@ class SyncFromFtrack:
 
     def _get_available_ft_statuses(
         self,
-        ft_entity: "ftrack_api.entity.base.Entity",
+        ft_entity: "FtrackEntity",
         project_schema_id: str,
     ):
         fields = {
@@ -1000,7 +1002,7 @@ class SyncFromFtrack:
 
     def _set_entity_status(
         self,
-        ft_entity: "ftrack_api.entity.base.Entity",
+        ft_entity: "FtrackEntity",
         entity: BaseEntity,
         ftrack_statuses: Dict[str, str],
         ayon_statuses: Dict[str, Any],
@@ -1025,8 +1027,8 @@ class SyncFromFtrack:
 
     def update_assignees_from_ftrack(
         self,
-        ft_entities_by_id: dict[str, "ftrack_api.entity.base.Entity"],
-    ):
+        ft_entities_by_id: dict[str, "FtrackEntity"],
+    ) -> None:
         task_entities_by_id = {}
         for entity in ft_entities_by_id.values():
             if entity.entity_type == "Task":
@@ -1081,9 +1083,9 @@ class SyncFromFtrack:
 
     def update_attributes_from_ftrack(
         self,
-        cust_attr_value_by_entity_id: Dict[str, Dict[str, Any]],
-        ft_entities_by_id: Dict[str, "ftrack_api.entity.base.Entity"]
-    ):
+        cust_attr_value_by_entity_id: dict[str, dict[str, Any]],
+        ft_entities_by_id: dict[str, "FtrackEntity"],
+    ) -> None:
         ftrack_statuses = {
             status["id"]: status["name"]
             for status in self._ft_session.query(
@@ -1154,8 +1156,8 @@ class SyncFromFtrack:
 
     def update_links_from_ftrack(
         self,
-        ft_entities_by_id: dict[str, "ftrack_api.entity.base.Entity"],
-    ):
+        ft_entities_by_id: dict[str, "FtrackEntity"],
+    ) -> None:
         settings = self.get_ftrack_project_settings()
         ay_link_type = (
             settings
