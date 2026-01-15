@@ -1770,6 +1770,11 @@ class SyncFromFtrack:
         folder_ids = set()
         for parent_id in assets_by_parent_id.keys():
             ayon_id = self._ids_mapping.get_server_mapping(parent_id)
+            try:
+                uuid.UUID(ayon_id)
+            except ValueError:
+                continue
+
             if ayon_id:
                 folders_mapping[ayon_id] = parent_id
                 folder_ids.add(ayon_id)
