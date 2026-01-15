@@ -5,7 +5,7 @@ import copy
 import logging
 import uuid
 import typing
-from typing import Any, Optional, Dict, Union
+from typing import Any, Optional, Union
 
 import arrow
 import ayon_api
@@ -142,12 +142,16 @@ class SyncFromFtrack:
 
         return self._report_items
 
-    def sync_project_types(self, ft_project, ft_session):
+    def sync_project_types(
+        self,
+        ft_project: "FtrackEntity",
+        ft_session: "FtrackSession",
+    ) -> tuple[list["FtrackEntity"], list["FtrackEntity"]]:
         """Sync project types from ftrack to AYON.
 
         Args:
-            ft_project (ftrack_api.entity.Entity): ftrack project entity.
-            ft_session (ftrack_api.Session): ftrack session.
+            ft_project (FtrackEntity): ftrack project entity.
+            ft_session (FtrackSession): ftrack session.
 
         Returns:
             tuple[list, list]: Tuple of object types and task types.
@@ -195,7 +199,20 @@ class SyncFromFtrack:
             self._ftrack_project_settings = settings["ftrack"]
         return copy.deepcopy(self._ftrack_project_settings)
 
-    def sync_statuses(self, ft_project, ft_session):
+    def sync_statuses(
+        self,
+        ft_project: "FtrackEntity",
+        ft_session: "FtrackSession",
+        ft_status_by_id: Optional[dict[str, "FtrackEntity"]] = None,
+    ) -> None:
+        if ft_status_by_id is None:
+            ft_status_by_id = {
+                status["id"]: status
+                for status in ft_session.query(
+                    "select id, name, color, state, sort from Status"
+                ).all()
+            }
+
         fields = {
             "asset_version_workflow_schema",
             "task_workflow_schema",
@@ -284,12 +301,6 @@ class SyncFromFtrack:
             ).all()
         }
 
-        statuses_by_id = {
-            status["id"]: status
-            for status in ft_session.query(
-                "select id, name, color, state, sort from Status"
-            ).all()
-        }
         all_status_ids = (
             folder_statuses_ids
             | task_status_ids
@@ -303,7 +314,7 @@ class SyncFromFtrack:
         }
         statuses_data = []
         for status_id in all_status_ids:
-            status = statuses_by_id[status_id]
+            status = ft_status_by_id[status_id]
             scope = ["representation", "workfile"]
             if status_id in folder_statuses_ids:
                 scope.append("folder")
@@ -342,7 +353,7 @@ class SyncFromFtrack:
         self,
         ft_entity: "FtrackEntity",
         project_schema_id: str,
-    ):
+    ) -> set[str]:
         fields = {
             "asset_version_workflow_schema",
             "task_workflow_schema",
@@ -401,7 +412,11 @@ class SyncFromFtrack:
             return False
         return True
 
-    def create_project(self, preset_name, attributes):
+    def create_project(
+        self,
+        preset_name: str,
+        attributes: dict[str, Any],
+    ) -> None:
         """Create project on AYON server.
 
         Args:
@@ -431,7 +446,7 @@ class SyncFromFtrack:
             project_entity.attribs[key] = value
         self._entity_hub.commit_changes()
 
-    def sync_to_server(self):
+    def sync_to_server(self) -> None:
         """Sync project with hierarchy from ftrack to AYON server."""
 
         t_start = time.perf_counter()
@@ -519,8 +534,18 @@ class SyncFromFtrack:
         # Query ftrack project
         ft_project = _get_ftrack_project(ft_session, project_name)
 
+        ft_status_by_id = {
+            status["id"]: status
+            for status in self._ft_session.query(
+                "select id, name, color, state, sort from Status"
+            ).all()
+        }
         self.sync_project_types(ft_project, ft_session)
-        self.sync_statuses(ft_project, ft_session)
+        self.sync_statuses(
+            ft_project,
+            ft_session,
+            ft_status_by_id
+        )
 
         self._entity_hub.commit_changes()
 
@@ -607,9 +632,16 @@ class SyncFromFtrack:
         )
 
         self.log.info("Updating attributes of entities")
+
+        ayon_statuses_by_name = {
+            status["name"].lower(): status
+            for status in self._entity_hub.project_entity["statuses"]
+        }
         self.update_attributes_from_ftrack(
             cust_attr_value_by_entity_id,
-            ft_entities_by_id
+            ft_entities_by_id,
+            ft_status_by_id,
+            ayon_statuses_by_name,
         )
         self._entity_hub.commit_changes()
 
@@ -639,7 +671,11 @@ class SyncFromFtrack:
             f" in {t_end - t_start}"
         ))
 
-    def update_project_types(self, object_types, task_types):
+    def update_project_types(
+        self,
+        object_types: list["FtrackEntity"],
+        task_types: list["FtrackEntity"],
+    ) -> None:
         project_entity = self._entity_hub.project_entity
         ignored_folder_types = {"task", "milestone"}
         src_folder_types = {
@@ -678,10 +714,10 @@ class SyncFromFtrack:
 
     def match_immutable_entities(
         self,
-        ft_project,
-        ft_entities_by_id,
-        ft_entities_by_parent_id,
-    ):
+        ft_project: "FtrackEntity",
+        ft_entities_by_id: dict[str, "FtrackEntity"],
+        ft_entities_by_parent_id: dict[str, list["FtrackEntity"]],
+    ) -> None:
         self.log.debug("Validation of immutable entities started")
 
         # Collect all ftrack ids from immuable entities
@@ -763,7 +799,9 @@ class SyncFromFtrack:
                 if child.immutable_for_hierarchy:
                     hierarchy_queue.append((child, expected_ftrack_id))
 
-    def ensure_mandatory_custom_attributes_exists(self, session):
+    def ensure_mandatory_custom_attributes_exists(
+        self, session: "FtrackSession"
+    ) -> bool:
         try:
             ensure_mandatory_custom_attributes_exists(
                 session,
@@ -802,10 +840,10 @@ class SyncFromFtrack:
     def _create_new_entity(
         self,
         parent_entity,
-        ft_entity,
-        ft_object_type_name_by_id,
-        ft_type_names_by_id: Dict[str, str],
-        cust_attr_value_by_entity_id: Dict[str, Dict[str, Any]],
+        ft_entity: "FtrackEntity",
+        ft_object_type_name_by_id: dict[str, "FtrackEntity"],
+        ft_type_names_by_id: dict[str, str],
+        cust_attr_value_by_entity_id: dict[str, dict[str, Any]],
     ):
         ftrack_id = ft_entity["id"]
         custom_attributes = cust_attr_value_by_entity_id[ftrack_id]
@@ -840,12 +878,12 @@ class SyncFromFtrack:
 
     def match_existing_entities(
         self,
-        ft_project,
-        ft_entities_by_parent_id,
-        ft_object_type_name_by_id,
-        ft_type_names_by_id: Dict[str, str],
-        cust_attr_value_by_entity_id: Dict[str, Dict[str, Any]],
-    ):
+        ft_project: "FtrackEntity",
+        ft_entities_by_parent_id: dict[str, list["FtrackEntity"]],
+        ft_object_type_name_by_id: dict[str, "FtrackEntity"],
+        ft_type_names_by_id: dict[str, str],
+        cust_attr_value_by_entity_id: dict[str, dict[str, Any]],
+    ) -> None:
         """Match exiting entities on both sides.
 
         Create new entities that are on ftrack and are not on server and remove
@@ -856,14 +894,14 @@ class SyncFromFtrack:
                 but also by type (right now task == folder).
 
         Args:
-            ft_project (ftrack_api.Entity): ftrack project entity.
-            ft_entities_by_parent_id (dict[str, list[ftrack_api.Entity]]): Map
+            ft_project (FtrackEntity): ftrack project entity.
+            ft_entities_by_parent_id (dict[str, list[FtrackEntity]]): Map
                 of ftrack entities by their parent ids.
-            ft_object_type_name_by_id (Dict[str, str]): Mapping of ftrack
+            ft_object_type_name_by_id (dict[str, str]): Mapping of ftrack
                 object type ids to their names.
-            ft_type_names_by_id (Dict[str, str]): Mapping of ftrack task type
+            ft_type_names_by_id (dict[str, str]): Mapping of ftrack task type
                 ids to their names.
-            cust_attr_value_by_entity_id (Dict[str, Dict[str, Any]): Custom
+            cust_attr_value_by_entity_id (dict[str, dict[str, Any]): Custom
                 attribute values by key stored by entity id.
         """
 
@@ -1000,30 +1038,48 @@ class SyncFromFtrack:
             for child in entity.children:
                 deactivate_queue.append(child)
 
+    def _get_ayon_status(
+        self,
+        ayon_statuses_by_name: dict[str, dict[str, Any]],
+        ayon_entity_type: str,
+        ft_status_name: Union[str, None],
+    ) -> Union[str, None]:
+        if not ft_status_name:
+            return None
+
+        ayon_status = ayon_statuses_by_name.get(ft_status_name.lower())
+        if ayon_status is None:
+            return None
+
+        scope = ayon_status.scope
+        if ayon_entity_type in scope:
+            return ayon_status["name"]
+        return None
+
     def _set_entity_status(
         self,
         ft_entity: "FtrackEntity",
+        ft_status_by_id: dict[str, "FtrackEntity"],
         entity: BaseEntity,
-        ftrack_statuses: Dict[str, str],
-        ayon_statuses: Dict[str, Any],
-    ):
+        ayon_statuses_by_name: dict[str, Any],
+    ) -> None:
         # QUESTION should we log all invalid/missing statuses?
         # QUESTION should we update AYON project statuses if status
         #   is not available?
         if entity.entity_type not in ("folder", "task"):
             return
 
-        ft_status_name = ftrack_statuses.get(ft_entity.get("status_id"))
-        if ft_status_name is None:
+        ft_status = ft_status_by_id.get(ft_entity.get("status_id"))
+        if ft_status is None:
             return
 
-        ayon_status = ayon_statuses.get(ft_status_name.lower())
-        if ayon_status is None:
-            return
-
-        scope = ayon_status.scope
-        if entity.entity_type in scope:
-            entity.set_status(ayon_status["name"])
+        ayon_status_name = self._get_ayon_status(
+            ayon_statuses_by_name,
+            entity.entity_type,
+            ft_status["name"]
+        )
+        if ayon_status_name is not None:
+            entity.set_status(ayon_status_name)
 
     def update_assignees_from_ftrack(
         self,
@@ -1085,17 +1141,9 @@ class SyncFromFtrack:
         self,
         cust_attr_value_by_entity_id: dict[str, dict[str, Any]],
         ft_entities_by_id: dict[str, "FtrackEntity"],
+        ft_status_by_id: dict[str, "FtrackEntity"],
+        ayon_statuses_by_name: dict[str, dict[str, Any]],
     ) -> None:
-        ftrack_statuses = {
-            status["id"]: status["name"]
-            for status in self._ft_session.query(
-                "select id, name from Status"
-            ).all()
-        }
-        ayon_statuses = {
-            status["name"].lower(): status
-            for status in self._entity_hub.project_entity["statuses"]
-        }
         hierarchy_queue = collections.deque()
         hierarchy_queue.append(self._entity_hub.project_entity)
         while hierarchy_queue:
@@ -1118,7 +1166,10 @@ class SyncFromFtrack:
             entity.attribs[FTRACK_PATH_ATTRIB] = path
 
             self._set_entity_status(
-                ft_entity, entity, ftrack_statuses, ayon_statuses
+                ft_entity,
+                ft_status_by_id,
+                entity,
+                ayon_statuses_by_name
             )
 
             for attr_name, value in (
@@ -1267,8 +1318,11 @@ class SyncFromFtrack:
             )
 
     def _prepare_attribute_values(
-        self, ft_session, attr_confs, ft_entities_by_id
-    ):
+        self,
+        ft_session: "FtrackSession",
+        attr_confs: list["FtrackEntity"],
+        ft_entities_by_id: dict[str, "FtrackEntity"],
+    ) -> dict[str, dict[str, Any]]:
         ft_entity_ids = set(ft_entities_by_id.keys())
         attr_mapping: CustomAttributesMapping = (
             get_custom_attributes_mapping(
@@ -1323,8 +1377,13 @@ class SyncFromFtrack:
         return cust_attr_value_by_entity_id
 
     def _create_ft_operation(
-        self, conf_id, entity_id, is_new, new_value, old_value=None
-    ):
+        self,
+        conf_id: str,
+        entity_id: str,
+        is_new: bool,
+        new_value: Any,
+        old_value: Optional[Any] = None,
+    ) -> "FtrackOperation":
         entity_key = collections.OrderedDict((
             ("configuration_id", conf_id),
             ("entity_id", entity_id)
@@ -1346,12 +1405,12 @@ class SyncFromFtrack:
 
     def update_ftrack_attributes(
         self,
-        ft_entities_by_id,
-        cust_attr_value_by_entity_id,
-        server_id_conf_id,
-        server_path_conf_id,
-        sync_failed_conf_id
-    ):
+        ft_entities_by_id: dict[str, "FtrackEntity"],
+        cust_attr_value_by_entity_id: dict[str, dict[str, Any]],
+        server_id_conf_id: str,
+        server_path_conf_id: str,
+        sync_failed_conf_id: str,
+    ) -> None:
         operations = []
         for ftrack_id, ft_entity in ft_entities_by_id.items():
             if ft_entity.entity_type == "Project":
@@ -1422,9 +1481,9 @@ class SyncFromFtrack:
 
     def sync_lists(
         self,
-        ft_project,
+        ft_project: "FtrackEntity",
         server_id_conf_id: str,
-        list_type_conf,
+        list_type_conf: "FtrackEntity",
     ) -> None:
         # TODO right now it does not remove AYON lists
         project_id = ft_project["id"]
@@ -1633,7 +1692,7 @@ class SyncFromFtrack:
 
     def _prepare_ftrack_list_items_mapping(
         self,
-        ft_list_items,
+        ft_list_items: list["FtrackEntity"],
         ay_id_by_ft_id: dict[str, Optional[str]],
         server_id_conf_id: str,
     ) -> None:
@@ -1697,9 +1756,9 @@ class SyncFromFtrack:
 
     def _prepare_list_items(
         self,
-        ft_list_items,
-        list_type,
-        ayon_list,
+        ft_list_items: list["FtrackEntity"],
+        list_type: str,
+        ayon_list: dict[str, Any],
         ay_id_by_ft_id: dict[str, str],
     ) -> tuple[set[str], set[str]]:
         to_add = set()
@@ -1864,7 +1923,9 @@ class SyncFromFtrack:
 
         return output
 
-    def create_report(self, ft_entities_by_id):
+    def create_report(
+        self, ft_entities_by_id: dict[str, "FtrackEntity"]
+    ) -> None:
         report_items = []
 
         # --- Immutable entities ---
