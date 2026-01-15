@@ -552,7 +552,8 @@ class SyncFromFtrack:
 
         t_project_existence_1 = time.perf_counter()
         self.log.debug(
-            f"Initial preparation took {t_project_existence_1 - t_start}"
+            "Initial preparation took"
+            f" {t_project_existence_1 - t_start:.2f}s"
         )
         self.log.debug("Loading entities from server")
         # Query entities from server (project, folders and tasks)
@@ -562,8 +563,8 @@ class SyncFromFtrack:
         )
         t_server_query_2 = time.perf_counter()
         self.log.debug((
-            "Loading of entities from server"
-            f" took {t_server_query_2 - t_project_existence_1}"
+            "Loading of entities from server took"
+            f" {t_server_query_2 - t_project_existence_1:.2f}s"
         ))
 
         self.log.info("Querying necessary data from ftrack")
@@ -582,8 +583,8 @@ class SyncFromFtrack:
 
         t_types_sync_3 = time.perf_counter()
         self.log.debug((
-            "Update of types from ftrack"
-            f" took {t_types_sync_3 - t_server_query_2}"
+            "Update of types from ftrack took"
+            f" {t_types_sync_3 - t_server_query_2:.2f}s"
         ))
 
         self.log.info("Querying project hierarchy from ftrack")
@@ -594,7 +595,8 @@ class SyncFromFtrack:
         ).format(ft_project["id"])).all()
         t_ft_entities_4 = time.perf_counter()
         self.log.debug((
-            f"Query of ftrack entities took {t_ft_entities_4 - t_types_sync_3}"
+            "Query of ftrack entities took"
+            f" {t_ft_entities_4 - t_types_sync_3:.2f}s"
         ))
 
         ft_entities_by_id = {ft_project["id"]: ft_project}
@@ -677,7 +679,7 @@ class SyncFromFtrack:
             t_version_end = time.perf_counter()
             self.log.info(
                 "Synchronizing versions took"
-                f" {t_version_end - t_version_start:.2f} seconds"
+                f" {t_version_end - t_version_start:.2f}s"
             )
 
         self.log.info("Synchronizing version lists")
@@ -692,7 +694,7 @@ class SyncFromFtrack:
         t_end = time.perf_counter()
         self.log.info((
             f"Synchronization of project \"{project_name}\" finished"
-            f" in {t_end - t_start:.2f} seconds"
+            f" in {t_end - t_start:.2f}s"
         ))
 
     def update_project_types(
