@@ -1029,19 +1029,40 @@ class EventProcessor:
             self._log.info("Unhandled entity update event")
 
     def _handle_create_event(self, entity_data: EntityEventData) -> None:
+        if entity_data.entity_type not in ("folder", "task"):
+            self._log.info(
+                f"Unhandled create event for type '{entity_data.entity_type}'"
+            )
+            return
+
+        project_name = entity_data.project_name
+        project_settings = ayon_api.get_addons_settings(
+            project_name=project_name
+        )
+        if not self._is_project_enabled(
+            project_name,
+            project_settings=project_settings,
+        ):
+            return
+
         if entity_data.entity_type == "folder":
-            self._handle_create_folder_event(entity_data)
+            self._handle_create_folder_event(entity_data, project_settings)
         elif entity_data.entity_type == "task":
-            self._handle_create_task_event(entity_data)
-        else:
-            self._log.info("Unhandled entity create event")
+            self._handle_create_task_event(entity_data, project_settings)
 
     def _handle_create_folder_event(
-        self, entity_data: EntityEventData
+        self, entity_data: EntityEventData, project_settings: dict[str, Any]
     ) -> None:
-        ay_entity = entity_data.get_ayon_entity()
+        ay_entity = ayon_api.get_folder_by_id(
+            entity_data.project_name,
+            entity_data.entity_id,
+            own_attributes=True,
+        )
         if not ay_entity:
             return
+
+        # This is a little bit hacky
+        entity_data._ayon_entity = ay_entity
 
         ay_path = ay_entity["path"]
         src_name_low = ay_entity["name"].lower()
@@ -1133,23 +1154,47 @@ class EventProcessor:
             "select id from CustomAttributeConfiguration"
             f" where key is '{CUST_ATTR_KEY_SERVER_ID}'"
         ).first()
-        if not server_id_def:
-            return
+        if server_id_def:
+            op = self._get_ft_attr_value_operation(
+                server_id_def["id"],
+                new_id,
+                True,
+                ay_entity["id"],
+                None
+            )
+            self._session.recorded_operations.push(op)
+            self._session.commit()
 
-        op = self._get_ft_attr_value_operation(
-            server_id_def["id"],
-            new_id,
-            True,
-            ay_entity["id"],
-            None
+        ft_entity = self._session.query(
+            f"select id from TypedContext where id is '{new_id}'"
+        ).one()
+
+        new_attribs = {
+            key: value
+            for key, value in ay_entity["ownAttrib"].items()
+            if value is not None
+        }
+        if new_attribs:
+            self._update_attribs(
+                entity_data,
+                ft_entity,
+                new_attribs,
+                project_settings,
+            )
+
+    def _handle_create_task_event(
+        self, entity_data: EntityEventData, project_settings: dict[str, Any]
+    ) -> None:
+        ay_entity = ayon_api.get_task_by_id(
+            entity_data.project_name,
+            entity_data.entity_id,
+            own_attributes=True,
         )
-        self._session.recorded_operations.push(op)
-        self._session.commit()
-
-    def _handle_create_task_event(self, entity_data: EntityEventData) -> None:
-        ay_entity = entity_data.get_ayon_entity()
         if not ay_entity:
             return
+
+        # This is a little bit hacky
+        entity_data._ayon_entity = ay_entity
 
         src_name = ay_entity["name"]
         src_name_low = src_name.lower()
@@ -1238,18 +1283,33 @@ class EventProcessor:
             "select id from CustomAttributeConfiguration"
             f" where key is '{CUST_ATTR_KEY_SERVER_ID}'"
         ).first()
-        if not server_id_def:
-            return
+        if server_id_def:
+            op = self._get_ft_attr_value_operation(
+                server_id_def["id"],
+                new_id,
+                True,
+                ay_entity["id"],
+                None
+            )
+            self._session.recorded_operations.push(op)
+            self._session.commit()
 
-        op = self._get_ft_attr_value_operation(
-            server_id_def["id"],
-            new_id,
-            True,
-            ay_entity["id"],
-            None
-        )
-        self._session.recorded_operations.push(op)
-        self._session.commit()
+        ft_entity = self._session.query(
+            f"select id from TypedContext where id is '{new_id}'"
+        ).one()
+
+        new_attribs = {
+            key: value
+            for key, value in ay_entity["ownAttrib"].items()
+            if value is not None
+        }
+        if new_attribs:
+            self._update_attribs(
+                entity_data,
+                ft_entity,
+                new_attribs,
+                project_settings,
+            )
 
     def _find_ftrack_entity(
         self,
@@ -1605,6 +1665,20 @@ class EventProcessor:
             return
 
         new_attribs = entity_data.changes["new"]["attrib"]
+        self._update_attribs(
+            entity_data,
+            ft_entity,
+            new_attribs,
+            project_settings,
+        )
+
+    def _update_attribs(
+        self,
+        entity_data: EntityEventData,
+        ft_entity: "FtrackEntityType",
+        new_attribs: dict[str, Any],
+        project_settings: dict[str, Any],
+    ) -> None:
         new_attrib_names = set(new_attribs)
         default_keys = {
             name
