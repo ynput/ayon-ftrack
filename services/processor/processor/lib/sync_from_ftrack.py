@@ -705,20 +705,25 @@ class SyncFromFtrack:
         project_entity = self._entity_hub.project_entity
         ignored_folder_types = {"task", "milestone"}
         src_folder_types = {
-            folder_type["name"]: folder_type
+            folder_type["name"].lower(): folder_type
             for folder_type in project_entity.folder_types
             if folder_type["name"].lower() not in ignored_folder_types
         }
         src_task_types = {
-            task_type["name"]: task_type
+            task_type["name"].lower(): task_type
             for task_type in project_entity.task_types
         }
 
         new_folder_types = []
         for object_type in sorted(object_types, key=lambda o: o["sort"]):
             name = object_type["name"]
-            src_folder_type = src_folder_types.get(name)
+            src_folder_type = src_folder_types.get(name.lower())
             if src_folder_type is not None:
+                if src_folder_type["name"] != name:
+                    old_name = src_folder_type["name"]
+                    src_folder_type["name"] = name
+                    src_folder_type["original_name"] = old_name
+
                 new_folder_types.append(src_folder_type)
             else:
                 new_folder_types.append({"name": name})
@@ -726,8 +731,12 @@ class SyncFromFtrack:
         new_task_types = []
         for task_type in task_types:
             name = task_type["name"]
-            src_task_type = src_task_types.get(name)
+            src_task_type = src_task_types.get(name.lower())
             if src_task_type is not None:
+                if src_task_type["name"] != name:
+                    old_name = src_task_type["name"]
+                    src_task_type["name"] = name
+                    src_task_type["original_name"] = old_name
                 new_task_types.append(src_task_type)
             else:
                 new_task_types.append({
