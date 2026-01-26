@@ -170,7 +170,7 @@ def integrate_ftrack_metadata_enum():
 class IntegrateFtrackInstanceModel(BaseSettingsModel):
     _isGroup = True
     product_base_type_mapping: list[IntegrateFtrackFamilyMapping] = SettingsField(
-        title="Product type Mapping",
+        title="Product base type Mapping",
         default_factory=list,
     )
     keep_first_product_name_for_review: bool = SettingsField(
