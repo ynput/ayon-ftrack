@@ -43,7 +43,7 @@ class IntegrateFtrackInstance(plugin.FtrackPublishInstancePlugin):
         "codec": "Codec"
     }
 
-    product_type_mapping = [
+    product_base_type_mapping = [
         {"name": "camera", "asset_type": "cam"},
         {"name": "look", "asset_type": "look"},
         {"name": "mayaAscii", "asset_type": "scene"},
@@ -86,14 +86,16 @@ class IntegrateFtrackInstance(plugin.FtrackPublishInstancePlugin):
 
         version_number = int(instance_version)
 
-        product_type = instance.data["productType"]
+        product_base_type = instance.data.get("productBaseType")
+        if not product_base_type:
+            product_base_type = instance.data["productType"]
 
         # Perform case-insensitive family mapping
-        product_type_low = product_type.lower()
+        product_base_type_low = product_base_type.lower()
         asset_type = instance.data.get("ftrackFamily")
         if not asset_type:
-            for item in self.product_type_mapping:
-                if item["name"].lower() == product_type_low:
+            for item in self.product_base_type_mapping:
+                if item["name"].lower() == product_base_type_low:
                     asset_type = item["asset_type"]
                     break
 
@@ -101,8 +103,8 @@ class IntegrateFtrackInstance(plugin.FtrackPublishInstancePlugin):
             asset_type = "upload"
 
         self.log.debug(
-            "Family: {}\nMapping: {}".format(
-                product_type_low, self.product_type_mapping)
+            f"Product base type: {product_base_type_low}"
+            f"\nMapping: {self.product_base_type_mapping}"
         )
         status_name = self._get_asset_version_status_name(instance)
 
@@ -535,10 +537,15 @@ class IntegrateFtrackInstance(plugin.FtrackPublishInstancePlugin):
             return None
 
         # Prepare filtering data for new asset version status
-        anatomy_data = instance.data["anatomyData"]
-        task_type = anatomy_data.get("task", {}).get("type")
+        task_entity = instance.data.get("taskEntity")
+        task_type = None
+        if task_entity:
+            task_type = task_entity.get("taskType")
+        product_base_type = instance.data.get("productBaseType")
+        if not product_base_type:
+            product_base_type = instance.data["productType"]
         filtering_criteria = {
-            "product_types": instance.data["productType"],
+            "product_base_types": product_base_type,
             "host_names": instance.context.data["hostName"],
             "task_types": task_type
         }

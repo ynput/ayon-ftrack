@@ -36,12 +36,14 @@ class CollectFtrackFamily(plugin.FtrackPublishInstancePlugin):
             return
 
         host_name = instance.context.data["hostName"]
-        product_type = instance.data["productType"]
+        product_base_type = instance.data.get("productBaseType")
+        if not product_base_type:
+            product_base_type = instance.data["productType"]
         task_name = instance.data.get("task")
 
         filtering_criteria = {
             "host_names": host_name,
-            "product_types": product_type,
+            "product_base_types": product_base_type,
             "task_names": task_name
         }
         profile = filter_profiles(
@@ -57,10 +59,10 @@ class CollectFtrackFamily(plugin.FtrackPublishInstancePlugin):
             add_ftrack_family = profile["add_ftrack_family"]
             additional_filters = profile.get("advanced_filtering")
             if additional_filters:
-                families_set = set(families) | {product_type}
+                families_set = set(families) | {product_base_type}
                 self.log.info(
-                    "'{}' families used for additional filtering".format(
-                        families_set))
+                    f"'{families_set}' families used for additional filtering"
+                )
                 add_ftrack_family = self._get_add_ftrack_f_from_addit_filters(
                     additional_filters,
                     families_set,
@@ -73,9 +75,10 @@ class CollectFtrackFamily(plugin.FtrackPublishInstancePlugin):
             if "ftrack" not in families:
                 families.append("ftrack")
 
-        self.log.debug("{} 'ftrack' family for instance with '{}'".format(
-            result_str, product_type
-        ))
+        self.log.debug(
+            f"{result_str} 'ftrack' family for instance"
+            f" with '{product_base_type}'"
+        )
 
     def _get_add_ftrack_f_from_addit_filters(
         self, additional_filters, families, add_ftrack_family

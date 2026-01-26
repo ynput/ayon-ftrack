@@ -58,7 +58,9 @@ class IntegrateFtrackFarmStatus(plugin.FtrackPublishContextPlugin):
     def get_instances_with_statuse_names(self, context, instances):
         instances_with_status_names = []
         for instance in instances:
-            product_type = instance.data["productType"]
+            product_base_type = instance.data.get("productBaseType")
+            if not product_base_type:
+                product_base_type = instance.data["productType"]
             product_name = instance.data["productName"]
             task_entity = instance.data["ftrackTask"]
             host_name = context.data["hostName"]
@@ -70,7 +72,7 @@ class IntegrateFtrackFarmStatus(plugin.FtrackPublishContextPlugin):
                     "host_names": host_name,
                     "task_types": task_type,
                     "task_names": task_name,
-                    "product_types": product_type,
+                    "product_base_types": product_base_type,
                     "product_names": product_name,
                 },
                 logger=self.log
