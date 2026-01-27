@@ -6,6 +6,44 @@ import semver
 from .custom_attributes import DEFAULT_CUSTOM_ATTRIBUTES_SETTINGS
 
 
+def _convert_product_base_types(overrides):
+    publish_settings = overrides.get("publish")
+    if not publish_settings:
+        return
+    for combs in (
+        ("CollectFtrackFamily", "profiles"),
+        ("IntegrateFtrackInstance", "asset_versions_status_profiles"),
+        ("IntegrateFtrackFarmStatus", "farm_status_profiles"),
+    ):
+        settings = publish_settings
+        for key in combs:
+            if key not in settings:
+                settings = None
+                break
+            settings = settings[key]
+        if not settings:
+            continue
+
+        f_profile = settings[0]
+        if (
+            "product_base_types" in f_profile
+            or "product_types" not in f_profile
+        ):
+            continue
+
+        for profile in settings:
+            profile["product_base_types"] = profile.pop("product_types")
+
+    mapping = publish_settings.get("IntegrateFtrackInstance") or {}
+    if (
+        "product_type_mapping" in mapping
+        and "product_base_type_mapping" not in mapping
+    ):
+        mapping["product_base_type_mapping"] = (
+            mapping.pop("product_type_mapping")
+        )
+
+
 def _convert_integrate_ftrack_status_settings(overrides):
     """Convert settings of 'IntegrateFtrackFarmStatus' profiles.
 

@@ -117,7 +117,7 @@ class IntegrateFtrackStatusBase(plugin.FtrackPublishInstancePlugin):
                 "host_names": ["nuke"],
                 "task_types": ["Compositing"],
                 "task_names": ["Comp"],
-                "product_types": ["render"],
+                "product_base_types": ["render"],
                 "product_names": ["renderComp"],
                 "status_name": "Rendering",
             }
@@ -146,12 +146,19 @@ class IntegrateFtrackStatusBase(plugin.FtrackPublishInstancePlugin):
             self.fill_status(context, instance, status_name)
 
     def get_profile_filter_data(self, context, instance):
-        task_entity = instance.data["ftrackTask"]
+        task_entity = instance.data.get("taskEntity")
+        task_name = task_type = None
+        if task_entity:
+            task_name = task_entity["name"]
+            task_type = task_entity["taskType"]
+        product_base_type = instance.data.get("productBaseType")
+        if not product_base_type:
+            product_base_type = instance.data["productType"]
         return {
             "host_names": context.data["hostName"],
-            "task_types": task_entity["type"]["name"],
-            "task_names": task_entity["name"],
-            "product_types": instance.data["productType"],
+            "task_types": task_type,
+            "task_names": task_name,
+            "product_base_types": product_base_type,
             "product_names": instance.data["productName"],
         }
 

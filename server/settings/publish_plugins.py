@@ -27,9 +27,9 @@ class CollectFamilyProfile(BaseSettingsModel):
         default_factory=list,
         title="Host names",
     )
-    product_types: list[str] = SettingsField(
+    product_base_types: list[str] = SettingsField(
         default_factory=list,
-        title="Product types",
+        title="Product base types",
     )
     task_types: list[str] = SettingsField(
         default_factory=list,
@@ -134,9 +134,9 @@ class AssetVersionStatusProfile(BaseSettingsModel):
         default_factory=list,
         title="Host names",
     )
-    product_types: list[str] = SettingsField(
+    product_base_types: list[str] = SettingsField(
         default_factory=list,
-        title="Families",
+        title="Product base types",
     )
     task_types: list[str] = SettingsField(
         default_factory=list,
@@ -169,8 +169,8 @@ def integrate_ftrack_metadata_enum():
 
 class IntegrateFtrackInstanceModel(BaseSettingsModel):
     _isGroup = True
-    product_type_mapping: list[IntegrateFtrackFamilyMapping] = SettingsField(
-        title="Product type Mapping",
+    product_base_type_mapping: list[IntegrateFtrackFamilyMapping] = SettingsField(
+        title="Product base type Mapping",
         default_factory=list,
     )
     keep_first_product_name_for_review: bool = SettingsField(
@@ -189,7 +189,7 @@ class IntegrateFtrackInstanceModel(BaseSettingsModel):
         enum_resolver=integrate_ftrack_metadata_enum
     )
 
-    @validator("product_type_mapping")
+    @validator("product_base_type_mapping")
     def validate_unique_outputs(cls, value):
         ensure_unique_names(value)
         return value
@@ -209,9 +209,9 @@ class IntegrateFarmStartusProfile(BaseSettingsModel):
         default_factory=list,
         title="Task names",
     )
-    product_types: list[str] = SettingsField(
+    product_base_types: list[str] = SettingsField(
         default_factory=list,
-        title="Product types",
+        title="Product base types",
     )
     product_names: list[str] = SettingsField(
         title="Product names",
@@ -245,9 +245,9 @@ class FtrackTaskStatusProfile(BaseSettingsModel):
         default_factory=list,
         title="Task names",
     )
-    product_types: list[str] = SettingsField(
+    product_base_types: list[str] = SettingsField(
         default_factory=list,
-        title="Product types",
+        title="Product base types",
     )
     product_names: list[str] = SettingsField(
         default_factory=list,
@@ -371,7 +371,7 @@ DEFAULT_PUBLISH_SETTINGS = {
                 "host_names": [
                     "traypublisher"
                 ],
-                "product_types": [],
+                "product_base_types": [],
                 "task_types": [],
                 "task_names": [],
                 "add_ftrack_family": True,
@@ -381,7 +381,7 @@ DEFAULT_PUBLISH_SETTINGS = {
                 "host_names": [
                     "traypublisher"
                 ],
-                "product_types": [
+                "product_base_types": [
                     "matchmove",
                     "shot"
                 ],
@@ -394,7 +394,7 @@ DEFAULT_PUBLISH_SETTINGS = {
                 "host_names": [
                     "traypublisher"
                 ],
-                "product_types": [
+                "product_base_types": [
                     "plate",
                     "review",
                     "audio"
@@ -416,7 +416,7 @@ DEFAULT_PUBLISH_SETTINGS = {
                 "host_names": [
                     "maya"
                 ],
-                "product_types": [
+                "product_base_types": [
                     "model",
                     "setdress",
                     "animation",
@@ -436,7 +436,7 @@ DEFAULT_PUBLISH_SETTINGS = {
                     "houdini",
                     "max"
                 ],
-                "product_types": [],
+                "product_base_types": [],
                 "task_types": [],
                 "task_names": [],
                 "add_ftrack_family": False,
@@ -453,7 +453,7 @@ DEFAULT_PUBLISH_SETTINGS = {
                 "host_names": [
                     "tvpaint"
                 ],
-                "product_types": [
+                "product_base_types": [
                     "renderPass"
                 ],
                 "task_types": [],
@@ -465,7 +465,7 @@ DEFAULT_PUBLISH_SETTINGS = {
                 "host_names": [
                     "tvpaint"
                 ],
-                "product_types": [],
+                "product_base_types": [],
                 "task_types": [],
                 "task_names": [],
                 "add_ftrack_family": True,
@@ -475,7 +475,7 @@ DEFAULT_PUBLISH_SETTINGS = {
                 "host_names": [
                     "nuke"
                 ],
-                "product_types": [
+                "product_base_types": [
                     "write",
                     "render",
                     "prerender"
@@ -496,7 +496,7 @@ DEFAULT_PUBLISH_SETTINGS = {
                 "host_names": [
                     "aftereffects"
                 ],
-                "product_types": [
+                "product_base_types": [
                     "render",
                     "workfile"
                 ],
@@ -509,7 +509,7 @@ DEFAULT_PUBLISH_SETTINGS = {
                 "host_names": [
                     "flame"
                 ],
-                "product_types": [
+                "product_base_types": [
                     "plate",
                     "take"
                 ],
@@ -522,7 +522,7 @@ DEFAULT_PUBLISH_SETTINGS = {
                 "host_names": [
                     "photoshop"
                 ],
-                "product_types": [
+                "product_base_types": [
                     "review"
                 ],
                 "task_types": [],
@@ -553,7 +553,7 @@ DEFAULT_PUBLISH_SETTINGS = {
         "enabled": True
     },
     "IntegrateFtrackInstance": {
-        "product_type_mapping": [
+        "product_base_type_mapping": [
             {
                 "name": "camera",
                 "asset_type": "cam"
@@ -664,7 +664,7 @@ DEFAULT_PUBLISH_SETTINGS = {
                 ],
                 "task_types": [],
                 "task_names": [],
-                "product_types": [
+                "product_base_types": [
                     "render"
                 ],
                 "product_names": [],
