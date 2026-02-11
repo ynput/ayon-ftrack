@@ -210,7 +210,7 @@ class FtrackAddon(
         else:
             settings = get_studio_settings()
 
-        if not is_ftrack_enabled_in_settings(settings):
+        if not is_ftrack_enabled_in_settings(settings["ftrack"]):
             return
 
         # Not sure if this should crash or silently continue?
