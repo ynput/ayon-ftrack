@@ -130,7 +130,7 @@ class IntegrateFtrackNoteModel(BaseSettingsModel):
         "",
         title="Note template",
         description=(
-            "Template may contain formatting keys <b>intent</b>,"
+            "Template may contain formatting keys"
             " <b>comment</b>, <b>host_name</b>, <b>app_name</b>,"
             " <b>app_label</b>, <b>published_paths</b> and <b>source</b>."
         )
@@ -348,7 +348,7 @@ class FtrackPublishPlugins(BaseSettingsModel):
             description="Add description to integrated AssetVersion.",
         )
     )
-    IntegrateFtrackNote: IntegrateFtrackDescriptionModel = (
+    IntegrateFtrackNote: IntegrateFtrackNoteModel = (
         SettingsField(
             title="Integrate ftrack Note",
             default_factory=IntegrateFtrackNoteModel,
