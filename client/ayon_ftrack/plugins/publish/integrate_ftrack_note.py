@@ -64,7 +64,10 @@ class IntegrateFtrackNote(plugin.FtrackPublishInstancePlugin):
         labels = []
         if self.note_labels:
             all_labels = session.query("select id, name from NoteLabel").all()
-            labels_by_low_name = {lab["name"].lower(): lab for lab in all_labels}
+            labels_by_low_name = {
+                lab["name"].lower(): lab
+                for lab in all_labels
+            }
             for _label in self.note_labels:
                 label = labels_by_low_name.get(_label.lower())
                 if not label:
