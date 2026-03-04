@@ -47,7 +47,7 @@ class IntegrateFtrackNote(plugin.FtrackPublishInstancePlugin):
         if not comment:
             self.log.debug("Comment is not set.")
         else:
-            self.log.debug("Comment is set to `{}`".format(comment))
+            self.log.debug(f"Comment is set to '{comment}'")
 
         session = context.data["ftrackSession"]
 
@@ -71,9 +71,7 @@ class IntegrateFtrackNote(plugin.FtrackPublishInstancePlugin):
             for _label in self.note_labels:
                 label = labels_by_low_name.get(_label.lower())
                 if not label:
-                    self.log.warning(
-                        "Note Label `{}` was not found.".format(_label)
-                    )
+                    self.log.warning(f"Note Label `{_label}` was not found.")
                     continue
 
                 labels.append(label)
