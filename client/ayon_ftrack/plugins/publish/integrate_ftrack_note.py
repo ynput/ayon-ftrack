@@ -27,7 +27,7 @@ class IntegrateFtrackNote(plugin.FtrackPublishInstancePlugin):
 
     # Can be set in presets:
     # - Allows only `comment` keys
-    note_template = None
+    note_template = ""
     # - note label must exist in ftrack
     note_labels = []
 
@@ -95,11 +95,7 @@ class IntegrateFtrackNote(plugin.FtrackPublishInstancePlugin):
             for component_item in component_items:
                 published_paths.add(component_item["component_path"])
 
-            # Backwards compatibility for older settings using
-            #   attribute 'note_with_intent_template'
             template = self.note_template
-            if template is None:
-                template = self.note_with_intent_template
             format_data = copy.deepcopy(base_format_data)
             format_data["published_paths"] = "<br/>".join(
                 sorted(published_paths)
