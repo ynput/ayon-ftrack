@@ -123,6 +123,24 @@ class IntegrateFtrackDescriptionModel(BaseSettingsModel):
     )
 
 
+class IntegrateFtrackNoteModel(BaseSettingsModel):
+    _isGroup = True
+    enabled: bool = False
+    note_template: str = SettingsField(
+        "",
+        title="Note template",
+        description=(
+            "Template may contain formatting keys <b>intent</b>,"
+            " <b>comment</b>, <b>host_name</b>, <b>app_name</b>,"
+            " <b>app_label</b>, <b>published_paths</b> and <b>source</b>."
+        )
+    )
+    note_labels: list[str] = SettingsField(
+        title="Note labels",
+        default_factory=list,
+    )
+
+
 class IntegrateFtrackComponentOverwriteModel(BaseSettingsModel):
     _isGroup = True
     enabled: bool = True
@@ -328,6 +346,13 @@ class FtrackPublishPlugins(BaseSettingsModel):
             title="Integrate ftrack Description",
             default_factory=IntegrateFtrackDescriptionModel,
             description="Add description to integrated AssetVersion.",
+        )
+    )
+    IntegrateFtrackNote: IntegrateFtrackDescriptionModel = (
+        SettingsField(
+            title="Integrate ftrack Note",
+            default_factory=IntegrateFtrackNoteModel,
+            description="Use publish comment as note on Asset Version",
         )
     )
     IntegrateFtrackComponentOverwrite: IntegrateFtrackComponentOverwriteModel = SettingsField(
@@ -544,6 +569,11 @@ DEFAULT_PUBLISH_SETTINGS = {
         "optional": True,
         "active": True,
         "description_template": "{comment}"
+    },
+    "IntegrateFtrackNote": {
+        "enabled": False,
+        "note_template": "{comment}",
+        "note_labels": []
     },
     "ValidateFtrackAttributes": {
         "enabled": False,
