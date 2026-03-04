@@ -132,4 +132,3 @@ class IntegrateFtrackNote(plugin.FtrackPublishInstancePlugin):
                 session.rollback()
                 session._configure_locations()
                 raise exc
-
