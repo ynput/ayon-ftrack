@@ -43,7 +43,7 @@ def callback(event):
 
 def _trigger_leecher_started_event(session: ftrack_api.Session):
     user = session.query(
-        "User where username is \"{}\"".format(session.api_user)
+        f"User where username is \"{session.api_user}\""
     ).one()
     user_data = {
         "username": user["username"],
