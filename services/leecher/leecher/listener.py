@@ -8,6 +8,8 @@ from typing import Any
 
 import ftrack_api
 import ayon_api
+from ayon_api.graphql_queries import events_graphql_query
+from ayon_api.exceptions import HTTPRequestError
 
 IGNORE_TOPICS = {
     "ftrack.meta.connected",
@@ -31,32 +33,97 @@ def callback(event):
     event_data = event._data
     description = create_event_description(event_data)
 
-    ayon_api.dispatch_event(
-        "ftrack.leech",
-        sender=ayon_api.ServiceContext.service_name,
-        event_hash=event_data["id"],
-        description=description,
-        payload=event_data,
-    )
+    try:
+        ayon_api.dispatch_event(
+            "ftrack.leech",
+            sender=ayon_api.ServiceContext.service_name,
+            event_hash=event_data["id"],
+            description=description,
+            payload=event_data,
+        )
+    except HTTPRequestError as exc:
+        if exc.response.status_code != 409:
+            raise
+        log.info(f"Event {event_data['topic']} already stored.")
+
     log.info(f"Stored event {event_data['topic']}")
+
+
+def _has_pending_start_event() -> bool:
+    query = events_graphql_query({"id"}, None, False)
+    events_field = query.get_field_by_path("events")
+    try:
+        text_filter_var = query.add_variable("textFilter", "String!")
+        events_field.set_filter("filter", text_filter_var)
+    except KeyError:
+        pass
+    try:
+        last_n_var = query.add_variable("lastFilter", "Int!")
+        events_field.set_filter("last", last_n_var)
+    except KeyError:
+        pass
+    events_field.set_limit(1)
+
+    query.set_variable_value("eventTopics", ["ftrack.leech"])
+    query.set_variable_value("lastFilter", 1)
+    query.set_variable_value(
+        "textFilter", "ayon.ftrack.leecher.started.ynternal"
+    )
+
+    con = ayon_api.get_server_api_connection()
+    src_event = None
+    for parsed_data in query.continuous_query(con):
+        for event in parsed_data["events"]:
+            src_event = event
+
+    if src_event is None:
+        return False
+
+    response = ayon_api.post(
+        "query",
+        entity="event",
+        filter={
+            "conditions": [
+                {"key": "topic", "value": "ftrack.proc"},
+                {"key": "depends_on", "value": src_event["id"]},
+            ]
+        },
+        limit=1,
+    )
+    response.raise_for_status()
+    if response.data:
+        return False
+    return True
 
 
 def _trigger_leecher_started_event(session: ftrack_api.Session):
     user = session.query(
-        "User where username is \"{}\"".format(session.api_user)
+        f"User where username is \"{session.api_user}\""
     ).one()
     user_data = {
         "username": user["username"],
         "id": user["id"]
     }
+    # Publish internal ftrack event directly to AYON (skip ftrack)
+    # - do not trigger the event if there already is one unprocessed
+    if _has_pending_start_event():
+        return
 
-    session.event_hub.publish(
-        ftrack_api.event.base.Event(
-            topic="ayon.ftrack.leecher.started",
-            data={},
-            source=dict(user=user_data)
-        ),
-        on_error="ignore"
+    print("Triggering internal ftrack event to AYON.")
+    topic = "ayon.ftrack.leecher.started.ynternal"
+    event = ftrack_api.event.base.Event(
+        topic=topic,
+        data={},
+        source=dict(user=user_data)
+    )
+    event_data = event._data
+
+    ayon_api.dispatch_event(
+        "ftrack.leech",
+        sender=ayon_api.ServiceContext.service_name,
+        event_hash=event_data["id"],
+        description=topic,
+        payload=event_data,
     )
 
 
@@ -168,8 +235,8 @@ def main_loop():
         while not session.event_hub.connected:
             time.sleep(0.1)
 
-        _trigger_leecher_started_event(session)
         session.event_hub.subscribe("topic=*", callback)
+        _trigger_leecher_started_event(session)
         session.event_hub.wait()
 
 

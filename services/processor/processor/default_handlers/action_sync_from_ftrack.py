@@ -51,7 +51,7 @@ class SyncFromFtrackAction(ServerAction):
 
         # Listen to leecher start event
         self.session.event_hub.subscribe(
-            "topic=ayon.ftrack.leecher.started",
+            "topic=ayon.ftrack.leecher.started.ynternal",
             self._on_leecher_start,
             priority=self.priority
         )
