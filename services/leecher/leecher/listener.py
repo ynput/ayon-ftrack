@@ -168,8 +168,9 @@ def main_loop():
         while not session.event_hub.connected:
             time.sleep(0.1)
 
-        _trigger_leecher_started_event(session)
+
         session.event_hub.subscribe("topic=*", callback)
+        _trigger_leecher_started_event(session)
         session.event_hub.wait()
 
 
