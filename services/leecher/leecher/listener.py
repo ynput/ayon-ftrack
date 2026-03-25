@@ -55,8 +55,7 @@ def _trigger_leecher_started_event(session: ftrack_api.Session):
             topic="ayon.ftrack.leecher.started",
             data={},
             source=dict(user=user_data)
-        ),
-        on_error="ignore"
+        )
     )
 
 
