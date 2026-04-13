@@ -132,6 +132,14 @@ class AppplicationsAction(BaseAction):
         if items:
             return {"items": items}
 
+    def _convert_icon(self, icon):
+        if icon["type"] != "url":
+            return None
+        icon_url = icon["url"]
+        if not icon_url.startswith("/"):
+            return icon_url
+        return f"{ayon_api.get_base_url()}/{icon_url.lstrip('/')}"
+
     def discover(self, session, entities, event):
         """Return true if we can handle the selected entities.
 
@@ -193,7 +201,7 @@ class AppplicationsAction(BaseAction):
                         app_info.addon_version,
                         app_info.identifier,
                     )),
-                    "icon": app_info.icon,
+                    "icon": self._convert_icon(app_info.icon),
                 })
             return items
 
@@ -216,15 +224,6 @@ class AppplicationsAction(BaseAction):
                 group_label = variant_label or identifier
                 variant_label = None
 
-            icon_url = None
-            icon = action["icon"]
-            if icon["type"] == "url":
-                icon_url = icon["url"]
-                if icon_url.startswith("/"):
-                    icon_url = (
-                        f"{ayon_api.get_base_url()}/{icon_url.lstrip('/')}"
-                    )
-
             addon_name = action["addonName"]
             addon_version = action["addonVersion"]
             items.append({
@@ -237,7 +236,7 @@ class AppplicationsAction(BaseAction):
                     addon_version,
                     identifier,
                 )),
-                "icon": icon_url,
+                "icon": self._convert_icon(action["icon"]),
             })
         return items
 
