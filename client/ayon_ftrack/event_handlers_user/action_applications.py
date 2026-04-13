@@ -1,34 +1,27 @@
+import os
 import time
-from typing import Optional
-from urllib.parse import urlparse, urlunparse
+from urllib.parse import urlencode
 
 import ayon_api
 
 from ayon_core.addon import AddonsManager
+from ayon_core.lib import get_settings_variant
+from ayon_core.lib.execute import (
+    run_detached_ayon_launcher_process,
+    clean_envs_for_ayon_process,
+)
+
 from ayon_ftrack.common import (
     is_ftrack_enabled_in_settings,
     get_folder_path_for_entities,
     BaseAction,
 )
-from ayon_applications import (
-    ApplicationLaunchFailed,
-    ApplicationExecutableNotFound,
-)
 try:
-    from ayon_applications.utils import get_applications_for_context
+    from ayon_applications.utils import get_applications_action_info_for_task
 except ImportError:
-    # Backwards compatibility for older ayon-applications addon
-    def get_applications_for_context(
-        project_name,
-        folder_entity,
-        task_entity,
-        project_settings,
-        project_entity,
-    ):
-        ayon_project_apps = project_entity["attrib"].get("applications")
-        if ayon_project_apps:
-            return ayon_project_apps
-        return []
+    get_applications_action_info_for_task = None
+
+IDENTIFIER_PREFIX = "application.launch."
 
 
 class AppplicationsAction(BaseAction):
@@ -183,67 +176,70 @@ class AppplicationsAction(BaseAction):
         task_entity = ayon_api.get_task_by_name(
             project_name, folder_entity["id"], task_name
         )
-
-        only_available = project_settings["applications"].get(
-            "only_available", False
-        )
-
-        app_names = get_applications_for_context(
-            project_name,
-            folder_entity,
-            task_entity,
-            project_settings=project_settings,
-            project_entity=ayon_project_entity
-        )
         items = []
-        for app_name in app_names:
-            app = self.applications_manager.applications.get(app_name)
-            if not app or not app.enabled:
+        if get_applications_action_info_for_task is not None:
+            for app_info in get_applications_action_info_for_task(
+                project_name,
+                task_entity["id"],
+                task_entity["taskType"],
+            ):
+                items.append({
+                    "label": app_info.group_label,
+                    "variant": app_info.variant_label,
+                    "description": None,
+                    "actionIdentifier": "|".join((
+                        self.launch_identifier_with_id,
+                        app_info.addon_name,
+                        app_info.addon_version,
+                        app_info.identifier,
+                    )),
+                    "icon": app_info.icon,
+                })
+            return items
+
+        variant = get_settings_variant()
+        for action in ayon_api.get_actions(
+            project_name,
+            entity_type="task",
+            entity_ids=[task_entity["id"]],
+            entity_subtypes=[task_entity["taskType"]],
+            variant=variant,
+            mode="simple",
+        ):
+            if not action["identifier"].startswith(IDENTIFIER_PREFIX):
                 continue
 
-            # Skip applications without valid executables
-            if only_available and not app.find_executable():
-                continue
+            identifier = action["identifier"]
+            variant_label = action["label"]
+            group_label = action.get("groupLabel")
+            if not group_label:
+                group_label = variant_label or identifier
+                variant_label = None
 
-            app_icon = self.applications_addon.get_app_icon_url(
-                app.icon, server=False
-            )
+            icon_url = None
+            icon = action["icon"]
+            if icon["type"] == "url":
+                icon_url = icon["url"]
+                if icon_url.startswith("/"):
+                    icon_url = (
+                        f"{ayon_api.get_base_url()}/{icon_url.lstrip('/')}"
+                    )
+
+            addon_name = action["addonName"]
+            addon_version = action["addonVersion"]
             items.append({
-                "label": app.group.label,
-                "variant": app.label,
+                "label": group_label,
+                "variant": variant_label,
                 "description": None,
-                "actionIdentifier": "{}.{}".format(
-                    self.launch_identifier_with_id, app_name
-                ),
-                "icon": self._get_icon_mapping(app_icon),
+                "actionIdentifier": "|".join((
+                    self.launch_identifier_with_id,
+                    addon_name,
+                    addon_version,
+                    identifier,
+                )),
+                "icon": icon_url,
             })
-
         return items
-
-    def _get_icon_mapping(self, icon: Optional[str]):
-        """Get icon mapping.
-
-        This function does create and store mapping of icon url. Urls with
-            '127.0.0.1' IP address are replaced with 'localhost'. Otherwise
-            is icon kept as was.
-
-        """
-        if not icon:
-            return icon
-
-        if icon not in self._icons_mapping:
-            # ftrack frontend does not allow redirect to IP address, but
-            #   allows redirect to 'localhost'
-            result = urlparse(icon)
-            if result.hostname == "127.0.0.1":
-                port = ""
-                if result.port:
-                    port = f":{result.port}"
-                icon = urlunparse(
-                    result._replace(netloc=f"localhost{port}")
-                )
-            self._icons_mapping[icon] = icon
-        return self._icons_mapping[icon]
 
     def _launch(self, event):
         event_identifier = event["data"]["actionIdentifier"]
@@ -279,54 +275,64 @@ class AppplicationsAction(BaseAction):
 
         *event* the unmodified original event
         """
-        identifier = event["data"]["actionIdentifier"]
-        id_identifier_len = len(self.launch_identifier_with_id) + 1
-        app_name = identifier[id_identifier_len:]
+        parts = event["data"]["actionIdentifier"].split("|")
+        _ = parts.pop(0)
+        addon_name = parts.pop(0)
+        addon_version = parts.pop(0)
+        action_id = "|".join(parts)
+
+        conn = ayon_api.get_server_api_connection()
+        headers = conn.get_headers()
+        if "referer" in headers:
+            headers = None
+        else:
+            headers["referer"] = conn.get_base_url()
 
         entity = entities[0]
-
-        task_name = entity["name"]
+        ft_project = self.get_project_from_entity(entity)
+        project_name = ft_project["full_name"]
         folder_path = self._get_folder_path(session, entity["parent"])
-        project_name = entity["project"]["full_name"]
-        self.log.info(
-            f"ftrack launch app: \"{app_name}\""
-            f" on {project_name}{folder_path}/{task_name}"
+        task_name = entity["name"]
+        folder_entity = ayon_api.get_folder_by_path(project_name, folder_path)
+        task_entity = ayon_api.get_task_by_name(
+            project_name, folder_entity["id"], task_name
         )
-        try:
-            self.applications_manager.launch(
-                app_name,
-                project_name=project_name,
-                folder_path=folder_path,
-                task_name=task_name
-            )
+        variant = get_settings_variant()
+        query = {
+            "addonName": addon_name,
+            "addonVersion": addon_version,
+            "identifier": action_id,
+            "variant": variant,
+        }
+        url = f"actions/execute?{urlencode(query)}"
+        request_data = {
+            "projectName": project_name,
+            "entityType": "task",
+            "entityIds": [task_entity["id"]],
+        }
+        response = ayon_api.raw_post(
+            url, headers=headers, json=request_data
+        )
+        response.raise_for_status()
 
-        except ApplicationExecutableNotFound as exc:
-            self.log.warning(exc.exc_msg)
+        data = response.data
+        if data["type"] != "launcher":
             return {
                 "success": False,
-                "message": exc.msg
+                "message": "Not launched. Unknown action type."
             }
+        uri = data["payload"]["uri"]
 
-        except ApplicationLaunchFailed as exc:
-            self.log.error(str(exc))
-            return {
-                "success": False,
-                "message": str(exc)
-            }
-
-        except Exception:
-            msg = "Unexpected failure of application launch {}".format(
-                self.label
-            )
-            self.log.error(msg, exc_info=True)
-            return {
-                "success": False,
-                "message": msg
-            }
+        # Remove bundles from environment variables
+        env = os.environ.copy()
+        env.pop("AYON_BUNDLE_NAME", None)
+        env.pop("AYON_STUDIO_BUNDLE_NAME", None)
+        env = clean_envs_for_ayon_process(env)
+        run_detached_ayon_launcher_process(uri, env=env)
 
         return {
             "success": True,
-            "message": "Launching {0}".format(self.label)
+            "message": "Application launched",
         }
 
     def _get_folder_path(self, session, entity):
