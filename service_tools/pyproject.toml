@@ -1,0 +1,10 @@
+[project]
+name = "ftrack-services"
+version = "1.0.0"
+description = "Tools for developing/testing ftrack services"
+authors = [{name = "Ynput s.r.o.", email ="info@ynput.io"}]
+requires-python = ">=3.9"
+dependencies = [
+    "ayon-python-api>=1.2.14",
+    "ftrack-python-api>=3.1.0"
+]

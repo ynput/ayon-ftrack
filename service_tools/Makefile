@@ -20,7 +20,7 @@ Optional arguments for service targets:
 --variant [variant] (Define settings variant. default: 'production')
 
 Runtime targets:
-	install    Install requirements to currently actie python (recommended to create venv)
+	install    Install requirements
 	leecher    Start leecher of ftrack events
 	processor  Main processing logic
 	services   Start both leecher and processor (experimental)
@@ -32,26 +32,25 @@ help:
 	@echo "$$HELP_INFO"
 
 install:
-		$(shell [[ -d $(CURDIR)/venv ]] || python -m venv $(CURDIR)/venv) && \
-		. $(CURDIR)/venv/bin/activate && python -m pip install -r "$(CURDIR)/requirements.txt"
+		uv sync
 
 leecher:
 		export AYON_ADDON_NAME="ftrack" && \
 		export AYON_ADDON_VERSION=$(VERSION) && \
 		. $(CURDIR)/venv/bin/activate && \
-		python "$(CURDIR)/main.py" --service leecher $@
+		uv run "$(CURDIR)/main.py" --service leecher $@
 
 processor:
 		export AYON_ADDON_NAME="ftrack" && \
 		export AYON_ADDON_VERSION=$(VERSION) && \
 		. $(CURDIR)/venv/bin/activate && \
-		python "$(CURDIR)/main.py" --service processor $@
+		uv run "$(CURDIR)/main.py" --service processor $@
 
 transmitter:
 		export AYON_ADDON_NAME="ftrack" && \
 		export AYON_ADDON_VERSION=$(VERSION) && \
 		. $(CURDIR)/venv/bin/activate && \
-		python "$(CURDIR)/main.py" --service transmitter $@
+		uv run "$(CURDIR)/main.py" --service transmitter $@
 
 ayon2ftrack: transmitter
 
