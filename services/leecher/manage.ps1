@@ -62,7 +62,7 @@ function load-env {
 function dev {
   load-env
   & docker run --rm -ti `
-    -v "$($script_dir):/service" `
+    -v "$($script_dir):/serviceasdasdasd" `
   	--hostname ftrackproc `
   	--env AYON_API_KEY=$env:AYON_API_KEY `
   	--env AYON_SERVER_URL=$env:AYON_SERVER_URL `
