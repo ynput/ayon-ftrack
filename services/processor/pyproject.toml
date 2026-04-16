@@ -6,7 +6,7 @@ authors = [{name = "Ynput s.r.o.", email ="info@ynput.io"}]
 dependencies = [
     "platformdirs",
     "ayon-python-api==1.2.16",
-    "ftrack-python-api==2.3.3"
+    "ftrack-python-api==3.1.0"
 ]
 
 [tool.setuptools]
