@@ -189,9 +189,6 @@ class CustomEventHubSession(ftrack_api.session.Session):
         )
         self.request_timeout = timeout
 
-        # Auto populating state is now thread-local
-        self._auto_populate = collections.defaultdict(lambda: auto_populate)
-
         # Fetch server information and in doing so also check credentials.
         self._server_information = self._fetch_server_information()
 
