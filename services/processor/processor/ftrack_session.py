@@ -7,9 +7,9 @@ import time
 import queue
 import collections
 
-import appdirs
 import arrow
 import requests
+import platformdirs
 import ftrack_api  # noqa: F401
 import ftrack_api.session
 import ftrack_api.cache
@@ -166,6 +166,9 @@ class CustomEventHubSession(ftrack_api.session.Session):
         schema_cache_path=None,
         plugin_arguments=None,
         timeout=60,
+        cookies=None,
+        headers=None,
+        strict_api=False,
         **kwargs,
     ):
         self.kwargs = kwargs
@@ -185,7 +188,7 @@ class CustomEventHubSession(ftrack_api.session.Session):
                 "in environment variable FTRACK_SERVER."
             )
 
-        self._server_url = server_url
+        self._server_url = server_url.rstrip("/")
 
         if api_key is None:
             api_key = os.environ.get(
@@ -251,11 +254,38 @@ class CustomEventHubSession(ftrack_api.session.Session):
             if cache is not None:
                 self.cache.caches.append(cache)
 
-        if new_api:
-            self.merge_lock = threading.RLock()
-
+        self._thread_lock = threading.RLock()
         self._managed_request = None
         self._request = requests.Session()
+
+        if cookies:
+            if not isinstance(cookies, collections.abc.Mapping):
+                raise TypeError(
+                    "The cookies argument is required to be a mapping."
+                )
+            self._request.cookies.update(cookies)
+
+        if headers:
+            if not isinstance(headers, collections.abc.Mapping):
+                raise TypeError(
+                    "The headers argument is required to be a mapping."
+                )
+
+            headers = dict(headers)
+
+        else:
+            headers = {}
+
+        if not isinstance(strict_api, bool):
+            raise TypeError(
+                "The strict_api argument is required to be a boolean."
+            )
+
+        headers.update({
+            "ftrack-strict-api": "true" if strict_api is True else "false"
+        })
+
+        self._request.headers.update(headers)
         self._request.auth = ftrack_api.session.SessionAuthentication(
             self._api_key, self._api_user
         )
@@ -274,6 +304,11 @@ class CustomEventHubSession(ftrack_api.session.Session):
         if auto_connect_event_hub:
             # Connect to event hub in background thread so as not to block main
             # session usage waiting for event hub connection.
+
+            # set the connection as initialising from the main thread so that
+            # we can queue up any potential published messages.
+            self._event_hub.init_connection()
+
             self._auto_connect_event_hub_thread = threading.Thread(
                 target=self._event_hub.connect
             )
@@ -294,7 +329,7 @@ class CustomEventHubSession(ftrack_api.session.Session):
         # rebuilding types)?
         if schema_cache_path is not False:
             if schema_cache_path is None:
-                schema_cache_path = appdirs.user_cache_dir()
+                schema_cache_path = platformdirs.user_cache_dir()
                 schema_cache_path = os.environ.get(
                     "FTRACK_API_SCHEMA_CACHE_PATH", schema_cache_path
                 )

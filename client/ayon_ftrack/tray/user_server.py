@@ -31,7 +31,7 @@ class SocketBaseEventHub(ftrack_api.event.hub.EventHub):
 
     def __init__(self, *args, **kwargs):
         self.sock = kwargs.pop("sock")
-        super(SocketBaseEventHub, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def _handle_packet(self, code, packet_identifier, path, data):
         """Override `_handle_packet` which extend heartbeat"""
@@ -44,7 +44,7 @@ class SocketBaseEventHub(ftrack_api.event.hub.EventHub):
             self.sock.sendall(self.hearbeat_msg)
             return self._send_packet(self._code_name_mapping["heartbeat"])
 
-        return super(SocketBaseEventHub, self)._handle_packet(
+        return super()._handle_packet(
             code, packet_identifier, path, data
         )
 
@@ -52,10 +52,22 @@ class SocketBaseEventHub(ftrack_api.event.hub.EventHub):
 class CustomEventHubSession(ftrack_api.session.Session):
     '''An isolated session for interaction with an ftrack server.'''
     def __init__(
-        self, server_url=None, api_key=None, api_user=None, auto_populate=True,
-        plugin_paths=None, cache=None, cache_key_maker=None,
-        auto_connect_event_hub=False, schema_cache_path=None,
-        plugin_arguments=None, timeout=60, **kwargs
+        self,
+        server_url=None,
+        api_key=None,
+        api_user=None,
+        auto_populate=True,
+        plugin_paths=None,
+        cache=None,
+        cache_key_maker=None,
+        auto_connect_event_hub=False,
+        schema_cache_path=None,
+        plugin_arguments=None,
+        timeout=60,
+        cookies=None,
+        headers=None,
+        strict_api=False,
+        **kwargs
     ):
         self.kwargs = kwargs
 
@@ -74,7 +86,7 @@ class CustomEventHubSession(ftrack_api.session.Session):
                 'in environment variable FTRACK_SERVER.'
             )
 
-        self._server_url = server_url
+        self._server_url = server_url.rstrip("/")
 
         if api_key is None:
             api_key = os.environ.get(
@@ -115,9 +127,7 @@ class CustomEventHubSession(ftrack_api.session.Session):
         new_api = hasattr(self.__class__, "record_operations")
 
         if new_api:
-            self._record_operations = collections.defaultdict(
-                lambda: True
-            )
+            self._record_operations = collections.defaultdict(lambda: True)
             self._auto_populate = collections.defaultdict(
                 lambda: auto_populate
             )
@@ -142,11 +152,38 @@ class CustomEventHubSession(ftrack_api.session.Session):
             if cache is not None:
                 self.cache.caches.append(cache)
 
-        if new_api:
-            self.merge_lock = threading.RLock()
-
+        self._thread_lock = threading.RLock()
         self._managed_request = None
         self._request = requests.Session()
+
+        if cookies:
+            if not isinstance(cookies, collections.abc.Mapping):
+                raise TypeError(
+                    "The cookies argument is required to be a mapping."
+                )
+            self._request.cookies.update(cookies)
+
+        if headers:
+            if not isinstance(headers, collections.abc.Mapping):
+                raise TypeError(
+                    "The headers argument is required to be a mapping."
+                )
+
+            headers = dict(headers)
+
+        else:
+            headers = {}
+
+        if not isinstance(strict_api, bool):
+            raise TypeError(
+                "The strict_api argument is required to be a boolean."
+            )
+
+        headers.update({
+            "ftrack-strict-api": "true" if strict_api is True else "false"
+        })
+
+        self._request.headers.update(headers)
         self._request.auth = ftrack_api.session.SessionAuthentication(
             self._api_key, self._api_user
         )
@@ -165,6 +202,11 @@ class CustomEventHubSession(ftrack_api.session.Session):
         if auto_connect_event_hub:
             # Connect to event hub in background thread so as not to block main
             # session usage waiting for event hub connection.
+
+            # set the connection as initialising from the main thread so that
+            # we can queue up any potential published messages.
+            self._event_hub.init_connection()
+
             self._auto_connect_event_hub_thread = threading.Thread(
                 target=self._event_hub.connect
             )
@@ -203,12 +245,9 @@ class CustomEventHubSession(ftrack_api.session.Session):
         self._configure_locations()
         self.event_hub.publish(
             ftrack_api.event.base.Event(
-                topic='ftrack.api.session.ready',
-                data=dict(
-                    session=self
-                )
+                topic="ftrack.api.session.ready", data=dict(session=self)
             ),
-            synchronous=True
+            synchronous=True,
         )
 
     def _create_event_hub(self):
