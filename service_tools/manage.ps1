@@ -25,7 +25,7 @@ function Default-Func {
   Write-Host "--variant [variant] (Define settings variant. default: 'production')"
   Write-Host ""
   Write-Host "Runtime targets:"
-  Write-Host "  install      Install requirements to currently actie python (recommended to create venv)"
+  Write-Host "  install      Install requirements"
   Write-Host "  leecher      Start leecher of ftrack events"
   Write-Host "  processor    Main processing logic"
   Write-Host "  transmitter  AYON to ftrack sync"
@@ -36,28 +36,27 @@ function Default-Func {
 }
 
 function Install-Requirements {
-  # TODO Install/verify venv is created
-  & python -m pip install -r "$($script_dir)\requirements.txt"
+  & uv sync
 }
 
 function Start-Leecher {
-  & python "$($script_dir)\main.py" --service leecher @arguments
+  & uv run "$($script_dir)\main.py" --service leecher @arguments
 }
 
 function Start-Processor {
-  & python "$($script_dir)\main.py" --service processor @arguments
+  & uv run "$($script_dir)\main.py" --service processor @arguments
 }
 
 function Start-Transmitter {
-  & python "$($script_dir)\main.py" --service transmitter @arguments
+  & uv run "$($script_dir)\main.py" --service transmitter @arguments
 }
 
 function Start-Leecher-Processor {
-  & python "$($script_dir)\main.py" --service ftrack2ayon @arguments
+  & uv run "$($script_dir)\main.py" --service ftrack2ayon @arguments
 }
 
 function Start-All {
-  & python "$($script_dir)\main.py" --service all @arguments
+  & uv run "$($script_dir)\main.py" --service all @arguments
 }
 
 function Load-Env {
@@ -71,16 +70,6 @@ function Load-Env {
     }
   }
 }
-
-function Activate-Venv {
-  # Make sure venv is created
-  $venv_path = "$($script_dir)\venv"
-  if (-not(Test-Path $venv_path)) {
-    & python -m venv $venv_path
-  }
-  & "$($venv_path)\Scripts\activate.ps1"
-}
-
 function main {
   if ($null -eq $FunctionName) {
     Default-Func
@@ -89,27 +78,22 @@ function main {
   $env:AYON_ADDON_NAME = "ftrack"
   $env:AYON_ADDON_VERSION = $ADDON_VERSION
   Load-Env
-  Activate-Venv
 
-  try {
-    if ($FunctionName -eq "install") {
-      Install-Requirements
-    } elseif ($FunctionName -eq "leecher") {
-      Start-Leecher
-    } elseif ($FunctionName -eq "processor") {
-      Start-Processor
-    } elseif (($FunctionName -eq "transmitter") -or ($FunctionName -eq "ayon2ftrack")) {
-      Start-Transmitter
-    } elseif ($FunctionName -eq "ftrack2ayon") {
-      Start-Leecher-Processor
-    } elseif ($FunctionName -eq "services") {
-      Start-All
-    } else {
-      Write-Host "Unknown function ""$FunctionName"""
-      Default-Func
-    }
-  } finally {
-    & deactivate
+  if ($FunctionName -eq "install") {
+    Install-Requirements
+  } elseif ($FunctionName -eq "leecher") {
+    Start-Leecher
+  } elseif ($FunctionName -eq "processor") {
+    Start-Processor
+  } elseif (($FunctionName -eq "transmitter") -or ($FunctionName -eq "ayon2ftrack")) {
+    Start-Transmitter
+  } elseif ($FunctionName -eq "ftrack2ayon") {
+    Start-Leecher-Processor
+  } elseif ($FunctionName -eq "services") {
+    Start-All
+  } else {
+    Write-Host "Unknown function ""$FunctionName"""
+    Default-Func
   }
 }
 
