@@ -38,19 +38,19 @@ install:
 leecher:
 		export AYON_ADDON_NAME="ftrack" && \
 		export AYON_ADDON_VERSION=$(VERSION) && \
-		. $(CURDIR)/venv/bin/activate && \
+		. $(CURDIR)/.venv/bin/activate && \
 		uv run "$(CURDIR)/main.py" --service leecher $(ARGS)
 
 processor:
 		export AYON_ADDON_NAME="ftrack" && \
 		export AYON_ADDON_VERSION=$(VERSION) && \
-		. $(CURDIR)/venv/bin/activate && \
+		. $(CURDIR)/.venv/bin/activate && \
 		uv run "$(CURDIR)/main.py" --service processor $(ARGS)
 
 transmitter:
 		export AYON_ADDON_NAME="ftrack" && \
 		export AYON_ADDON_VERSION=$(VERSION) && \
-		. $(CURDIR)/venv/bin/activate && \
+		. $(CURDIR)/.venv/bin/activate && \
 		uv run "$(CURDIR)/main.py" --service transmitter $(ARGS)
 
 ayon2ftrack: transmitter
@@ -58,13 +58,13 @@ ayon2ftrack: transmitter
 ftrack2ayon:
 		export AYON_ADDON_NAME="ftrack" && \
 		export AYON_ADDON_VERSION=$(VERSION) && \
-		. $(CURDIR)/venv/bin/activate && \
+		. $(CURDIR)/.venv/bin/activate && \
 		python "$(CURDIR)/main.py" --service ftrack2ayon $(ARGS)
 
 services:
 		export AYON_ADDON_NAME="ftrack" && \
 		export AYON_ADDON_VERSION=$(VERSION) && \
-		. $(CURDIR)/venv/bin/activate && \
+		. $(CURDIR)/.venv/bin/activate && \
 		python "$(CURDIR)/main.py" --service all $(ARGS)
 
 info: help
