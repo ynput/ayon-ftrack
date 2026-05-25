@@ -4,6 +4,7 @@ ifneq (,$(wildcard ./.env))
 endif
 
 VERSION=$(shell python -c "import os;import sys;content={};f=open('$(CURDIR)/../package.py');exec(f.read(),content);f.close();print(content['version'])")
+ARGS ?=
 
 define HELP_INFO
 
@@ -38,19 +39,19 @@ leecher:
 		export AYON_ADDON_NAME="ftrack" && \
 		export AYON_ADDON_VERSION=$(VERSION) && \
 		. $(CURDIR)/venv/bin/activate && \
-		uv run "$(CURDIR)/main.py" --service leecher $@
+		uv run "$(CURDIR)/main.py" --service leecher $(ARGS)
 
 processor:
 		export AYON_ADDON_NAME="ftrack" && \
 		export AYON_ADDON_VERSION=$(VERSION) && \
 		. $(CURDIR)/venv/bin/activate && \
-		uv run "$(CURDIR)/main.py" --service processor $@
+		uv run "$(CURDIR)/main.py" --service processor $(ARGS)
 
 transmitter:
 		export AYON_ADDON_NAME="ftrack" && \
 		export AYON_ADDON_VERSION=$(VERSION) && \
 		. $(CURDIR)/venv/bin/activate && \
-		uv run "$(CURDIR)/main.py" --service transmitter $@
+		uv run "$(CURDIR)/main.py" --service transmitter $(ARGS)
 
 ayon2ftrack: transmitter
 
@@ -58,13 +59,13 @@ ftrack2ayon:
 		export AYON_ADDON_NAME="ftrack" && \
 		export AYON_ADDON_VERSION=$(VERSION) && \
 		. $(CURDIR)/venv/bin/activate && \
-		python "$(CURDIR)/main.py" --service ftrack2ayon $@
+		python "$(CURDIR)/main.py" --service ftrack2ayon $(ARGS)
 
 services:
 		export AYON_ADDON_NAME="ftrack" && \
 		export AYON_ADDON_VERSION=$(VERSION) && \
 		. $(CURDIR)/venv/bin/activate && \
-		python "$(CURDIR)/main.py" --service all $@
+		python "$(CURDIR)/main.py" --service all $(ARGS)
 
 info: help
 default: help
