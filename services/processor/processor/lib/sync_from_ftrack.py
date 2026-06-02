@@ -1170,7 +1170,7 @@ class SyncFromFtrack:
                 if ayon_user:
                     new_assignees.add(ayon_user)
 
-            ayon_task.assignees = list(new_assignees)
+            ayon_task.assignees = new_assignees
 
     def update_attributes_from_ftrack(
         self,

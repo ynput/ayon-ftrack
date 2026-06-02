@@ -15,6 +15,11 @@ IGNORE_TOPICS = {
     "ftrack.meta.connected",
     "ftrack.meta.disconnected",
 }
+IGNORED_ENTITY_TYPES = {
+    "socialfeed",
+    "socialnotification",
+    "team",
+}
 
 log = logging.getLogger(__name__)
 
@@ -31,6 +36,18 @@ def callback(event):
         return
 
     event_data = event._data
+    event_entities = event_data["data"].get("entities") or []
+    # Allow custom events
+    is_valid = True
+    # Check if there is at least one entity with non-ignored type.
+    for entity in event_entities:
+        is_valid = entity["entityType"] not in IGNORED_ENTITY_TYPES
+        if is_valid:
+            break
+
+    if not is_valid:
+        return
+
     description = create_event_description(event_data)
 
     try:
