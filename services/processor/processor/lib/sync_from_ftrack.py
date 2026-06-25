@@ -1778,6 +1778,8 @@ class SyncFromFtrack:
             list_type = "version"
             if ft_list["system_type"] != "assetversion":
                 list_type = list_type_by_id.get(ftrack_id)
+                if not list_type:
+                    continue
 
             # Check if AYON list type matches ftrack list type
             if ay_list is not None:
@@ -1853,7 +1855,7 @@ class SyncFromFtrack:
         self,
         ft_list_items: list["FtrackEntity"],
         list_type: str,
-        ayon_list: dict[str, Any],
+        ayon_list: dict[str, Any] | None,
         ay_id_by_ft_id: dict[str, str],
     ) -> tuple[set[str], set[str]]:
         to_add = set()
