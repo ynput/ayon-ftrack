@@ -1550,7 +1550,7 @@ class SyncFromFtrack:
             for asset in ft_session.query(
                 "select id, context_id, name from Asset"
                 f" where context_id in ({joined_ids})"
-            ):
+            ).all():
                 asset_id = asset["id"]
                 context_id = asset["context_id"]
                 assets_by_id[asset_id] = asset
@@ -1569,7 +1569,7 @@ class SyncFromFtrack:
             for asset_version in ft_session.query(
                 "select id, asset_id, version, status_id from AssetVersion"
                 f" where asset_id in ({joined_ids})"
-            ):
+            ).all():
                 av_id = asset_version["id"]
                 asset_id = asset_version["asset_id"]
                 asset_version_by_id[av_id] = asset_version
