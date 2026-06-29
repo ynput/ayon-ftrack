@@ -1878,6 +1878,17 @@ class SyncFromFtrack:
             if entity and entity.entity_type == list_type:
                 to_add.add(ay_id)
 
+        # Make sure the versions do exist
+        if list_type == "version":
+            to_add = {
+                version["id"]
+                for version in ayon_api.get_versions(
+                    self.project_name,
+                    version_ids=to_add,
+                    fields={"id"},
+                )
+            }
+
         if ayon_list:
             for item in ayon_list["items"]:
                 entity_id = item["entityId"]
