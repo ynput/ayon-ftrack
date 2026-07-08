@@ -1,3 +1,4 @@
+from __future__ import annotations
 import re
 import collections
 import time
@@ -1550,7 +1551,7 @@ class SyncFromFtrack:
             for asset in ft_session.query(
                 "select id, context_id, name from Asset"
                 f" where context_id in ({joined_ids})"
-            ):
+            ).all():
                 asset_id = asset["id"]
                 context_id = asset["context_id"]
                 assets_by_id[asset_id] = asset
@@ -1569,7 +1570,7 @@ class SyncFromFtrack:
             for asset_version in ft_session.query(
                 "select id, asset_id, version, status_id from AssetVersion"
                 f" where asset_id in ({joined_ids})"
-            ):
+            ).all():
                 av_id = asset_version["id"]
                 asset_id = asset_version["asset_id"]
                 asset_version_by_id[av_id] = asset_version
@@ -1778,6 +1779,8 @@ class SyncFromFtrack:
             list_type = "version"
             if ft_list["system_type"] != "assetversion":
                 list_type = list_type_by_id.get(ftrack_id)
+                if not list_type:
+                    continue
 
             # Check if AYON list type matches ftrack list type
             if ay_list is not None:
@@ -1853,7 +1856,7 @@ class SyncFromFtrack:
         self,
         ft_list_items: list["FtrackEntity"],
         list_type: str,
-        ayon_list: dict[str, Any],
+        ayon_list: dict[str, Any] | None,
         ay_id_by_ft_id: dict[str, str],
     ) -> tuple[set[str], set[str]]:
         to_add = set()
@@ -1874,6 +1877,17 @@ class SyncFromFtrack:
             entity = self._entity_hub.get_entity_by_id(ay_id)
             if entity and entity.entity_type == list_type:
                 to_add.add(ay_id)
+
+        # Make sure the versions do exist
+        if list_type == "version":
+            to_add = {
+                version["id"]
+                for version in ayon_api.get_versions(
+                    self.project_name,
+                    version_ids=to_add,
+                    fields={"id"},
+                )
+            }
 
         if ayon_list:
             for item in ayon_list["items"]:
