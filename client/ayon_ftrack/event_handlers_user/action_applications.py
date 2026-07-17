@@ -226,6 +226,10 @@ class AppplicationsAction(BaseAction):
 
             addon_name = action["addonName"]
             addon_version = action["addonVersion"]
+            icon_def = action.get("icon")
+            icon = None
+            if icon_def:
+                icon = self._convert_icon(icon_def)
             items.append({
                 "label": group_label,
                 "variant": variant_label,
@@ -236,7 +240,7 @@ class AppplicationsAction(BaseAction):
                     addon_version,
                     identifier,
                 )),
-                "icon": self._convert_icon(action["icon"]),
+                "icon": icon,
             })
         return items
 
