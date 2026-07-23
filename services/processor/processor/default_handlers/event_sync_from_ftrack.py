@@ -1457,7 +1457,8 @@ class SyncProcess:
 
         new_task_types = []
         project_schema = self.ft_project["project_schema"]
-        for task_type in project_schema["task_type_schema"]["types"]:
+        task_types = project_schema["task_type_schema"]["types"]
+        for task_type in sorted(task_types, key=lambda o: o["sort"]):
             task_type_name = task_type["name"]
             if task_type_name in src_task_types:
                 new_task_types.append(src_task_types[task_type_name])

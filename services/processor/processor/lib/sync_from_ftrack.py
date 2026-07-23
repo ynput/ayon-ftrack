@@ -730,7 +730,7 @@ class SyncFromFtrack:
                 new_folder_types.append({"name": name})
 
         new_task_types = []
-        for task_type in task_types:
+        for task_type in sorted(task_types, key=lambda o: o["sort"]):
             name = task_type["name"]
             src_task_type = src_task_types.get(name.lower())
             if src_task_type is not None:
