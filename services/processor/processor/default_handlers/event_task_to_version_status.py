@@ -225,10 +225,6 @@ class TaskToVersionStatus(BaseEventHandler):
                         new_asset_version_status = _status
                         break
 
-            if not new_asset_version_status:
-                new_asset_version_status = av_statuses_by_low_name.get(
-                    task_status_name_low
-                )
             # Skip if tasks status is not available to AssetVersion
             if not new_asset_version_status:
                 self.log.debug((
