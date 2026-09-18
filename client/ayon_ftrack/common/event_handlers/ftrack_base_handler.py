@@ -570,6 +570,7 @@ class BaseHandler(metaclass=ABCMeta):
         project_entity = self.get_project_entity_from_event(
             session, event, project_id
         )
+        project_name = None
         if project_entity:
             project_name = project_entity["full_name"]
         project_id_mapping[project_id] = project_name
