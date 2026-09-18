@@ -214,10 +214,9 @@ class TaskToVersionStatus(BaseEventHandler):
             task_path = self._get_ent_path(task_entity)
 
             task_status_name = task_status_name_by_id[status_id]
-            task_status_name_low = task_status_name.lower()
 
             new_asset_version_status = None
-            mapped_status_names = status_mapping.get(task_status_name_low)
+            mapped_status_names = status_mapping.get(task_status_name.lower())
             if mapped_status_names:
                 for status_name in mapped_status_names:
                     _status = av_statuses_by_low_name.get(status_name.lower())
@@ -225,10 +224,6 @@ class TaskToVersionStatus(BaseEventHandler):
                         new_asset_version_status = _status
                         break
 
-            if not new_asset_version_status:
-                new_asset_version_status = av_statuses_by_low_name.get(
-                    task_status_name_low
-                )
             # Skip if tasks status is not available to AssetVersion
             if not new_asset_version_status:
                 self.log.debug((
@@ -236,6 +231,8 @@ class TaskToVersionStatus(BaseEventHandler):
                 ).format(task_status_name))
                 continue
 
+            new_status_id = new_asset_version_status["id"]
+            new_status_name = new_asset_version_status["name"]
             last_asset_versions = last_asset_versions_by_task_id[task_id]
             for asset_version in last_asset_versions:
                 version = asset_version["version"]
@@ -252,18 +249,11 @@ class TaskToVersionStatus(BaseEventHandler):
                 )
 
                 # Skip if current AssetVersion's status is same
-                status_id = asset_version["status_id"]
-                current_status_name = av_statuses_by_id[status_id]["name"]
-                if current_status_name.lower() == task_status_name_low:
-                    self.log.debug((
-                        "AssetVersion already has set status \"{}\". \"{}\""
-                    ).format(current_status_name, av_ent_path))
-                    continue
-
-                new_status_id = new_asset_version_status["id"]
-                new_status_name = new_asset_version_status["name"]
-                # Skip if status is already same
                 if asset_version["status_id"] == new_status_id:
+                    self.log.debug(
+                        "AssetVersion already has set status"
+                        f" \"{new_status_name}\". \"{av_ent_path}\""
+                    )
                     continue
 
                 # Change the status
