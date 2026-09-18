@@ -249,16 +249,11 @@ class TaskToVersionStatus(BaseEventHandler):
                 )
 
                 # Skip if current AssetVersion's status is same
-                status_id = asset_version["status_id"]
-                current_status_name = av_statuses_by_id[status_id]["name"]
-                if current_status_name.lower() == new_status_name.lower():
-                    self.log.debug((
-                        "AssetVersion already has set status \"{}\". \"{}\""
-                    ).format(current_status_name, av_ent_path))
-                    continue
-
-                # Skip if status is already same
                 if asset_version["status_id"] == new_status_id:
+                    self.log.debug(
+                        "AssetVersion already has set status"
+                        f" \"{new_status_name}\". \"{av_ent_path}\""
+                    )
                     continue
 
                 # Change the status
