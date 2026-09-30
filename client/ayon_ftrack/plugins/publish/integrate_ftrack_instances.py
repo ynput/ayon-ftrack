@@ -675,11 +675,19 @@ class IntegrateFtrackInstance(plugin.FtrackPublishInstancePlugin):
         fps = stream_fps or repre_fps or instance_fps
 
         # Prepare frame ranges
-        frame_start = repre.get("frameStartFtrack")
-        frame_end = repre.get("frameEndFtrack")
-        if frame_start is None or frame_end is None:
-            frame_start = instance.data["frameStart"]
-            frame_end = instance.data["frameEnd"]
+        frame_start = frame_end = 0
+        for start_key, end_key, src_data in (
+            ("frameStartFtrack", "frameEndFtrack", repre),
+            ("frameStart", "frameEnd", repre),
+            ("frameStart", "frameEnd", instance.data),
+        ):
+            _frame_start = src_data.get(start_key)
+            _frame_end = src_data.get(end_key)
+            if _frame_start is not None and _frame_end is not None:
+                frame_start = _frame_start
+                frame_end = _frame_end
+                break
+
         duration = (frame_end - frame_start) + 1
 
         for key, value in [
