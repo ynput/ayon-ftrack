@@ -103,6 +103,11 @@ class VersionToTaskStatus(BaseEventHandler):
                 self.join_query_keys(asset_version_ids)
             )
         ).all()
+        if only_last_version:
+            _asset_version_entities = self.filter_last_asset_versions(
+                session, _asset_version_entities
+            )
+
         if not _asset_version_entities:
             return
 
