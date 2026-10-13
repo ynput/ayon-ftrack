@@ -172,6 +172,14 @@ class SyncStatusTaskToVersion(BaseSettingsModel):
 class SyncStatusVersionToTask(BaseSettingsModel):
     _isGroup = True
     enabled: bool = True
+    only_last_version: bool = SettingsField(
+        False,
+        title="Only for latest version",
+        description=(
+            "Propagate status to the task only if the AssetVersion is the "
+            "latest version on its parent asset."
+        ),
+    )
     mapping: list[DictWithStrList] = SettingsField(
         title="Status mapping",
         default_factory=list,
