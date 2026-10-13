@@ -124,16 +124,6 @@ class VersionToTaskStatus(BaseEventHandler):
             asset_version_entities.append(asset_version)
             task_ids.add(asset_version["task_id"])
 
-        if only_last_version:
-            asset_version_entities = self.filter_last_asset_versions(
-                session, asset_version_entities
-            )
-            task_ids = {
-                asset_version["task_id"]
-                for asset_version in asset_version_entities
-            }
-        
-
         # Skipt if `task_ids` are empty
         if not task_ids:
             return
