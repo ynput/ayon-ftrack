@@ -32,3 +32,5 @@ class CollectFtrackJobEnvVars(pyblish.api.ContextPlugin):
             self.log.debug(
                 f"Collected job env keys: {', '.join(collected_keys)}"
             )
+        else:
+            self.log.debug("No ftrack job env keys were collected.")
