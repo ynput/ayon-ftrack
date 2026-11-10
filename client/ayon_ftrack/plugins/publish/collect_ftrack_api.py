@@ -238,10 +238,7 @@ class CollectFtrackApi(plugin.FtrackPublishContextPlugin):
         folders = ayon_api.get_folders(
             project_entity["full_name"],
             folder_paths=folder_paths_s,
-            fields={
-                "path",
-                f"attrib.{FTRACK_ID_ATTRIB}",
-            },
+            fields={"path", "attrib"},
             own_attributes=True
         )
         folders_by_path = {
@@ -254,7 +251,10 @@ class CollectFtrackApi(plugin.FtrackPublishContextPlugin):
         for folder_path in folder_paths:
             folder = folders_by_path.get(folder_path)
             if folder:
-                ftrack_id = folder["ownAttrib"].get(FTRACK_ID_ATTRIB)
+                own_attributes = folder.get("own_attributes")
+                if own_attributes is None:
+                    own_attributes = folder.get("ownAttrib") or {}
+                ftrack_id = own_attributes.get(FTRACK_ID_ATTRIB)
                 if ftrack_id:
                     folder_path_by_ftrack_id[ftrack_id] = folder_path
                     continue
