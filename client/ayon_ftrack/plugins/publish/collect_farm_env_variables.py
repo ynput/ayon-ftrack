@@ -17,6 +17,7 @@ class CollectFtrackJobEnvVars(pyblish.api.ContextPlugin):
 
     def process(self, context):
         env = context.data.setdefault(FARM_JOB_ENV_DATA_KEY, {})
+        collected_keys = []
         for key in [
             "FTRACK_SERVER",
             "FTRACK_API_USER",
@@ -24,5 +25,12 @@ class CollectFtrackJobEnvVars(pyblish.api.ContextPlugin):
         ]:
             value = os.getenv(key)
             if value:
-                self.log.debug(f"Setting job env: {key}: {value}")
                 env[key] = value
+                collected_keys.append(key)
+
+        if collected_keys:
+            self.log.debug(
+                f"Collected job env keys: {', '.join(collected_keys)}"
+            )
+        else:
+            self.log.debug("No ftrack job env keys were collected.")
